@@ -6,8 +6,76 @@ import model.User;
 import model.User.Gender;
 
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class UserDAO {
+
+    public List<User> findAll() throws SQLException {
+        String sql = "SELECT u.*, r.role_name FROM users u "
+                   + "JOIN roles r ON u.role_id = r.role_id "
+                   + "ORDER BY u.user_id";
+        List<User> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
+    public User findByUsername(String username) throws SQLException {
+        String sql = "SELECT u.*, r.role_name FROM users u "
+                   + "JOIN roles r ON u.role_id = r.role_id "
+                   + "WHERE u.username = ?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, username);
+            rs = ps.executeQuery();
+            if (rs.next()) return mapRow(rs);
+        } finally {
+            close(conn, ps, rs);
+        }
+        return null;
+    }
+
+    public int insert(User user) throws SQLException {
+        String sql = "INSERT INTO users (username, password_hash, full_name, email, phone, "
+                   + "gender, date_of_birth, address, role_id, is_active) "
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            ps.setString(1, user.getUsername());
+            ps.setString(2, user.getPasswordHash());
+            ps.setString(3, user.getFullName());
+            ps.setString(4, user.getEmail());
+            ps.setString(5, user.getPhone());
+            ps.setString(6, user.getGender() != null ? user.getGender().name() : Gender.Other.name());
+            ps.setObject(7, user.getDateOfBirth());
+            ps.setString(8, user.getAddress());
+            ps.setInt(9, user.getRoleId());
+            ps.executeUpdate();
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) return keys.getInt(1);
+            }
+        } finally {
+            close(conn, ps, null);
+        }
+        return -1;
+    }
 
     public User findByUsernameAndPassword(String username, String password) throws SQLException {
         String sql = "SELECT u.*, r.role_name FROM users u "
