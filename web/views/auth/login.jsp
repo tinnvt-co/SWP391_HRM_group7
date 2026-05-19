@@ -65,6 +65,18 @@
     <div class="card-body p-4">
         <h5 class="fw-semibold mb-4 text-center text-secondary">Sign in to your account</h5>
 
+        <c:if test="${param.reset == 'success'}">
+            <div class="alert alert-success d-flex align-items-center gap-2 py-2">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Password reset successfully. Please sign in.</span>
+            </div>
+        </c:if>
+        <c:if test="${param.changed == 'success'}">
+            <div class="alert alert-success d-flex align-items-center gap-2 py-2">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Password changed successfully. Please sign in again.</span>
+            </div>
+        </c:if>
         <c:if test="${not empty error}">
             <div class="alert alert-danger d-flex align-items-center gap-2 py-2" role="alert">
                 <i class="bi bi-exclamation-circle-fill"></i>
