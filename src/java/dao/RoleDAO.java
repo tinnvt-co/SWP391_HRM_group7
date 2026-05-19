@@ -60,6 +60,22 @@ public class RoleDAO {
         return null;
     }
 
+    public boolean update(Role role) throws SQLException {
+        String sql = "UPDATE roles SET role_name = ?, description = ?, updated_at = NOW() WHERE role_id = ?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, role.getRoleName());
+            ps.setString(2, role.getDescription());
+            ps.setInt(3, role.getRoleId());
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
     private Role mapRow(ResultSet rs) throws SQLException {
         Role r = new Role();
         r.setRoleId(rs.getInt("role_id"));
