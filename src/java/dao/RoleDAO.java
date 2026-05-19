@@ -60,6 +60,52 @@ public class RoleDAO {
         return null;
     }
 
+    public boolean setActiveStatus(int roleId, boolean isActive) throws SQLException {
+        String sql = "UPDATE roles SET is_active = ?, updated_at = NOW() WHERE role_id = ?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setBoolean(1, isActive);
+            ps.setInt(2, roleId);
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
+    public void updatePermissions(int roleId, List<Integer> permissionIds) throws SQLException {
+        String deleteSql = "DELETE FROM role_permissions WHERE role_id = ?";
+        String insertSql = "INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)";
+        Connection conn = null;
+        PreparedStatement del = null;
+        PreparedStatement ins = null;
+        try {
+            conn = DBContext.getConnection();
+            conn.setAutoCommit(false);
+            del = conn.prepareStatement(deleteSql);
+            del.setInt(1, roleId);
+            del.executeUpdate();
+            if (permissionIds != null && !permissionIds.isEmpty()) {
+                ins = conn.prepareStatement(insertSql);
+                for (int pid : permissionIds) {
+                    ins.setInt(1, roleId);
+                    ins.setInt(2, pid);
+                    ins.addBatch();
+                }
+                ins.executeBatch();
+            }
+            conn.commit();
+        } catch (SQLException e) {
+            if (conn != null) conn.rollback();
+            throw e;
+        } finally {
+            if (ins != null) try { ins.close(); } catch (SQLException ignored) {}
+            close(conn, del, null);
+        }
+    }
+
     public boolean update(Role role) throws SQLException {
         String sql = "UPDATE roles SET role_name = ?, description = ?, updated_at = NOW() WHERE role_id = ?";
         Connection conn = null;
