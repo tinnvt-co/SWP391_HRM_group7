@@ -1,6 +1,7 @@
 <%@ page contentType="text/html;charset=UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<c:set var="activePage" value="home" scope="request"/>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,113 +13,46 @@
     <style>
         body { background-color: #f4f6f9; }
         .sidebar {
-            width: 240px;
-            min-height: calc(100vh - 56px);
-            background-color: #1a3c5e;
-            position: fixed;
-            top: 56px;
-            left: 0;
-            padding-top: 1rem;
-            z-index: 100;
+            width: 240px; min-height: calc(100vh - 56px);
+            background-color: #1a3c5e; position: fixed;
+            top: 56px; left: 0; padding-top: 1rem; z-index: 100;
         }
         .sidebar .nav-link {
-            color: rgba(255,255,255,0.75);
-            padding: 0.6rem 1.25rem;
-            border-radius: 6px;
-            margin: 2px 10px;
-            font-size: 0.9rem;
-            transition: all 0.2s;
+            color: rgba(255,255,255,0.75); padding: 0.6rem 1.25rem;
+            border-radius: 6px; margin: 2px 10px; font-size: 0.9rem; transition: all 0.2s;
         }
         .sidebar .nav-link:hover, .sidebar .nav-link.active {
-            color: #fff;
-            background-color: rgba(255,255,255,0.12);
+            color: #fff; background-color: rgba(255,255,255,0.12);
         }
         .sidebar .nav-link i { width: 20px; }
         .sidebar-label {
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: rgba(255,255,255,0.4);
-            padding: 0.75rem 1.25rem 0.25rem;
+            font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;
+            color: rgba(255,255,255,0.4); padding: 0.75rem 1.25rem 0.25rem;
         }
         .main-content { margin-left: 240px; padding: 2rem; }
         .stat-card {
-            border: none;
-            border-radius: 12px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.07);
-            transition: transform 0.2s;
+            border: none; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.07); transition: transform 0.2s;
         }
         .stat-card:hover { transform: translateY(-3px); }
         .stat-icon {
-            width: 52px;
-            height: 52px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.4rem;
+            width: 52px; height: 52px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center; font-size: 1.4rem;
         }
         .welcome-card {
-            border: none;
-            border-radius: 16px;
+            border: none; border-radius: 16px;
             background: linear-gradient(135deg, #1a3c5e, #2d6a9f);
-            color: white;
-            box-shadow: 0 4px 20px rgba(26,60,94,0.3);
+            color: white; box-shadow: 0 4px 20px rgba(26,60,94,0.3);
         }
         .role-badge {
-            background-color: rgba(255,255,255,0.2);
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 500;
+            background-color: rgba(255,255,255,0.2); color: white;
+            padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 500;
         }
     </style>
 </head>
 <body>
-
 <%@ include file="/views/common/navbar.jsp" %>
-
-<div class="sidebar">
-    <div class="sidebar-label">Navigation</div>
-    <ul class="nav flex-column">
-        <li class="nav-item">
-            <a class="nav-link active" href="${pageContext.request.contextPath}/home">
-                <i class="bi bi-house-door me-2"></i>Dashboard
-            </a>
-        </li>
-        <c:if test="${fn:contains(permissions, 'VIEW_USER_LIST')}">
-            <li class="nav-item">
-                <a class="nav-link" href="${pageContext.request.contextPath}/users">
-                    <i class="bi bi-people me-2"></i>Employees
-                </a>
-            </li>
-        </c:if>
-        <c:if test="${fn:contains(permissions, 'VIEW_ROLE_LIST')}">
-            <li class="nav-item">
-                <a class="nav-link" href="${pageContext.request.contextPath}/roles">
-                    <i class="bi bi-shield-check me-2"></i>Roles & Permissions
-                </a>
-            </li>
-        </c:if>
-        <div class="sidebar-label mt-2">Account</div>
-        <li class="nav-item">
-            <a class="nav-link" href="${pageContext.request.contextPath}/profile">
-                <i class="bi bi-person me-2"></i>My Profile
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="${pageContext.request.contextPath}/change-password">
-                <i class="bi bi-key me-2"></i>Change Password
-            </a>
-        </li>
-        <li class="nav-item mt-2">
-            <a class="nav-link text-danger" href="${pageContext.request.contextPath}/logout">
-                <i class="bi bi-box-arrow-right me-2"></i>Sign Out
-            </a>
-        </li>
-    </ul>
-</div>
+<%@ include file="/views/common/sidebar.jsp" %>
 
 <div class="main-content">
 
@@ -142,10 +76,7 @@
                     <div class="stat-icon" style="background:#e3f0fb;">
                         <i class="bi bi-people-fill text-primary"></i>
                     </div>
-                    <div>
-                        <div class="text-muted small">Employees</div>
-                        <div class="fw-bold fs-5">—</div>
-                    </div>
+                    <div><div class="text-muted small">Employees</div><div class="fw-bold fs-5">—</div></div>
                 </div>
             </div>
         </div>
@@ -155,10 +86,7 @@
                     <div class="stat-icon" style="background:#e6f9f0;">
                         <i class="bi bi-shield-check text-success"></i>
                     </div>
-                    <div>
-                        <div class="text-muted small">Roles</div>
-                        <div class="fw-bold fs-5">—</div>
-                    </div>
+                    <div><div class="text-muted small">Roles</div><div class="fw-bold fs-5">—</div></div>
                 </div>
             </div>
         </div>
@@ -168,10 +96,7 @@
                     <div class="stat-icon" style="background:#fff8e1;">
                         <i class="bi bi-calendar-check text-warning"></i>
                     </div>
-                    <div>
-                        <div class="text-muted small">Attendance</div>
-                        <div class="fw-bold fs-5">—</div>
-                    </div>
+                    <div><div class="text-muted small">Attendance</div><div class="fw-bold fs-5">—</div></div>
                 </div>
             </div>
         </div>
@@ -181,10 +106,7 @@
                     <div class="stat-icon" style="background:#fce8e8;">
                         <i class="bi bi-cash-coin text-danger"></i>
                     </div>
-                    <div>
-                        <div class="text-muted small">Payroll</div>
-                        <div class="fw-bold fs-5">—</div>
-                    </div>
+                    <div><div class="text-muted small">Payroll</div><div class="fw-bold fs-5">—</div></div>
                 </div>
             </div>
         </div>
@@ -210,7 +132,6 @@
     </div>
 
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
