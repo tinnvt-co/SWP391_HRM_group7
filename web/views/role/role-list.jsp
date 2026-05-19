@@ -52,6 +52,16 @@
             <i class="bi bi-check-circle-fill"></i><span>Role updated successfully.</span>
         </div>
     </c:if>
+    <c:if test="${param.toggled == 'success'}">
+        <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-check-circle-fill"></i><span>Role status updated successfully.</span>
+        </div>
+    </c:if>
+    <c:if test="${param.permsUpdated == 'success'}">
+        <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-check-circle-fill"></i><span>Role permissions updated successfully.</span>
+        </div>
+    </c:if>
 
     <div class="card border-0 shadow-sm rounded-3">
         <div class="card-body p-0">
@@ -95,11 +105,36 @@
                                                 <i class="bi bi-key me-1"></i>Permissions
                                             </a>
                                         </c:if>
+                                        <c:if test="${fn:contains(permissions, 'EDIT_ROLE_PERMISSIONS')}">
+                                            <a href="${pageContext.request.contextPath}/roles?action=editPerms&id=${r.roleId}"
+                                               class="btn btn-sm btn-outline-warning" title="Edit Permissions">
+                                                <i class="bi bi-pencil-square me-1"></i>Edit Perms
+                                            </a>
+                                        </c:if>
                                         <c:if test="${fn:contains(permissions, 'UPDATE_ROLE_INFORMATION')}">
                                             <a href="${pageContext.request.contextPath}/roles?action=edit&id=${r.roleId}"
                                                class="btn btn-sm btn-outline-primary" title="Edit Role">
                                                 <i class="bi bi-pencil me-1"></i>Edit
                                             </a>
+                                        </c:if>
+                                        <c:if test="${fn:contains(permissions, 'ACTIVE_DEACTIVE_ROLE')}">
+                                            <form method="post" action="${pageContext.request.contextPath}/roles?action=toggle"
+                                                  class="d-inline" onsubmit="return confirmToggle('${r.roleName}', ${r.active})">
+                                                <input type="hidden" name="roleId" value="${r.roleId}">
+                                                <input type="hidden" name="currentStatus" value="${r.active}">
+                                                <c:choose>
+                                                    <c:when test="${r.active}">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Deactivate">
+                                                            <i class="bi bi-toggle-on me-1"></i>Deactivate
+                                                        </button>
+                                                    </c:when>
+                                                    <c:otherwise>
+                                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Activate">
+                                                            <i class="bi bi-toggle-off me-1"></i>Activate
+                                                        </button>
+                                                    </c:otherwise>
+                                                </c:choose>
+                                            </form>
                                         </c:if>
                                     </div>
                                 </td>
@@ -120,5 +155,11 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function confirmToggle(roleName, isActive) {
+        const action = isActive ? 'deactivate' : 'activate';
+        return confirm('Are you sure you want to ' + action + ' role "' + roleName + '"?');
+    }
+</script>
 </body>
 </html>

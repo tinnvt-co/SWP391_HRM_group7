@@ -9,6 +9,25 @@ import java.util.List;
 
 public class PermissionDAO {
 
+    public List<Permission> findAll() throws SQLException {
+        String sql = "SELECT * FROM permissions ORDER BY permission_id";
+        List<Permission> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            if (rs != null) try { rs.close(); } catch (SQLException ignored) {}
+            if (ps != null) try { ps.close(); } catch (SQLException ignored) {}
+            DBContext.closeConnection(conn);
+        }
+        return list;
+    }
+
     public List<Permission> findByRoleId(int roleId) throws SQLException {
         String sql = "SELECT p.* FROM permissions p "
                    + "JOIN role_permissions rp ON p.permission_id = rp.permission_id "
