@@ -135,6 +135,43 @@ public class UserDAO {
         return null;
     }
 
+    public boolean update(User user) throws SQLException {
+        String sql = "UPDATE users SET full_name=?, email=?, phone=?, gender=?, "
+                   + "date_of_birth=?, address=?, role_id=?, updated_at=NOW() WHERE user_id=?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, user.getFullName());
+            ps.setString(2, user.getEmail());
+            ps.setString(3, user.getPhone());
+            ps.setString(4, user.getGender() != null ? user.getGender().name() : Gender.Other.name());
+            ps.setObject(5, user.getDateOfBirth());
+            ps.setString(6, user.getAddress());
+            ps.setInt(7, user.getRoleId());
+            ps.setInt(8, user.getUserId());
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
+    public boolean setActiveStatus(int userId, boolean isActive) throws SQLException {
+        String sql = "UPDATE users SET is_active=?, updated_at=NOW() WHERE user_id=?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setBoolean(1, isActive);
+            ps.setInt(2, userId);
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
     public boolean updatePassword(int userId, String newPassword) throws SQLException {
         String sql = "UPDATE users SET password_hash = ?, updated_at = NOW() WHERE user_id = ?";
         Connection conn = null;

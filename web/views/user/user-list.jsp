@@ -62,6 +62,21 @@
             <i class="bi bi-check-circle-fill"></i><span>User created successfully.</span>
         </div>
     </c:if>
+    <c:if test="${param.updated == 'success'}">
+        <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-check-circle-fill"></i><span>User updated successfully.</span>
+        </div>
+    </c:if>
+    <c:if test="${param.toggled == 'success'}">
+        <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-check-circle-fill"></i><span>User status updated successfully.</span>
+        </div>
+    </c:if>
+    <c:if test="${param.toggleError == 'self'}">
+        <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-exclamation-triangle-fill"></i><span>You cannot change your own active status.</span>
+        </div>
+    </c:if>
 
     <div class="card border-0 shadow-sm rounded-3">
         <div class="card-body p-0">
@@ -110,12 +125,40 @@
                                     </c:choose>
                                 </td>
                                 <td class="text-end pe-4">
-                                    <c:if test="${fn:contains(permissions, 'VIEW_USER_INFORMATION')}">
-                                        <a href="${pageContext.request.contextPath}/users?action=view&id=${u.userId}"
-                                           class="btn btn-sm btn-outline-primary">
-                                            <i class="bi bi-eye me-1"></i>View
-                                        </a>
-                                    </c:if>
+                                    <div class="d-flex justify-content-end gap-1">
+                                        <c:if test="${fn:contains(permissions, 'VIEW_USER_INFORMATION')}">
+                                            <a href="${pageContext.request.contextPath}/users?action=view&id=${u.userId}"
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-eye me-1"></i>View
+                                            </a>
+                                        </c:if>
+                                        <c:if test="${fn:contains(permissions, 'UPDATE_USER_INFORMATION')}">
+                                            <a href="${pageContext.request.contextPath}/users?action=edit&id=${u.userId}"
+                                               class="btn btn-sm btn-outline-secondary">
+                                                <i class="bi bi-pencil me-1"></i>Edit
+                                            </a>
+                                        </c:if>
+                                        <c:if test="${fn:contains(permissions, 'ACTIVE_DEACTIVE_USER')}">
+                                            <form method="post" action="${pageContext.request.contextPath}/users?action=toggle"
+                                                  class="d-inline"
+                                                  onsubmit="return confirm('${u.active ? 'Deactivate' : 'Activate'} user \'${u.fullName}\'?')">
+                                                <input type="hidden" name="userId" value="${u.userId}">
+                                                <input type="hidden" name="currentStatus" value="${u.active}">
+                                                <c:choose>
+                                                    <c:when test="${u.active}">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                            <i class="bi bi-toggle-on me-1"></i>Deactivate
+                                                        </button>
+                                                    </c:when>
+                                                    <c:otherwise>
+                                                        <button type="submit" class="btn btn-sm btn-outline-success">
+                                                            <i class="bi bi-toggle-off me-1"></i>Activate
+                                                        </button>
+                                                    </c:otherwise>
+                                                </c:choose>
+                                            </form>
+                                        </c:if>
+                                    </div>
                                 </td>
                             </tr>
                         </c:forEach>
