@@ -39,7 +39,7 @@ public class LoginServlet extends HttpServlet {
         String password = request.getParameter("password");
 
         if (username == null || username.isBlank() || password == null || password.isBlank()) {
-            request.setAttribute("error", "Vui lòng nhập đầy đủ tài khoản và mật khẩu.");
+            request.setAttribute("error", "Please enter your username and password.");
             request.getRequestDispatcher("/views/auth/login.jsp").forward(request, response);
             return;
         }
@@ -47,7 +47,7 @@ public class LoginServlet extends HttpServlet {
         try {
             User user = userDAO.findByUsernameAndPassword(username.trim(), password);
             if (user == null) {
-                request.setAttribute("error", "Tài khoản hoặc mật khẩu không đúng.");
+                request.setAttribute("error", "Invalid username or password.");
                 request.setAttribute("username", username);
                 request.getRequestDispatcher("/views/auth/login.jsp").forward(request, response);
                 return;
@@ -63,7 +63,8 @@ public class LoginServlet extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/home");
 
         } catch (SQLException e) {
-            request.setAttribute("error", "Hệ thống gặp lỗi, vui lòng thử lại.");
+            e.printStackTrace();
+            request.setAttribute("error", "System error, please try again.");
             request.getRequestDispatcher("/views/auth/login.jsp").forward(request, response);
         }
     }
