@@ -4,6 +4,7 @@ import dao.PasswordResetTokenDAO;
 import dao.UserDAO;
 import model.PasswordResetToken;
 import model.User;
+import service.MailService;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -21,6 +22,7 @@ public class ForgotPasswordServlet extends HttpServlet {
 
     private final UserDAO userDAO = new UserDAO();
     private final PasswordResetTokenDAO tokenDAO = new PasswordResetTokenDAO();
+    private final MailService mailService = new MailService();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -92,8 +94,17 @@ public class ForgotPasswordServlet extends HttpServlet {
                     + request.getContextPath()
                     + "/forgot-password?token=" + rawToken;
 
-            request.setAttribute("resetLink", resetLink);
-            request.setAttribute("success", "Reset link generated.");
+            try {
+                mailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), resetLink);
+            } catch (Exception mailEx) {
+                mailEx.printStackTrace();
+                request.setAttribute("error", "Could not send reset email. Please try again later.");
+                request.setAttribute("email", email);
+                request.getRequestDispatcher("/views/auth/forgot-password.jsp").forward(request, response);
+                return;
+            }
+
+            request.setAttribute("success", "A reset link has been sent to your email. Please check your inbox.");
             request.getRequestDispatcher("/views/auth/forgot-password.jsp").forward(request, response);
 
         } catch (SQLException e) {

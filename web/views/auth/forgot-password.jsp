@@ -59,15 +59,6 @@
             <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
                 <i class="bi bi-check-circle-fill"></i><span>${success}</span>
             </div>
-            <div class="reset-link-box mb-4">
-                <div class="d-flex align-items-center justify-content-between mb-1">
-                    <small class="text-muted fw-medium">Reset Link (valid 15 minutes)</small>
-                    <button class="btn btn-sm btn-outline-secondary py-0" onclick="copyLink()">
-                        <i class="bi bi-clipboard me-1"></i>Copy
-                    </button>
-                </div>
-                <a href="${resetLink}" id="resetLinkText">${resetLink}</a>
-            </div>
         </c:if>
 
         <c:if test="${empty success}">
@@ -100,15 +91,5 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    function copyLink() {
-        const link = document.getElementById('resetLinkText').href;
-        navigator.clipboard.writeText(link).then(() => {
-            const btn = event.target.closest('button');
-            btn.innerHTML = '<i class="bi bi-check me-1"></i>Copied';
-            setTimeout(() => btn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy', 2000);
-        });
-    }
-</script>
 </body>
 </html>
