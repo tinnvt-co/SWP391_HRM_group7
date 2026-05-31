@@ -42,6 +42,11 @@
             font-weight: 600;
         }
         .btn-login:hover { opacity: 0.88; }
+        .btn-google {
+            border-radius: 8px;
+            padding: 0.6rem;
+            font-weight: 600;
+        }
         .input-group-text {
             background-color: #f8f9fa;
             border-right: none;
@@ -112,6 +117,18 @@
                 <button type="submit" class="btn btn-primary btn-login text-white">
                     <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
                 </button>
+            </div>
+
+            <div class="d-flex align-items-center my-3">
+                <hr class="flex-grow-1">
+                <span class="px-2 small text-secondary">OR</span>
+                <hr class="flex-grow-1">
+            </div>
+
+            <div class="d-grid mb-3">
+                <a href="${pageContext.request.contextPath}/auth/google" class="btn btn-outline-secondary btn-google">
+                    <i class="bi bi-google me-2 text-danger"></i>Sign in with Google
+                </a>
             </div>
 
             <div class="d-flex justify-content-between align-items-center">

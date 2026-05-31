@@ -24,6 +24,7 @@ public class AuthFilter implements Filter {
             "/login",
             "/logout",
             "/forgot-password",
+            "/auth/google",
             "/assets/"
     );
 
