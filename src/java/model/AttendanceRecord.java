@@ -40,6 +40,7 @@ public class AttendanceRecord {
 
     private String employeeFullName;
     private String employeeCode;
+    private Integer employeeManagerUserId;
     private String verifiedByFullName;
 
     public AttendanceRecord() {}
@@ -91,6 +92,9 @@ public class AttendanceRecord {
 
     public String getEmployeeCode()                           { return employeeCode; }
     public void setEmployeeCode(String employeeCode)          { this.employeeCode = employeeCode; }
+
+    public Integer getEmployeeManagerUserId()                 { return employeeManagerUserId; }
+    public void setEmployeeManagerUserId(Integer m)           { this.employeeManagerUserId = m; }
 
     public String getVerifiedByFullName()                     { return verifiedByFullName; }
     public void setVerifiedByFullName(String name)            { this.verifiedByFullName = name; }

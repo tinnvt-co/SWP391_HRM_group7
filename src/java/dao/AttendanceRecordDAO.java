@@ -63,6 +63,90 @@ public class AttendanceRecordDAO {
         }
     }
 
+    public AttendanceRecord findById(int attendanceId) throws SQLException {
+        String sql = "SELECT a.*, u.full_name AS emp_full_name, e.employee_code, "
+                   + "       u.manager_id AS emp_manager_user_id, "
+                   + "       vu.full_name AS verified_by_name "
+                   + "FROM attendance_records a "
+                   + "JOIN employees e   ON a.employee_id = e.employee_id "
+                   + "JOIN users u       ON e.user_id     = u.user_id "
+                   + "LEFT JOIN users vu ON a.verified_by = vu.user_id "
+                   + "WHERE a.attendance_id = ?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, attendanceId);
+            rs = ps.executeQuery();
+            if (rs.next()) {
+                AttendanceRecord r = mapRow(rs);
+                int mgrId = rs.getInt("emp_manager_user_id");
+                r.setEmployeeManagerUserId(rs.wasNull() ? null : mgrId);
+                return r;
+            }
+        } finally {
+            close(conn, ps, rs);
+        }
+        return null;
+    }
+
+    public boolean update(AttendanceRecord r) throws SQLException {
+        String sql = "UPDATE attendance_records SET work_date=?, check_in_time=?, check_out_time=?, "
+                   + "working_hours=?, overtime_hours=?, attendance_status=?, note=?, "
+                   + "updated_at=NOW() "
+                   + "WHERE attendance_id=?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setDate(1, Date.valueOf(r.getWorkDate()));
+            ps.setObject(2, r.getCheckInTime() != null ? Time.valueOf(r.getCheckInTime()) : null);
+            ps.setObject(3, r.getCheckOutTime() != null ? Time.valueOf(r.getCheckOutTime()) : null);
+            ps.setBigDecimal(4, r.getWorkingHours());
+            ps.setBigDecimal(5, r.getOvertimeHours());
+            ps.setString(6, r.getAttendanceStatus().getDbValue());
+            ps.setString(7, r.getNote());
+            ps.setInt(8, r.getAttendanceId());
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
+    public boolean deleteById(int attendanceId) throws SQLException {
+        String sql = "DELETE FROM attendance_records WHERE attendance_id = ?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, attendanceId);
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
+    public boolean verify(int attendanceId, int verifierUserId) throws SQLException {
+        String sql = "UPDATE attendance_records SET verification_status='Verified', "
+                   + "verified_by=?, verified_at=NOW(), updated_at=NOW() "
+                   + "WHERE attendance_id=?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, verifierUserId);
+            ps.setInt(2, attendanceId);
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
     public List<AttendanceRecord> findByManagerScope(int managerUserId,
                                                      Integer employeeIdFilter,
                                                      LocalDate fromDate,

@@ -48,6 +48,13 @@ public class AttendanceServlet extends HttpServlet {
                     }
                     handleAddForm(request, response);
                 }
+                case "edit" -> {
+                    if (!hasPermission(request, "VERIFY_STAFF_ATTENDANCE")) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleEditForm(request, response);
+                }
                 default -> {
                     if (!hasPermission(request, "VIEW_ATTENDANCE")) {
                         response.sendError(HttpServletResponse.SC_FORBIDDEN);
@@ -76,6 +83,27 @@ public class AttendanceServlet extends HttpServlet {
                         return;
                     }
                     handleAdd(request, response);
+                }
+                case "edit" -> {
+                    if (!hasPermission(request, "VERIFY_STAFF_ATTENDANCE")) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleEdit(request, response);
+                }
+                case "delete" -> {
+                    if (!hasPermission(request, "VERIFY_STAFF_ATTENDANCE")) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleDelete(request, response);
+                }
+                case "verify" -> {
+                    if (!hasPermission(request, "VERIFY_STAFF_ATTENDANCE")) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleVerify(request, response);
                 }
                 default -> response.sendRedirect(request.getContextPath() + "/attendance");
             }
@@ -249,9 +277,7 @@ public class AttendanceServlet extends HttpServlet {
         r.setWorkingHours(workingHours);
         r.setOvertimeHours(overtimeHours);
         r.setAttendanceStatus(status);
-        r.setVerificationStatus(VerificationStatus.Verified);
-        r.setVerifiedBy(currentUser.getUserId());
-        r.setVerifiedAt(LocalDateTime.now());
+        r.setVerificationStatus(VerificationStatus.Pending);
         r.setNote(note);
 
         attendanceDAO.insert(r);
@@ -266,6 +292,211 @@ public class AttendanceServlet extends HttpServlet {
         request.setAttribute("statuses", AttendanceStatus.values());
         request.getRequestDispatcher("/views/attendance/add-attendance.jsp")
                .forward(request, response);
+    }
+
+    private void handleEditForm(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, ServletException, IOException {
+
+        AttendanceRecord existing = loadOwnedRecordOrError(request, response);
+        if (existing == null) return;
+
+        if (existing.getVerificationStatus() == VerificationStatus.Verified) {
+            response.sendRedirect(request.getContextPath()
+                    + "/attendance?error=already-verified");
+            return;
+        }
+
+        request.setAttribute("record", existing);
+        request.setAttribute("statuses", AttendanceStatus.values());
+        request.getRequestDispatcher("/views/attendance/edit-attendance.jsp")
+               .forward(request, response);
+    }
+
+    private void handleEdit(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, ServletException, IOException {
+
+        AttendanceRecord existing = loadOwnedRecordOrError(request, response);
+        if (existing == null) return;
+
+        if (existing.getVerificationStatus() == VerificationStatus.Verified) {
+            response.sendRedirect(request.getContextPath()
+                    + "/attendance?error=already-verified");
+            return;
+        }
+
+        String workDateStr  = trim(request.getParameter("workDate"));
+        String statusStr    = request.getParameter("attendanceStatus");
+        String checkInStr   = trim(request.getParameter("checkInTime"));
+        String checkOutStr  = trim(request.getParameter("checkOutTime"));
+        String overtimeStr  = trim(request.getParameter("overtimeHours"));
+        String note         = trim(request.getParameter("note"));
+
+        if (workDateStr.isEmpty() || statusStr == null || statusStr.isBlank()) {
+            forwardEditForm(request, response, existing,
+                    "Please fill in all required fields (date, status).");
+            return;
+        }
+
+        LocalDate workDate;
+        try { workDate = LocalDate.parse(workDateStr); }
+        catch (DateTimeParseException ex) {
+            forwardEditForm(request, response, existing, "Invalid work date.");
+            return;
+        }
+
+        if (workDate.isAfter(LocalDate.now())) {
+            forwardEditForm(request, response, existing, "Work date cannot be in the future.");
+            return;
+        }
+
+        AttendanceStatus status;
+        try { status = AttendanceStatus.valueOf(statusStr); }
+        catch (IllegalArgumentException ex) {
+            forwardEditForm(request, response, existing, "Invalid attendance status.");
+            return;
+        }
+
+        LocalTime checkIn  = parseTimeOrNull(checkInStr);
+        LocalTime checkOut = parseTimeOrNull(checkOutStr);
+
+        boolean requiresTime =
+                status == AttendanceStatus.Present || status == AttendanceStatus.Late;
+        if (requiresTime && (checkIn == null || checkOut == null)) {
+            forwardEditForm(request, response, existing,
+                    "Check-in and check-out time are required when status is Present or Late.");
+            return;
+        }
+        if (checkIn != null && checkOut != null && checkOut.isBefore(checkIn)) {
+            forwardEditForm(request, response, existing,
+                    "Check-out time must be after check-in time.");
+            return;
+        }
+
+        BigDecimal overtimeHours = BigDecimal.ZERO;
+        if (!overtimeStr.isEmpty()) {
+            try {
+                overtimeHours = new BigDecimal(overtimeStr);
+                if (overtimeHours.signum() < 0) {
+                    forwardEditForm(request, response, existing,
+                            "Overtime hours cannot be negative.");
+                    return;
+                }
+            } catch (NumberFormatException ex) {
+                forwardEditForm(request, response, existing, "Invalid overtime hours.");
+                return;
+            }
+        }
+
+        if (note.length() > 255) {
+            forwardEditForm(request, response, existing,
+                    "Note must be 255 characters or fewer.");
+            return;
+        }
+
+        if (!workDate.isEqual(existing.getWorkDate())
+                && attendanceDAO.existsByEmployeeAndDate(existing.getEmployeeId(), workDate)) {
+            forwardEditForm(request, response, existing,
+                    "Another attendance record for this employee on this date already exists.");
+            return;
+        }
+
+        BigDecimal workingHours = BigDecimal.ZERO;
+        if (checkIn != null && checkOut != null) {
+            long minutes = Duration.between(checkIn, checkOut).toMinutes();
+            workingHours = BigDecimal.valueOf(minutes)
+                    .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        }
+
+        existing.setWorkDate(workDate);
+        existing.setCheckInTime(checkIn);
+        existing.setCheckOutTime(checkOut);
+        existing.setWorkingHours(workingHours);
+        existing.setOvertimeHours(overtimeHours);
+        existing.setAttendanceStatus(status);
+        existing.setNote(note);
+
+        attendanceDAO.update(existing);
+        response.sendRedirect(request.getContextPath() + "/attendance?updated=success");
+    }
+
+    private void forwardEditForm(HttpServletRequest request, HttpServletResponse response,
+                                 AttendanceRecord record, String error)
+            throws ServletException, IOException {
+        request.setAttribute("error", error);
+        request.setAttribute("record", record);
+        request.setAttribute("statuses", AttendanceStatus.values());
+        request.getRequestDispatcher("/views/attendance/edit-attendance.jsp")
+               .forward(request, response);
+    }
+
+    private void handleDelete(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, IOException {
+
+        AttendanceRecord existing = loadOwnedRecordOrError(request, response);
+        if (existing == null) return;
+
+        if (existing.getVerificationStatus() == VerificationStatus.Verified) {
+            response.sendRedirect(request.getContextPath()
+                    + "/attendance?error=already-verified");
+            return;
+        }
+
+        attendanceDAO.deleteById(existing.getAttendanceId());
+        response.sendRedirect(request.getContextPath() + "/attendance?deleted=success");
+    }
+
+    private void handleVerify(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, IOException {
+
+        AttendanceRecord existing = loadOwnedRecordOrError(request, response);
+        if (existing == null) return;
+
+        if (existing.getVerificationStatus() == VerificationStatus.Verified) {
+            response.sendRedirect(request.getContextPath()
+                    + "/attendance?error=already-verified");
+            return;
+        }
+
+        User currentUser = getCurrentUser(request);
+        attendanceDAO.verify(existing.getAttendanceId(), currentUser.getUserId());
+        response.sendRedirect(request.getContextPath() + "/attendance?verified=success");
+    }
+
+    private AttendanceRecord loadOwnedRecordOrError(HttpServletRequest request,
+                                                    HttpServletResponse response)
+            throws SQLException, IOException {
+
+        String idParam = request.getParameter("id");
+        if (idParam == null || idParam.isBlank()) {
+            response.sendRedirect(request.getContextPath() + "/attendance");
+            return null;
+        }
+
+        int attendanceId;
+        try { attendanceId = Integer.parseInt(idParam); }
+        catch (NumberFormatException ex) {
+            response.sendRedirect(request.getContextPath() + "/attendance");
+            return null;
+        }
+
+        AttendanceRecord existing = attendanceDAO.findById(attendanceId);
+        if (existing == null) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND);
+            return null;
+        }
+
+        User currentUser = getCurrentUser(request);
+        String roleName  = currentUser.getRole() != null ? currentUser.getRole().getRoleName() : "";
+        boolean isAdmin  = "ADMIN".equalsIgnoreCase(roleName);
+        boolean ownsThis = existing.getEmployeeManagerUserId() != null
+                && existing.getEmployeeManagerUserId() == currentUser.getUserId();
+
+        if (!isAdmin && !ownsThis) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+            return null;
+        }
+
+        return existing;
     }
 
     private User getCurrentUser(HttpServletRequest request) {

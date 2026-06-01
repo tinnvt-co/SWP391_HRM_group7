@@ -84,6 +84,30 @@
             <span>Attendance record created successfully.</span>
         </div>
     </c:if>
+    <c:if test="${param.updated == 'success'}">
+        <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-check-circle-fill"></i>
+            <span>Attendance record updated successfully.</span>
+        </div>
+    </c:if>
+    <c:if test="${param.deleted == 'success'}">
+        <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-check-circle-fill"></i>
+            <span>Attendance record deleted successfully.</span>
+        </div>
+    </c:if>
+    <c:if test="${param.verified == 'success'}">
+        <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-check-circle-fill"></i>
+            <span>Attendance record verified successfully.</span>
+        </div>
+    </c:if>
+    <c:if test="${param.error == 'already-verified'}">
+        <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <span>This record is already verified and cannot be modified or deleted.</span>
+        </div>
+    </c:if>
 
     <div class="card border-0 shadow-sm rounded-3 mb-3">
         <div class="card-body">
@@ -145,7 +169,8 @@
                             <th>OT</th>
                             <th>Status</th>
                             <th>Verified</th>
-                            <th class="pe-4">Note</th>
+                            <th>Note</th>
+                            <th class="text-end pe-4">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -221,11 +246,40 @@
                                         <c:otherwise>&mdash;</c:otherwise>
                                     </c:choose>
                                 </td>
+                                <td class="text-end pe-4">
+                                    <c:if test="${fn:contains(permissions, 'VERIFY_STAFF_ATTENDANCE')
+                                              and r.verificationStatus != 'Verified'}">
+                                        <div class="d-flex justify-content-end gap-1">
+                                            <form method="post"
+                                                  action="${pageContext.request.contextPath}/attendance?action=verify"
+                                                  class="d-inline"
+                                                  onsubmit="return confirm('Verify attendance for ${r.employeeFullName} on ${r.workDate}?')">
+                                                <input type="hidden" name="id" value="${r.attendanceId}">
+                                                <button type="submit" class="btn btn-sm btn-outline-success" title="Verify">
+                                                    <i class="bi bi-check2-circle me-1"></i>Verify
+                                                </button>
+                                            </form>
+                                            <a href="${pageContext.request.contextPath}/attendance?action=edit&id=${r.attendanceId}"
+                                               class="btn btn-sm btn-outline-primary" title="Edit">
+                                                <i class="bi bi-pencil me-1"></i>Edit
+                                            </a>
+                                            <form method="post"
+                                                  action="${pageContext.request.contextPath}/attendance?action=delete"
+                                                  class="d-inline"
+                                                  onsubmit="return confirm('Delete attendance for ${r.employeeFullName} on ${r.workDate}? This cannot be undone.')">
+                                                <input type="hidden" name="id" value="${r.attendanceId}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                                    <i class="bi bi-trash me-1"></i>Delete
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </c:if>
+                                </td>
                             </tr>
                         </c:forEach>
                         <c:if test="${empty records}">
                             <tr>
-                                <td colspan="10" class="text-center text-muted py-5">
+                                <td colspan="11" class="text-center text-muted py-5">
                                     <i class="bi bi-calendar2-x fs-2 d-block mb-2 opacity-25"></i>
                                     No attendance records found for this filter.
                                 </td>
