@@ -37,6 +37,54 @@ public class LeaveRequestDAO {
         return -1;
     }
 
+    public LeaveRequest findById(int leaveRequestId) throws SQLException {
+        String sql = "SELECT lr.*, "
+                   + "       u.full_name AS emp_full_name, u.email AS emp_email, "
+                   + "       u.phone AS emp_phone, u.user_id AS emp_user_id, "
+                   + "       u.manager_id AS emp_manager_user_id, "
+                   + "       e.employee_code, "
+                   + "       d.department_name, p.position_name, "
+                   + "       au.full_name AS approver_full_name "
+                   + "FROM leave_requests lr "
+                   + "JOIN employees e   ON lr.employee_id   = e.employee_id "
+                   + "JOIN users u       ON e.user_id        = u.user_id "
+                   + "JOIN departments d ON e.department_id  = d.department_id "
+                   + "JOIN positions p   ON e.position_id    = p.position_id "
+                   + "LEFT JOIN users au ON lr.approved_by   = au.user_id "
+                   + "WHERE lr.leave_request_id = ?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, leaveRequestId);
+            rs = ps.executeQuery();
+            if (rs.next()) return mapDetailRow(rs);
+        } finally {
+            close(conn, ps, rs);
+        }
+        return null;
+    }
+
+    private LeaveRequest mapDetailRow(ResultSet rs) throws SQLException {
+        LeaveRequest lr = mapRow(rs);
+        try { lr.setEmployeeEmail(rs.getString("emp_email")); } catch (SQLException ignored) {}
+        try { lr.setEmployeePhone(rs.getString("emp_phone")); } catch (SQLException ignored) {}
+        try { lr.setEmployeeDepartment(rs.getString("department_name")); } catch (SQLException ignored) {}
+        try { lr.setEmployeePosition(rs.getString("position_name")); } catch (SQLException ignored) {}
+        try {
+            int userId = rs.getInt("emp_user_id");
+            if (!rs.wasNull()) lr.setEmployeeUserId(userId);
+        } catch (SQLException ignored) {}
+        try {
+            int mgrId = rs.getInt("emp_manager_user_id");
+            if (!rs.wasNull()) lr.setEmployeeManagerUserId(mgrId);
+        } catch (SQLException ignored) {}
+        try { lr.setApproverFullName(rs.getString("approver_full_name")); } catch (SQLException ignored) {}
+        return lr;
+    }
+
     public List<LeaveRequest> findByEmployeeId(int employeeId) throws SQLException {
         String sql = "SELECT lr.*, u.full_name AS emp_full_name, e.employee_code "
                    + "FROM leave_requests lr "

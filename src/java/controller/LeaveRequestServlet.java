@@ -59,6 +59,13 @@ public class LeaveRequestServlet extends HttpServlet {
                     }
                     handleList(request, response);
                 }
+                case "detail" -> {
+                    if (!hasPermission(request, "VIEW_LEAVE_REQUEST_DETAIL")) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleDetail(request, response);
+                }
                 default -> {
                     if (!hasPermission(request, "SUBMIT_LEAVE_REQUEST")) {
                         response.sendError(HttpServletResponse.SC_FORBIDDEN);
@@ -204,6 +211,58 @@ public class LeaveRequestServlet extends HttpServlet {
         request.setAttribute("countCancelled", cancelled);
         request.setAttribute("countTotal", allForCount.size());
         request.getRequestDispatcher("/views/leave/leave-request-list.jsp")
+               .forward(request, response);
+    }
+
+    private void handleDetail(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, ServletException, IOException {
+
+        String idParam = request.getParameter("id");
+        if (idParam == null || idParam.isBlank()) {
+            response.sendRedirect(request.getContextPath() + "/leave-requests?action=list");
+            return;
+        }
+
+        int leaveRequestId;
+        try {
+            leaveRequestId = Integer.parseInt(idParam);
+        } catch (NumberFormatException ex) {
+            response.sendRedirect(request.getContextPath() + "/leave-requests?action=list");
+            return;
+        }
+
+        LeaveRequest lr = leaveDAO.findById(leaveRequestId);
+        if (lr == null) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+
+        User currentUser = getCurrentUser(request);
+        String roleName  = currentUser.getRole() != null ? currentUser.getRole().getRoleName() : "";
+
+        boolean isOwner = lr.getEmployeeUserId() != null
+                && lr.getEmployeeUserId() == currentUser.getUserId();
+        boolean isManagerOfTarget = lr.getEmployeeManagerUserId() != null
+                && lr.getEmployeeManagerUserId() == currentUser.getUserId();
+        boolean isOrgWide = "ADMIN".equalsIgnoreCase(roleName)
+                || "HR_STAFF".equalsIgnoreCase(roleName)
+                || "HR_MANAGER".equalsIgnoreCase(roleName);
+
+        boolean canSee = (isOwner    && hasPermission(request, "VIEW_LEAVE_REQUEST_STATUS"))
+                      || (isManagerOfTarget && hasPermission(request, "VIEW_LEAVE_REQUEST_LIST"))
+                      || (isOrgWide  && hasPermission(request, "VIEW_LEAVE_REQUEST_LIST"));
+
+        if (!canSee) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+            return;
+        }
+
+        String backTo = "list";
+        if (isOwner && !isManagerOfTarget && !isOrgWide) backTo = "status";
+
+        request.setAttribute("lr", lr);
+        request.setAttribute("backTo", backTo);
+        request.getRequestDispatcher("/views/leave/leave-request-detail.jsp")
                .forward(request, response);
     }
 

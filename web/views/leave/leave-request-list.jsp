@@ -170,7 +170,8 @@
                             <th>Days</th>
                             <th>Reason</th>
                             <th>Submitted</th>
-                            <th class="pe-4">Status</th>
+                            <th>Status</th>
+                            <th class="text-end pe-4">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -235,11 +236,19 @@
                                         <c:otherwise>${lr.status}</c:otherwise>
                                     </c:choose>
                                 </td>
+                                <td class="text-end pe-4">
+                                    <c:if test="${fn:contains(permissions, 'VIEW_LEAVE_REQUEST_DETAIL')}">
+                                        <a href="${pageContext.request.contextPath}/leave-requests?action=detail&id=${lr.leaveRequestId}"
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-eye me-1"></i>View
+                                        </a>
+                                    </c:if>
+                                </td>
                             </tr>
                         </c:forEach>
                         <c:if test="${empty requests}">
                             <tr>
-                                <td colspan="8" class="text-center text-muted py-5">
+                                <td colspan="9" class="text-center text-muted py-5">
                                     <i class="bi bi-inbox fs-2 d-block mb-2 opacity-25"></i>
                                     No leave requests found for this filter.
                                 </td>

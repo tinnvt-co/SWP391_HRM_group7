@@ -170,7 +170,8 @@
                             <th>Reason</th>
                             <th>Submitted</th>
                             <th>Status</th>
-                            <th class="pe-4">Reviewed</th>
+                            <th>Reviewed</th>
+                            <th class="text-end pe-4">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -241,11 +242,19 @@
                                         </c:otherwise>
                                     </c:choose>
                                 </td>
+                                <td class="text-end pe-4">
+                                    <c:if test="${fn:contains(permissions, 'VIEW_LEAVE_REQUEST_DETAIL')}">
+                                        <a href="${pageContext.request.contextPath}/leave-requests?action=detail&id=${lr.leaveRequestId}"
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-eye me-1"></i>View
+                                        </a>
+                                    </c:if>
+                                </td>
                             </tr>
                         </c:forEach>
                         <c:if test="${empty requests}">
                             <tr id="emptyRow">
-                                <td colspan="8" class="text-center text-muted py-5">
+                                <td colspan="9" class="text-center text-muted py-5">
                                     <i class="bi bi-calendar-x fs-2 d-block mb-2 opacity-25"></i>
                                     You have not submitted any leave request yet.
                                 </td>

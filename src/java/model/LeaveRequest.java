@@ -44,6 +44,13 @@ public class LeaveRequest {
 
     private String employeeFullName;
     private String employeeCode;
+    private String employeeEmail;
+    private String employeePhone;
+    private String employeeDepartment;
+    private String employeePosition;
+    private Integer employeeUserId;
+    private Integer employeeManagerUserId;
+    private String approverFullName;
 
     public LeaveRequest() {}
 
@@ -91,4 +98,25 @@ public class LeaveRequest {
 
     public String getEmployeeCode()                           { return employeeCode; }
     public void setEmployeeCode(String employeeCode)          { this.employeeCode = employeeCode; }
+
+    public String getEmployeeEmail()                          { return employeeEmail; }
+    public void setEmployeeEmail(String employeeEmail)        { this.employeeEmail = employeeEmail; }
+
+    public String getEmployeePhone()                          { return employeePhone; }
+    public void setEmployeePhone(String employeePhone)        { this.employeePhone = employeePhone; }
+
+    public String getEmployeeDepartment()                     { return employeeDepartment; }
+    public void setEmployeeDepartment(String d)               { this.employeeDepartment = d; }
+
+    public String getEmployeePosition()                       { return employeePosition; }
+    public void setEmployeePosition(String p)                 { this.employeePosition = p; }
+
+    public Integer getEmployeeUserId()                        { return employeeUserId; }
+    public void setEmployeeUserId(Integer employeeUserId)     { this.employeeUserId = employeeUserId; }
+
+    public Integer getEmployeeManagerUserId()                 { return employeeManagerUserId; }
+    public void setEmployeeManagerUserId(Integer m)           { this.employeeManagerUserId = m; }
+
+    public String getApproverFullName()                       { return approverFullName; }
+    public void setApproverFullName(String approverFullName)  { this.approverFullName = approverFullName; }
 }
