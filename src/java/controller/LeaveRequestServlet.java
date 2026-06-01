@@ -33,18 +33,32 @@ public class LeaveRequestServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        if (!hasPermission(request, "SUBMIT_LEAVE_REQUEST")) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN);
-            return;
-        }
-
         String action = request.getParameter("action");
         if (action == null) action = "submit";
 
         try {
             switch (action) {
-                case "submit" -> handleSubmitForm(request, response);
-                default       -> handleSubmitForm(request, response);
+                case "submit" -> {
+                    if (!hasPermission(request, "SUBMIT_LEAVE_REQUEST")) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleSubmitForm(request, response);
+                }
+                case "status" -> {
+                    if (!hasPermission(request, "VIEW_LEAVE_REQUEST_STATUS")) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleMyStatus(request, response);
+                }
+                default -> {
+                    if (!hasPermission(request, "SUBMIT_LEAVE_REQUEST")) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleSubmitForm(request, response);
+                }
             }
         } catch (SQLException e) {
             throw new ServletException(e);
@@ -90,6 +104,44 @@ public class LeaveRequestServlet extends HttpServlet {
         request.setAttribute("employee", employee);
         request.setAttribute("leaveTypes", LeaveType.values());
         request.getRequestDispatcher("/views/leave/submit-leave-request.jsp")
+               .forward(request, response);
+    }
+
+    private void handleMyStatus(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, ServletException, IOException {
+
+        User currentUser = getCurrentUser(request);
+        Employee employee = employeeDAO.findByUserId(currentUser.getUserId());
+
+        if (employee == null) {
+            request.setAttribute("error",
+                    "Your account is not linked to an employee record. Please contact HR.");
+            request.setAttribute("requests", java.util.Collections.emptyList());
+            request.getRequestDispatcher("/views/leave/my-leave-requests.jsp")
+                   .forward(request, response);
+            return;
+        }
+
+        java.util.List<LeaveRequest> requests = leaveDAO.findByEmployeeId(employee.getEmployeeId());
+
+        int pending = 0, approved = 0, rejected = 0, cancelled = 0;
+        for (LeaveRequest lr : requests) {
+            if (lr.getStatus() == null) continue;
+            switch (lr.getStatus()) {
+                case Pending   -> pending++;
+                case Approved  -> approved++;
+                case Rejected  -> rejected++;
+                case Cancelled -> cancelled++;
+            }
+        }
+
+        request.setAttribute("employee", employee);
+        request.setAttribute("requests", requests);
+        request.setAttribute("countPending", pending);
+        request.setAttribute("countApproved", approved);
+        request.setAttribute("countRejected", rejected);
+        request.setAttribute("countCancelled", cancelled);
+        request.getRequestDispatcher("/views/leave/my-leave-requests.jsp")
                .forward(request, response);
     }
 
