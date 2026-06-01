@@ -5,6 +5,8 @@ import model.Employee;
 import model.Employee.EmploymentStatus;
 
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class EmployeeDAO {
 
@@ -28,6 +30,75 @@ public class EmployeeDAO {
             close(conn, ps, rs);
         }
         return null;
+    }
+
+    public Employee findById(int employeeId) throws SQLException {
+        String sql = "SELECT e.*, u.full_name, d.department_name, p.position_name "
+                   + "FROM employees e "
+                   + "JOIN users u       ON e.user_id       = u.user_id "
+                   + "JOIN departments d ON e.department_id = d.department_id "
+                   + "JOIN positions p   ON e.position_id   = p.position_id "
+                   + "WHERE e.employee_id = ?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, employeeId);
+            rs = ps.executeQuery();
+            if (rs.next()) return mapRow(rs);
+        } finally {
+            close(conn, ps, rs);
+        }
+        return null;
+    }
+
+    public List<Employee> findByManagerUserId(int managerUserId) throws SQLException {
+        String sql = "SELECT e.*, u.full_name, d.department_name, p.position_name "
+                   + "FROM employees e "
+                   + "JOIN users u       ON e.user_id       = u.user_id "
+                   + "JOIN departments d ON e.department_id = d.department_id "
+                   + "JOIN positions p   ON e.position_id   = p.position_id "
+                   + "WHERE u.manager_id = ? AND u.is_active = 1 "
+                   + "ORDER BY u.full_name";
+        List<Employee> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, managerUserId);
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
+    public List<Employee> findAllActive() throws SQLException {
+        String sql = "SELECT e.*, u.full_name, d.department_name, p.position_name "
+                   + "FROM employees e "
+                   + "JOIN users u       ON e.user_id       = u.user_id "
+                   + "JOIN departments d ON e.department_id = d.department_id "
+                   + "JOIN positions p   ON e.position_id   = p.position_id "
+                   + "WHERE u.is_active = 1 "
+                   + "ORDER BY u.full_name";
+        List<Employee> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
     }
 
     private Employee mapRow(ResultSet rs) throws SQLException {

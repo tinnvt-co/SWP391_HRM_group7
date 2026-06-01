@@ -55,6 +55,26 @@
                 </li>
             </c:if>
         </c:if>
+        <c:if test="${fn:contains(permissions, 'VIEW_ATTENDANCE')
+                   or fn:contains(permissions, 'VERIFY_STAFF_ATTENDANCE')}">
+            <div class="sidebar-label mt-2">Attendance</div>
+            <c:if test="${fn:contains(permissions, 'VIEW_ATTENDANCE')}">
+                <li class="nav-item">
+                    <a class="nav-link ${activePage == 'attendanceList' ? 'active' : ''}"
+                       href="${pageContext.request.contextPath}/attendance">
+                        <i class="bi bi-calendar2-week me-2"></i>Attendance Records
+                    </a>
+                </li>
+            </c:if>
+            <c:if test="${fn:contains(permissions, 'VERIFY_STAFF_ATTENDANCE')}">
+                <li class="nav-item">
+                    <a class="nav-link ${activePage == 'attendanceAdd' ? 'active' : ''}"
+                       href="${pageContext.request.contextPath}/attendance?action=add">
+                        <i class="bi bi-plus-circle me-2"></i>New Attendance Record
+                    </a>
+                </li>
+            </c:if>
+        </c:if>
         <div class="sidebar-label mt-2">Account</div>
         <li class="nav-item">
             <a class="nav-link ${activePage == 'profile' ? 'active' : ''}"
