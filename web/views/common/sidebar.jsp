@@ -26,6 +26,18 @@
                 </a>
             </li>
         </c:if>
+        <c:if test="${fn:contains(permissions, 'SUBMIT_LEAVE_REQUEST')
+                   or fn:contains(permissions, 'VIEW_LEAVE_REQUEST_LIST')}">
+            <div class="sidebar-label mt-2">Leave</div>
+            <c:if test="${fn:contains(permissions, 'SUBMIT_LEAVE_REQUEST')}">
+                <li class="nav-item">
+                    <a class="nav-link ${activePage == 'leaveSubmit' ? 'active' : ''}"
+                       href="${pageContext.request.contextPath}/leave-requests">
+                        <i class="bi bi-calendar-plus me-2"></i>Submit Leave Request
+                    </a>
+                </li>
+            </c:if>
+        </c:if>
         <div class="sidebar-label mt-2">Account</div>
         <li class="nav-item">
             <a class="nav-link ${activePage == 'profile' ? 'active' : ''}"
