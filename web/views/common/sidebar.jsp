@@ -46,6 +46,14 @@
                     </a>
                 </li>
             </c:if>
+            <c:if test="${fn:contains(permissions, 'VIEW_LEAVE_REQUEST_LIST')}">
+                <li class="nav-item">
+                    <a class="nav-link ${activePage == 'leaveList' ? 'active' : ''}"
+                       href="${pageContext.request.contextPath}/leave-requests?action=list">
+                        <i class="bi bi-clipboard-check me-2"></i>Leave Requests
+                    </a>
+                </li>
+            </c:if>
         </c:if>
         <div class="sidebar-label mt-2">Account</div>
         <li class="nav-item">

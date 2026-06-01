@@ -52,6 +52,13 @@ public class LeaveRequestServlet extends HttpServlet {
                     }
                     handleMyStatus(request, response);
                 }
+                case "list" -> {
+                    if (!hasPermission(request, "VIEW_LEAVE_REQUEST_LIST")) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleList(request, response);
+                }
                 default -> {
                     if (!hasPermission(request, "SUBMIT_LEAVE_REQUEST")) {
                         response.sendError(HttpServletResponse.SC_FORBIDDEN);
@@ -142,6 +149,61 @@ public class LeaveRequestServlet extends HttpServlet {
         request.setAttribute("countRejected", rejected);
         request.setAttribute("countCancelled", cancelled);
         request.getRequestDispatcher("/views/leave/my-leave-requests.jsp")
+               .forward(request, response);
+    }
+
+    private void handleList(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, ServletException, IOException {
+
+        User currentUser = getCurrentUser(request);
+
+        String statusParam = request.getParameter("status");
+        if (statusParam == null) statusParam = "Pending";
+
+        Status statusFilter = null;
+        if (!"all".equalsIgnoreCase(statusParam)) {
+            try {
+                statusFilter = Status.valueOf(statusParam);
+            } catch (IllegalArgumentException ex) {
+                statusFilter = Status.Pending;
+                statusParam = "Pending";
+            }
+        }
+
+        String roleName = currentUser.getRole() != null ? currentUser.getRole().getRoleName() : "";
+        boolean managerScope = "MANAGER".equalsIgnoreCase(roleName);
+
+        java.util.List<LeaveRequest> requests;
+        if (managerScope) {
+            requests = leaveDAO.findByManagerUserId(currentUser.getUserId(), statusFilter);
+        } else {
+            requests = leaveDAO.findAll(statusFilter);
+        }
+
+        java.util.List<LeaveRequest> allForCount = managerScope
+                ? leaveDAO.findByManagerUserId(currentUser.getUserId(), null)
+                : leaveDAO.findAll(null);
+
+        int pending = 0, approved = 0, rejected = 0, cancelled = 0;
+        for (LeaveRequest lr : allForCount) {
+            if (lr.getStatus() == null) continue;
+            switch (lr.getStatus()) {
+                case Pending   -> pending++;
+                case Approved  -> approved++;
+                case Rejected  -> rejected++;
+                case Cancelled -> cancelled++;
+            }
+        }
+
+        request.setAttribute("requests", requests);
+        request.setAttribute("statusFilter", statusParam);
+        request.setAttribute("managerScope", managerScope);
+        request.setAttribute("countPending", pending);
+        request.setAttribute("countApproved", approved);
+        request.setAttribute("countRejected", rejected);
+        request.setAttribute("countCancelled", cancelled);
+        request.setAttribute("countTotal", allForCount.size());
+        request.getRequestDispatcher("/views/leave/leave-request-list.jsp")
                .forward(request, response);
     }
 

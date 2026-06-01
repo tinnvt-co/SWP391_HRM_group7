@@ -60,6 +60,62 @@ public class LeaveRequestDAO {
         return list;
     }
 
+    public List<LeaveRequest> findByManagerUserId(int managerUserId, Status statusFilter) throws SQLException {
+        StringBuilder sql = new StringBuilder()
+            .append("SELECT lr.*, u.full_name AS emp_full_name, e.employee_code ")
+            .append("FROM leave_requests lr ")
+            .append("JOIN employees e ON lr.employee_id = e.employee_id ")
+            .append("JOIN users u     ON e.user_id      = u.user_id ")
+            .append("WHERE u.manager_id = ? ");
+        if (statusFilter != null) sql.append("AND lr.status = ? ");
+        sql.append("ORDER BY ")
+           .append("CASE lr.status WHEN 'Pending' THEN 0 WHEN 'Approved' THEN 1 ")
+           .append("WHEN 'Rejected' THEN 2 ELSE 3 END, lr.created_at DESC");
+
+        List<LeaveRequest> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            ps.setInt(1, managerUserId);
+            if (statusFilter != null) ps.setString(2, statusFilter.name());
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
+    public List<LeaveRequest> findAll(Status statusFilter) throws SQLException {
+        StringBuilder sql = new StringBuilder()
+            .append("SELECT lr.*, u.full_name AS emp_full_name, e.employee_code ")
+            .append("FROM leave_requests lr ")
+            .append("JOIN employees e ON lr.employee_id = e.employee_id ")
+            .append("JOIN users u     ON e.user_id      = u.user_id ");
+        if (statusFilter != null) sql.append("WHERE lr.status = ? ");
+        sql.append("ORDER BY ")
+           .append("CASE lr.status WHEN 'Pending' THEN 0 WHEN 'Approved' THEN 1 ")
+           .append("WHEN 'Rejected' THEN 2 ELSE 3 END, lr.created_at DESC");
+
+        List<LeaveRequest> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            if (statusFilter != null) ps.setString(1, statusFilter.name());
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
     public boolean hasOverlapping(int employeeId, LocalDate start, LocalDate end) throws SQLException {
         String sql = "SELECT COUNT(*) FROM leave_requests "
                    + "WHERE employee_id = ? "
