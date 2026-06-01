@@ -486,12 +486,10 @@ public class AttendanceServlet extends HttpServlet {
         }
 
         User currentUser = getCurrentUser(request);
-        String roleName  = currentUser.getRole() != null ? currentUser.getRole().getRoleName() : "";
-        boolean isAdmin  = "ADMIN".equalsIgnoreCase(roleName);
         boolean ownsThis = existing.getEmployeeManagerUserId() != null
                 && existing.getEmployeeManagerUserId() == currentUser.getUserId();
 
-        if (!isAdmin && !ownsThis) {
+        if (!ownsThis) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN);
             return null;
         }
