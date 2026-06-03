@@ -66,6 +66,9 @@ public class LeaveRequestServlet extends HttpServlet {
                     }
                     handleDetail(request, response);
                 }
+                case "approve", "reject" -> {
+                    response.sendRedirect(request.getContextPath() + "/leave-requests?action=list");
+                }
                 default -> {
                     if (!hasPermission(request, "SUBMIT_LEAVE_REQUEST")) {
                         response.sendError(HttpServletResponse.SC_FORBIDDEN);
@@ -83,18 +86,33 @@ public class LeaveRequestServlet extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        if (!hasPermission(request, "SUBMIT_LEAVE_REQUEST")) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN);
-            return;
-        }
-
         String action = request.getParameter("action");
         if (action == null) action = "";
 
         try {
             switch (action) {
-                case "submit" -> handleSubmit(request, response);
-                default       -> response.sendRedirect(request.getContextPath() + "/leave-requests");
+                case "submit" -> {
+                    if (!hasPermission(request, "SUBMIT_LEAVE_REQUEST")) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleSubmit(request, response);
+                }
+                case "approve" -> {
+                    if (!hasPermission(request, "APPROVE_REJECT_LEAVE_REQUEST")) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleApproveReject(request, response, true);
+                }
+                case "reject" -> {
+                    if (!hasPermission(request, "APPROVE_REJECT_LEAVE_REQUEST")) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleApproveReject(request, response, false);
+                }
+                default -> response.sendRedirect(request.getContextPath() + "/leave-requests");
             }
         } catch (SQLException e) {
             throw new ServletException(e);
@@ -341,6 +359,70 @@ public class LeaveRequestServlet extends HttpServlet {
 
         leaveDAO.insert(lr);
         response.sendRedirect(request.getContextPath() + "/leave-requests?submitted=success");
+    }
+
+    private void handleApproveReject(HttpServletRequest request, HttpServletResponse response,
+                                      boolean approve)
+            throws SQLException, IOException {
+
+        if (!hasPermission(request, "APPROVE_REJECT_LEAVE_REQUEST")) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+            return;
+        }
+
+        String idParam = request.getParameter("id");
+        if (idParam == null || idParam.isBlank()) {
+            response.sendRedirect(request.getContextPath() + "/leave-requests?action=list");
+            return;
+        }
+
+        int leaveRequestId;
+        try {
+            leaveRequestId = Integer.parseInt(idParam);
+        } catch (NumberFormatException ex) {
+            response.sendRedirect(request.getContextPath() + "/leave-requests?action=list");
+            return;
+        }
+
+        LeaveRequest lr = leaveDAO.findById(leaveRequestId);
+        if (lr == null) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+
+        User currentUser = getCurrentUser(request);
+        boolean isManagerOfTarget = lr.getEmployeeManagerUserId() != null
+                && lr.getEmployeeManagerUserId() == currentUser.getUserId();
+
+        if (!isManagerOfTarget) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+            return;
+        }
+
+        if (lr.getStatus() != Status.Pending) {
+            response.sendRedirect(request.getContextPath()
+                    + "/leave-requests?action=detail&id=" + leaveRequestId + "&error=not-pending");
+            return;
+        }
+
+        String managerNote = trim(request.getParameter("managerNote"));
+        if (managerNote.length() > 500) {
+            managerNote = managerNote.substring(0, 500);
+        }
+
+        if (!approve && managerNote.isEmpty()) {
+            response.sendRedirect(request.getContextPath()
+                    + "/leave-requests?action=detail&id=" + leaveRequestId + "&error=reject-note-required");
+            return;
+        }
+
+        boolean ok = approve
+                ? leaveDAO.approve(leaveRequestId, currentUser.getUserId(), managerNote)
+                : leaveDAO.reject(leaveRequestId, currentUser.getUserId(), managerNote);
+
+        String result = ok ? (approve ? "approved" : "rejected") : "not-pending";
+        response.sendRedirect(request.getContextPath()
+                + "/leave-requests?action=detail&id=" + leaveRequestId + "&result=" + result);
     }
 
     private void forwardForm(HttpServletRequest request, HttpServletResponse response,

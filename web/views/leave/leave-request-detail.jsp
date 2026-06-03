@@ -82,6 +82,27 @@
         </div>
     </div>
 
+    <c:if test="${param.result == 'approved'}">
+        <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-check-circle-fill"></i><span>Leave request approved successfully.</span>
+        </div>
+    </c:if>
+    <c:if test="${param.result == 'rejected'}">
+        <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-check-circle-fill"></i><span>Leave request rejected successfully.</span>
+        </div>
+    </c:if>
+    <c:if test="${param.error == 'not-pending'}">
+        <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-exclamation-triangle-fill"></i><span>Only pending leave requests can be approved or rejected.</span>
+        </div>
+    </c:if>
+    <c:if test="${param.error == 'reject-note-required'}">
+        <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-exclamation-triangle-fill"></i><span>Please enter a reason before rejecting this request.</span>
+        </div>
+    </c:if>
+
     <div class="leave-banner d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
         <div class="d-flex align-items-center gap-3">
             <div class="bg-white bg-opacity-25 rounded-3 d-flex align-items-center justify-content-center"
@@ -218,6 +239,32 @@
                             <i class="bi bi-hourglass-split fs-3 d-block mb-2 opacity-50"></i>
                             This request is awaiting manager review.
                         </div>
+
+                        <c:if test="${fn:contains(permissions, 'APPROVE_REJECT_LEAVE_REQUEST') && backTo == 'list'}">
+                            <hr>
+                            <form method="post" action="${pageContext.request.contextPath}/leave-requests?action=approve"
+                                  class="mb-3"
+                                  onsubmit="return confirm('Approve this leave request?')">
+                                <input type="hidden" name="id" value="${lr.leaveRequestId}">
+                                <label class="form-label small text-muted">Manager Note (optional)</label>
+                                <textarea name="managerNote" class="form-control mb-2" rows="2"
+                                          maxlength="500" placeholder="Optional note..."></textarea>
+                                <button type="submit" class="btn btn-success btn-sm px-4">
+                                    <i class="bi bi-check-circle me-1"></i>Approve
+                                </button>
+                            </form>
+
+                            <form method="post" action="${pageContext.request.contextPath}/leave-requests?action=reject"
+                                  onsubmit="return confirm('Reject this leave request?')">
+                                <input type="hidden" name="id" value="${lr.leaveRequestId}">
+                                <label class="form-label small text-muted">Reject Reason</label>
+                                <textarea name="managerNote" class="form-control mb-2" rows="2"
+                                          maxlength="500" placeholder="Enter reason for rejection..." required></textarea>
+                                <button type="submit" class="btn btn-outline-danger btn-sm px-4">
+                                    <i class="bi bi-x-circle me-1"></i>Reject
+                                </button>
+                            </form>
+                        </c:if>
                     </c:when>
                     <c:otherwise>
                         <div class="info-row row align-items-center">

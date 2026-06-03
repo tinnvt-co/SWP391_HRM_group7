@@ -164,6 +164,42 @@ public class LeaveRequestDAO {
         return list;
     }
 
+    public boolean approve(int leaveRequestId, int approverUserId, String managerNote) throws SQLException {
+        String sql = "UPDATE leave_requests SET status='Approved', approved_by=?, "
+                   + "approved_at=NOW(), manager_note=?, updated_at=NOW() "
+                   + "WHERE leave_request_id=? AND status='Pending'";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, approverUserId);
+            ps.setString(2, managerNote);
+            ps.setInt(3, leaveRequestId);
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
+    public boolean reject(int leaveRequestId, int approverUserId, String managerNote) throws SQLException {
+        String sql = "UPDATE leave_requests SET status='Rejected', approved_by=?, "
+                   + "approved_at=NOW(), manager_note=?, updated_at=NOW() "
+                   + "WHERE leave_request_id=? AND status='Pending'";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, approverUserId);
+            ps.setString(2, managerNote);
+            ps.setInt(3, leaveRequestId);
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
     public boolean hasOverlapping(int employeeId, LocalDate start, LocalDate end) throws SQLException {
         String sql = "SELECT COUNT(*) FROM leave_requests "
                    + "WHERE employee_id = ? "

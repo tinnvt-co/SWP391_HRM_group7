@@ -243,6 +243,52 @@
                                             <i class="bi bi-eye me-1"></i>View
                                         </a>
                                     </c:if>
+                                    <c:if test="${fn:contains(permissions, 'APPROVE_REJECT_LEAVE_REQUEST') && lr.status == 'Pending'}">
+                                        <form method="post" action="${pageContext.request.contextPath}/leave-requests?action=approve"
+                                              class="d-inline"
+                                              onsubmit="return confirm('Approve leave request from ${lr.employeeFullName}?')">
+                                            <input type="hidden" name="id" value="${lr.leaveRequestId}">
+                                            <button type="submit" class="btn btn-sm btn-outline-success">
+                                                <i class="bi bi-check-lg me-1"></i>Approve
+                                            </button>
+                                        </form>
+                                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#rejectModal${lr.leaveRequestId}">
+                                            <i class="bi bi-x-lg me-1"></i>Reject
+                                        </button>
+
+                                        <div class="modal fade" id="rejectModal${lr.leaveRequestId}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-centered">
+                                                <div class="modal-content text-start">
+                                                    <form method="post" action="${pageContext.request.contextPath}/leave-requests?action=reject">
+                                                        <div class="modal-header">
+                                                            <h6 class="modal-title fw-bold">Reject Leave Request</h6>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                        </div>
+                                                        <div class="modal-body">
+                                                            <input type="hidden" name="id" value="${lr.leaveRequestId}">
+                                                            <p class="small text-muted mb-2">
+                                                                Reject leave request from <strong>${lr.employeeFullName}</strong>
+                                                                (${lr.startDate} to ${lr.endDate}).
+                                                            </p>
+                                                            <label class="form-label small fw-medium">Reject Reason</label>
+                                                            <textarea name="managerNote" class="form-control" rows="3"
+                                                                      maxlength="500" required
+                                                                      placeholder="Enter reason for rejection..."></textarea>
+                                                            <div class="form-text">Required, max 500 characters.</div>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                                <i class="bi bi-x-circle me-1"></i>Reject
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </c:if>
                                 </td>
                             </tr>
                         </c:forEach>
