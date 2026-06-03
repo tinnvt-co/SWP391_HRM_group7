@@ -330,8 +330,8 @@ public class LeaveRequestServlet extends HttpServlet {
             return;
         }
 
-        if (startDate.isBefore(LocalDate.now())) {
-            forwardForm(request, response, employee, "Start date cannot be in the past.");
+        if (!startDate.isAfter(LocalDate.now())) {
+            forwardForm(request, response, employee, "Start date must be in the future.");
             return;
         }
 
