@@ -43,13 +43,12 @@ public class LeaveRequestDAO {
                    + "       u.phone AS emp_phone, u.user_id AS emp_user_id, "
                    + "       u.manager_id AS emp_manager_user_id, "
                    + "       e.employee_code, "
-                   + "       d.department_name, p.position_name, "
+                   + "       d.department_name, "
                    + "       au.full_name AS approver_full_name "
                    + "FROM leave_requests lr "
                    + "JOIN employees e   ON lr.employee_id   = e.employee_id "
                    + "JOIN users u       ON e.user_id        = u.user_id "
                    + "JOIN departments d ON e.department_id  = d.department_id "
-                   + "JOIN positions p   ON e.position_id    = p.position_id "
                    + "LEFT JOIN users au ON lr.approved_by   = au.user_id "
                    + "WHERE lr.leave_request_id = ?";
         Connection conn = null;
@@ -72,7 +71,6 @@ public class LeaveRequestDAO {
         try { lr.setEmployeeEmail(rs.getString("emp_email")); } catch (SQLException ignored) {}
         try { lr.setEmployeePhone(rs.getString("emp_phone")); } catch (SQLException ignored) {}
         try { lr.setEmployeeDepartment(rs.getString("department_name")); } catch (SQLException ignored) {}
-        try { lr.setEmployeePosition(rs.getString("position_name")); } catch (SQLException ignored) {}
         try {
             int userId = rs.getInt("emp_user_id");
             if (!rs.wasNull()) lr.setEmployeeUserId(userId);

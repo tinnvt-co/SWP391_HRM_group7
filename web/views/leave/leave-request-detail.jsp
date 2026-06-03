@@ -155,11 +155,6 @@
                             <i class="bi bi-building me-2"></i>${lr.employeeDepartment}
                         </div>
                     </c:if>
-                    <c:if test="${not empty lr.employeePosition}">
-                        <div class="mb-2">
-                            <i class="bi bi-briefcase me-2"></i>${lr.employeePosition}
-                        </div>
-                    </c:if>
                     <c:if test="${not empty lr.employeeEmail}">
                         <div class="mb-2">
                             <i class="bi bi-envelope me-2"></i>${lr.employeeEmail}

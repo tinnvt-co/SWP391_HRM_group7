@@ -47,7 +47,6 @@ public class LeaveRequest {
     private String employeeEmail;
     private String employeePhone;
     private String employeeDepartment;
-    private String employeePosition;
     private Integer employeeUserId;
     private Integer employeeManagerUserId;
     private String approverFullName;
@@ -108,8 +107,6 @@ public class LeaveRequest {
     public String getEmployeeDepartment()                     { return employeeDepartment; }
     public void setEmployeeDepartment(String d)               { this.employeeDepartment = d; }
 
-    public String getEmployeePosition()                       { return employeePosition; }
-    public void setEmployeePosition(String p)                 { this.employeePosition = p; }
 
     public Integer getEmployeeUserId()                        { return employeeUserId; }
     public void setEmployeeUserId(Integer employeeUserId)     { this.employeeUserId = employeeUserId; }

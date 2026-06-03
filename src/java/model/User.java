@@ -17,6 +17,7 @@ public class User {
     private LocalDate dateOfBirth;
     private String address;
     private int roleId;
+    private Integer managerId;
     private boolean isActive;
     private LocalDateTime lastLogin;
     private LocalDateTime createdAt;
@@ -74,6 +75,9 @@ public class User {
 
     public int getRoleId()                              { return roleId; }
     public void setRoleId(int roleId)                   { this.roleId = roleId; }
+
+    public Integer getManagerId()                       { return managerId; }
+    public void setManagerId(Integer managerId)         { this.managerId = managerId; }
 
     public boolean isActive()                           { return isActive; }
     public void setActive(boolean isActive)             { this.isActive = isActive; }

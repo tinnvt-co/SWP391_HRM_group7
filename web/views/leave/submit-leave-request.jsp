@@ -87,8 +87,6 @@
                     <div class="small">
                         <div class="opacity-75">Department</div>
                         <div class="fw-medium mb-2">${employee.departmentName}</div>
-                        <div class="opacity-75">Position</div>
-                        <div class="fw-medium">${employee.positionName}</div>
                     </div>
                 </div>
 

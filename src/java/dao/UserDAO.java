@@ -51,8 +51,8 @@ public class UserDAO {
 
     public int insert(User user) throws SQLException {
         String sql = "INSERT INTO users (username, password_hash, full_name, email, phone, "
-                   + "gender, date_of_birth, address, role_id, is_active) "
-                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)";
+                   + "gender, date_of_birth, address, role_id, manager_id, is_active) "
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)";
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -67,6 +67,8 @@ public class UserDAO {
             ps.setObject(7, user.getDateOfBirth());
             ps.setString(8, user.getAddress());
             ps.setInt(9, user.getRoleId());
+            if (user.getManagerId() != null) ps.setInt(10, user.getManagerId());
+            else                            ps.setNull(10, Types.INTEGER);
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) return keys.getInt(1);
@@ -116,6 +118,27 @@ public class UserDAO {
         return null;
     }
 
+    public List<User> findActiveByRoleName(String roleName) throws SQLException {
+        String sql = "SELECT u.*, r.role_name FROM users u "
+                   + "JOIN roles r ON u.role_id = r.role_id "
+                   + "WHERE r.role_name = ? AND u.is_active = 1 "
+                   + "ORDER BY u.full_name";
+        List<User> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, roleName);
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
     public User findByEmail(String email) throws SQLException {
         String sql = "SELECT u.*, r.role_name FROM users u "
                    + "JOIN roles r ON u.role_id = r.role_id "
@@ -137,7 +160,7 @@ public class UserDAO {
 
     public boolean update(User user) throws SQLException {
         String sql = "UPDATE users SET full_name=?, email=?, phone=?, gender=?, "
-                   + "date_of_birth=?, address=?, role_id=?, updated_at=NOW() WHERE user_id=?";
+                   + "date_of_birth=?, address=?, role_id=?, manager_id=?, updated_at=NOW() WHERE user_id=?";
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -150,7 +173,9 @@ public class UserDAO {
             ps.setObject(5, user.getDateOfBirth());
             ps.setString(6, user.getAddress());
             ps.setInt(7, user.getRoleId());
-            ps.setInt(8, user.getUserId());
+            if (user.getManagerId() != null) ps.setInt(8, user.getManagerId());
+            else                            ps.setNull(8, Types.INTEGER);
+            ps.setInt(9, user.getUserId());
             return ps.executeUpdate() > 0;
         } finally {
             close(conn, ps, null);
@@ -215,6 +240,8 @@ public class UserDAO {
         if (dob != null) u.setDateOfBirth(dob.toLocalDate());
         u.setAddress(rs.getString("address"));
         u.setRoleId(rs.getInt("role_id"));
+        int managerId = rs.getInt("manager_id");
+        if (!rs.wasNull()) u.setManagerId(managerId);
         u.setActive(rs.getBoolean("is_active"));
         Timestamp lastLogin = rs.getTimestamp("last_login");
         if (lastLogin != null) u.setLastLogin(lastLogin.toLocalDateTime());

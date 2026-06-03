@@ -13,7 +13,6 @@ public class Employee {
     private int userId;
     private String employeeCode;
     private int departmentId;
-    private int positionId;
     private LocalDate hireDate;
     private EmploymentStatus employmentStatus;
     private String bankName;
@@ -24,7 +23,6 @@ public class Employee {
 
     private String fullName;
     private String departmentName;
-    private String positionName;
 
     public Employee() {}
 
@@ -39,9 +37,6 @@ public class Employee {
 
     public int getDepartmentId()                            { return departmentId; }
     public void setDepartmentId(int departmentId)           { this.departmentId = departmentId; }
-
-    public int getPositionId()                              { return positionId; }
-    public void setPositionId(int positionId)               { this.positionId = positionId; }
 
     public LocalDate getHireDate()                          { return hireDate; }
     public void setHireDate(LocalDate hireDate)             { this.hireDate = hireDate; }
@@ -70,6 +65,4 @@ public class Employee {
     public String getDepartmentName()                       { return departmentName; }
     public void setDepartmentName(String departmentName)    { this.departmentName = departmentName; }
 
-    public String getPositionName()                         { return positionName; }
-    public void setPositionName(String positionName)        { this.positionName = positionName; }
 }

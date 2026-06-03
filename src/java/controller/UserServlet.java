@@ -1,7 +1,13 @@
 package controller;
 
+import dao.DepartmentDAO;
+import dao.EmployeeDAO;
 import dao.RoleDAO;
 import dao.UserDAO;
+import model.Department;
+import model.Employee;
+import model.Employee.EmploymentStatus;
+import model.Role;
 import model.User;
 import model.User.Gender;
 
@@ -23,6 +29,8 @@ public class UserServlet extends HttpServlet {
 
     private final UserDAO userDAO = new UserDAO();
     private final RoleDAO roleDAO = new RoleDAO();
+    private final EmployeeDAO employeeDAO = new EmployeeDAO();
+    private final DepartmentDAO departmentDAO = new DepartmentDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -105,8 +113,7 @@ public class UserServlet extends HttpServlet {
             return;
         }
 
-        request.setAttribute("roles", roleDAO.findAllActive());
-        request.setAttribute("genders", Gender.values());
+        setUserFormLookups(request);
         request.getRequestDispatcher("/views/user/add-user.jsp").forward(request, response);
     }
 
@@ -127,10 +134,17 @@ public class UserServlet extends HttpServlet {
         String dobStr    = trim(request.getParameter("dateOfBirth"));
         String address   = trim(request.getParameter("address"));
         String roleIdStr = request.getParameter("roleId");
+        String deptIdStr = request.getParameter("departmentId");
 
         if (username.isEmpty() || password == null || password.isBlank()
                 || fullName.isEmpty() || email.isEmpty() || roleIdStr == null) {
             forwardAddForm(request, response, "Please fill in all required fields.");
+            return;
+        }
+
+        String validationError = validateUserInput(email, phone, dobStr);
+        if (validationError != null) {
+            forwardAddForm(request, response, validationError);
             return;
         }
 
@@ -144,6 +158,15 @@ public class UserServlet extends HttpServlet {
             return;
         }
 
+        int roleId = Integer.parseInt(roleIdStr);
+        Department assignedDepartment;
+        try {
+            assignedDepartment = resolveDepartmentForRole(roleId, deptIdStr);
+        } catch (IllegalArgumentException ex) {
+            forwardAddForm(request, response, ex.getMessage());
+            return;
+        }
+
         User user = new User();
         user.setUsername(username);
         user.setPasswordHash(password);
@@ -151,7 +174,8 @@ public class UserServlet extends HttpServlet {
         user.setEmail(email);
         user.setPhone(phone);
         user.setAddress(address);
-        user.setRoleId(Integer.parseInt(roleIdStr));
+        user.setRoleId(roleId);
+        user.setManagerId(managerIdForRole(roleId, assignedDepartment));
 
         if (genderStr != null && !genderStr.isBlank()) {
             try { user.setGender(Gender.valueOf(genderStr)); } catch (IllegalArgumentException ignored) {}
@@ -161,7 +185,8 @@ public class UserServlet extends HttpServlet {
             try { user.setDateOfBirth(LocalDate.parse(dobStr)); } catch (DateTimeParseException ignored) {}
         }
 
-        userDAO.insert(user);
+        int newUserId = userDAO.insert(user);
+        upsertEmployeeProfileIfNeeded(newUserId, roleId, assignedDepartment, getCurrentUser(request).getUserId());
         response.sendRedirect(request.getContextPath() + "/users?added=success");
     }
 
@@ -186,8 +211,8 @@ public class UserServlet extends HttpServlet {
         }
 
         request.setAttribute("user", user);
-        request.setAttribute("roles", roleDAO.findAllActive());
-        request.setAttribute("genders", Gender.values());
+        request.setAttribute("employee", employeeDAO.findByUserId(user.getUserId()));
+        setUserFormLookups(request);
         request.getRequestDispatcher("/views/user/edit-user.jsp").forward(request, response);
     }
 
@@ -207,9 +232,16 @@ public class UserServlet extends HttpServlet {
         String dobStr    = trim(request.getParameter("dateOfBirth"));
         String address   = trim(request.getParameter("address"));
         String roleIdStr = request.getParameter("roleId");
+        String deptIdStr = request.getParameter("departmentId");
 
         if (idParam == null || fullName.isEmpty() || email.isEmpty() || roleIdStr == null) {
             forwardEditForm(request, response, Integer.parseInt(idParam), "Please fill in all required fields.");
+            return;
+        }
+
+        String validationError = validateUserInput(email, phone, dobStr);
+        if (validationError != null) {
+            forwardEditForm(request, response, Integer.parseInt(idParam), validationError);
             return;
         }
 
@@ -220,13 +252,23 @@ public class UserServlet extends HttpServlet {
             return;
         }
 
+        int roleId = Integer.parseInt(roleIdStr);
+        Department assignedDepartment;
+        try {
+            assignedDepartment = resolveDepartmentForRole(roleId, deptIdStr);
+        } catch (IllegalArgumentException ex) {
+            forwardEditForm(request, response, userId, ex.getMessage());
+            return;
+        }
+
         User user = new User();
         user.setUserId(userId);
         user.setFullName(fullName);
         user.setEmail(email);
         user.setPhone(phone);
         user.setAddress(address);
-        user.setRoleId(Integer.parseInt(roleIdStr));
+        user.setRoleId(roleId);
+        user.setManagerId(managerIdForRole(roleId, assignedDepartment));
 
         if (genderStr != null && !genderStr.isBlank()) {
             try { user.setGender(Gender.valueOf(genderStr)); } catch (IllegalArgumentException ignored) {}
@@ -236,6 +278,7 @@ public class UserServlet extends HttpServlet {
         }
 
         userDAO.update(user);
+        upsertEmployeeProfileIfNeeded(userId, roleId, assignedDepartment, getCurrentUser(request).getUserId());
         response.sendRedirect(request.getContextPath() + "/users?updated=success");
     }
 
@@ -274,17 +317,130 @@ public class UserServlet extends HttpServlet {
             throws SQLException, ServletException, IOException {
         request.setAttribute("error", error);
         request.setAttribute("user", userDAO.findById(userId));
-        request.setAttribute("roles", roleDAO.findAllActive());
-        request.setAttribute("genders", Gender.values());
+        request.setAttribute("employee", employeeDAO.findByUserId(userId));
+        setUserFormLookups(request);
         request.getRequestDispatcher("/views/user/edit-user.jsp").forward(request, response);
     }
 
     private void forwardAddForm(HttpServletRequest request, HttpServletResponse response, String error)
             throws SQLException, ServletException, IOException {
         request.setAttribute("error", error);
+        setUserFormLookups(request);
+        request.getRequestDispatcher("/views/user/add-user.jsp").forward(request, response);
+    }
+
+    private void setUserFormLookups(HttpServletRequest request) throws SQLException {
         request.setAttribute("roles", roleDAO.findAllActive());
         request.setAttribute("genders", Gender.values());
-        request.getRequestDispatcher("/views/user/add-user.jsp").forward(request, response);
+        request.setAttribute("employeeDepartments", departmentDAO.findEmployeeAssignable());
+    }
+
+    private void upsertEmployeeProfileIfNeeded(int userId, int roleId,
+                                               Department assignedDepartment,
+                                               int actorUserId) throws SQLException {
+        Role role = roleDAO.findById(roleId);
+        if (role == null || !requiresEmployeeProfile(role.getRoleName())) return;
+        if (assignedDepartment == null) return;
+
+        Employee employee = new Employee();
+        employee.setUserId(userId);
+        employee.setEmployeeCode(generateEmployeeCode(userId));
+        employee.setDepartmentId(assignedDepartment.getDepartmentId());
+        employee.setHireDate(LocalDate.now());
+        employee.setEmploymentStatus(EmploymentStatus.Working);
+        employeeDAO.upsertBasicProfile(employee, actorUserId);
+    }
+
+    private Department resolveDepartmentForRole(int roleId, String deptIdStr) throws SQLException {
+        Role role = roleDAO.findById(roleId);
+        if (role == null) throw new IllegalArgumentException("Invalid role.");
+
+        String roleName = role.getRoleName();
+        if ("EMPLOYEE".equalsIgnoreCase(roleName)) {
+            if (deptIdStr == null || deptIdStr.isBlank()) {
+                throw new IllegalArgumentException("Please select a department for employee.");
+            }
+            int deptId;
+            try { deptId = Integer.parseInt(deptIdStr); }
+            catch (NumberFormatException ex) { throw new IllegalArgumentException("Invalid department."); }
+
+            Department dept = departmentDAO.findById(deptId);
+            if (dept == null) throw new IllegalArgumentException("Invalid department.");
+            if ("ADMIN_DEPT".equalsIgnoreCase(dept.getDepartmentCode())
+                    || "HR".equalsIgnoreCase(dept.getDepartmentCode())) {
+                throw new IllegalArgumentException("Employee cannot be assigned to Administration or HR department.");
+            }
+            if (dept.getManagerId() == null) {
+                throw new IllegalArgumentException("Selected department has no manager assigned.");
+            }
+            return dept;
+        }
+
+        if ("HR_STAFF".equalsIgnoreCase(roleName)) {
+            Department hr = departmentDAO.findByCode("HR");
+            if (hr == null) throw new IllegalArgumentException("HR department is not configured.");
+            if (hr.getManagerId() == null) throw new IllegalArgumentException("HR department has no HR Manager assigned.");
+            return hr;
+        }
+
+        if ("MANAGER".equalsIgnoreCase(roleName) || "HR_MANAGER".equalsIgnoreCase(roleName)) {
+            Department dept = "HR_MANAGER".equalsIgnoreCase(roleName)
+                    ? departmentDAO.findByCode("HR")
+                    : departmentDAO.findByCode("ADMIN_DEPT");
+            if (dept == null) throw new IllegalArgumentException("Default department is not configured.");
+            return dept;
+        }
+
+        return null;
+    }
+
+    private Integer managerIdForRole(int roleId, Department assignedDepartment) throws SQLException {
+        Role role = roleDAO.findById(roleId);
+        if (role == null || assignedDepartment == null) return null;
+        String roleName = role.getRoleName();
+        if ("EMPLOYEE".equalsIgnoreCase(roleName) || "HR_STAFF".equalsIgnoreCase(roleName)) {
+            return assignedDepartment.getManagerId();
+        }
+        return null;
+    }
+
+    private boolean requiresEmployeeProfile(String roleName) {
+        return "EMPLOYEE".equalsIgnoreCase(roleName)
+                || "MANAGER".equalsIgnoreCase(roleName)
+                || "HR_STAFF".equalsIgnoreCase(roleName)
+                || "HR_MANAGER".equalsIgnoreCase(roleName);
+    }
+
+    private String generateEmployeeCode(int userId) {
+        return String.format("MP-U%05d", userId);
+    }
+
+    private String validateUserInput(String email, String phone, String dobStr) {
+        if (email == null || !email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+            return "Please enter a valid email address (e.g., user@company.com).";
+        }
+
+        if (phone != null && !phone.isBlank() && !phone.matches("^[0-9]{10,15}$")) {
+            return "Phone number must contain digits only and be 10 to 15 characters long.";
+        }
+
+        if (dobStr != null && !dobStr.isBlank()) {
+            try {
+                LocalDate dob = LocalDate.parse(dobStr);
+                if (dob.isAfter(LocalDate.now())) {
+                    return "Date of birth cannot be in the future.";
+                }
+            } catch (DateTimeParseException ex) {
+                return "Invalid date of birth.";
+            }
+        }
+
+        return null;
+    }
+
+    private User getCurrentUser(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        return session == null ? null : (User) session.getAttribute("currentUser");
     }
 
     private boolean hasPermission(HttpServletRequest request, String permCode) {
