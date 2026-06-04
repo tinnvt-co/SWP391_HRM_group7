@@ -6,3 +6,4 @@ src/java/mail.properties
 src/java/mail.properties
 inspect-jar.ps1
 db/migrations/01_repermission.sql
+db/migrations/02_department_permissions.sql
