@@ -1,6 +1,8 @@
 package controller;
 
+import dao.EmployeeDAO;
 import dao.UserDAO;
+import model.Employee;
 import model.User;
 
 import jakarta.servlet.ServletException;
@@ -17,6 +19,7 @@ import java.sql.SQLException;
 public class ProfileServlet extends HttpServlet {
 
     private final UserDAO userDAO = new UserDAO();
+    private final EmployeeDAO employeeDAO = new EmployeeDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -27,6 +30,8 @@ public class ProfileServlet extends HttpServlet {
         try {
             User user = userDAO.findById(sessionUser.getUserId());
             request.setAttribute("user", user);
+            Employee employee = employeeDAO.findByUserId(sessionUser.getUserId());
+            request.setAttribute("employee", employee);
             request.getRequestDispatcher("/views/profile/view-profile.jsp").forward(request, response);
         } catch (SQLException e) {
             request.setAttribute("user", sessionUser);

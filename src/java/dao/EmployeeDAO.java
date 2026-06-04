@@ -128,6 +128,26 @@ public class EmployeeDAO {
         }
     }
 
+    public boolean updateBankInfo(int userId, String bankName, String bankAccountNumber,
+                                  String bankBranch, int actorUserId) throws SQLException {
+        String sql = "UPDATE employees SET bank_name=?, bank_account_number=?, bank_branch=?, "
+                   + "updated_by=?, updated_at=NOW() WHERE user_id=?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, bankName);
+            ps.setString(2, bankAccountNumber);
+            ps.setString(3, bankBranch);
+            ps.setInt(4, actorUserId);
+            ps.setInt(5, userId);
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
     public List<Employee> findAllActive() throws SQLException {
         String sql = "SELECT e.*, u.full_name, d.department_name "
                    + "FROM employees e "

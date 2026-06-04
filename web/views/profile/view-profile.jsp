@@ -79,9 +79,15 @@
                 </div>
                 <hr>
                 <a href="${pageContext.request.contextPath}/change-password"
-                   class="btn btn-outline-primary btn-sm w-100">
+                   class="btn btn-outline-primary btn-sm w-100 mb-2">
                     <i class="bi bi-key me-2"></i>Change Password
                 </a>
+                <c:if test="${not empty employee}">
+                    <a href="${pageContext.request.contextPath}/bank-account"
+                       class="btn btn-outline-secondary btn-sm w-100">
+                        <i class="bi bi-bank me-2"></i>Manage Bank Account
+                    </a>
+                </c:if>
             </div>
         </div>
 
@@ -120,6 +126,77 @@
                     <div class="col-8">${not empty user.address ? user.address : '—'}</div>
                 </div>
             </div>
+
+            <div class="card border-0 shadow-sm rounded-3 p-4 mt-3">
+                <h6 class="fw-semibold mb-3 text-secondary">
+                    <i class="bi bi-briefcase me-2"></i>Employment Information
+                </h6>
+                <c:choose>
+                    <c:when test="${not empty employee}">
+                        <div class="info-row row align-items-center">
+                            <div class="col-4 text-muted small">Employee Code</div>
+                            <div class="col-8 fw-medium">${employee.employeeCode}</div>
+                        </div>
+                        <div class="info-row row align-items-center">
+                            <div class="col-4 text-muted small">Department</div>
+                            <div class="col-8">${not empty employee.departmentName ? employee.departmentName : '—'}</div>
+                        </div>
+                        <div class="info-row row align-items-center">
+                            <div class="col-4 text-muted small">Role</div>
+                            <div class="col-8"><span class="badge-role">${user.role.roleName}</span></div>
+                        </div>
+                        <div class="info-row row align-items-center">
+                            <div class="col-4 text-muted small">Employment Status</div>
+                            <div class="col-8">${not empty employee.employmentStatus ? employee.employmentStatus : '—'}</div>
+                        </div>
+                        <div class="info-row row align-items-center">
+                            <div class="col-4 text-muted small">Hire Date</div>
+                            <div class="col-8">${not empty employee.hireDate ? employee.hireDate : '—'}</div>
+                        </div>
+                    </c:when>
+                    <c:otherwise>
+                        <div class="text-muted small">
+                            <i class="bi bi-info-circle me-1"></i>No employment record linked to this account.
+                        </div>
+                    </c:otherwise>
+                </c:choose>
+            </div>
+
+            <c:if test="${not empty employee}">
+                <div class="card border-0 shadow-sm rounded-3 p-4 mt-3">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <h6 class="fw-semibold mb-0 text-secondary">
+                            <i class="bi bi-bank me-2"></i>Bank Account
+                        </h6>
+                        <a href="${pageContext.request.contextPath}/bank-account"
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil me-1"></i>Manage
+                        </a>
+                    </div>
+                    <c:choose>
+                        <c:when test="${not empty employee.bankAccountNumber}">
+                            <div class="info-row row align-items-center">
+                                <div class="col-4 text-muted small">Bank Name</div>
+                                <div class="col-8 fw-medium">${employee.bankName}</div>
+                            </div>
+                            <div class="info-row row align-items-center">
+                                <div class="col-4 text-muted small">Account Number</div>
+                                <div class="col-8">${employee.bankAccountNumber}</div>
+                            </div>
+                            <div class="info-row row align-items-center">
+                                <div class="col-4 text-muted small">Branch</div>
+                                <div class="col-8">${not empty employee.bankBranch ? employee.bankBranch : '—'}</div>
+                            </div>
+                        </c:when>
+                        <c:otherwise>
+                            <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-0">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                                <span>No bank account added yet. Please add one to receive your salary.</span>
+                            </div>
+                        </c:otherwise>
+                    </c:choose>
+                </div>
+            </c:if>
 
             <div class="card border-0 shadow-sm rounded-3 p-4 mt-3">
                 <h6 class="fw-semibold mb-3 text-secondary">
