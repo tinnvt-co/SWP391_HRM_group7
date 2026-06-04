@@ -13,6 +13,7 @@ public class Department {
     private LocalDateTime updatedAt;
 
     private String managerName;
+    private int employeeCount;
 
     public Department() {}
 
@@ -42,4 +43,7 @@ public class Department {
 
     public String getManagerName()                       { return managerName; }
     public void setManagerName(String managerName)       { this.managerName = managerName; }
+
+    public int getEmployeeCount()                        { return employeeCount; }
+    public void setEmployeeCount(int employeeCount)      { this.employeeCount = employeeCount; }
 }

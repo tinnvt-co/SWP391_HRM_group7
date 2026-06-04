@@ -88,6 +88,7 @@
                             <th>Department</th>
                             <th>Code</th>
                             <th>Manager</th>
+                            <th>Employees</th>
                             <th>Status</th>
                             <th class="text-end pe-4">Actions</th>
                         </tr>
@@ -115,6 +116,11 @@
                                         </c:when>
                                         <c:otherwise><span class="text-muted">— Not assigned</span></c:otherwise>
                                     </c:choose>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                        <i class="bi bi-people me-1"></i>${d.employeeCount}
+                                    </span>
                                 </td>
                                 <td>
                                     <c:choose>
@@ -160,7 +166,7 @@
                         </c:forEach>
                         <c:if test="${empty departments}">
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-5">
+                                <td colspan="7" class="text-center text-muted py-5">
                                     <i class="bi bi-diagram-3 fs-2 d-block mb-2 opacity-25"></i>No departments found.
                                 </td>
                             </tr>

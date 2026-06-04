@@ -12,7 +12,8 @@ public class DepartmentDAO {
     private static final String BASE_SELECT =
             "SELECT d.department_id, d.department_code, d.department_name, d.description, "
           + "       d.manager_id, d.is_active, d.created_at, d.updated_at, "
-          + "       u.full_name AS manager_name "
+          + "       u.full_name AS manager_name, "
+          + "       (SELECT COUNT(*) FROM employees e WHERE e.department_id = d.department_id) AS employee_count "
           + "FROM departments d "
           + "LEFT JOIN users u ON d.manager_id = u.user_id ";
 
@@ -176,6 +177,7 @@ public class DepartmentDAO {
         Timestamp updated = rs.getTimestamp("updated_at");
         if (updated != null) d.setUpdatedAt(updated.toLocalDateTime());
         try { d.setManagerName(rs.getString("manager_name")); } catch (SQLException ignored) {}
+        try { d.setEmployeeCount(rs.getInt("employee_count")); } catch (SQLException ignored) {}
         return d;
     }
 
