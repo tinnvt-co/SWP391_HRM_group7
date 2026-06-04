@@ -85,11 +85,11 @@
                                 <option value="">-- No manager --</option>
                                 <c:forEach var="m" items="${managers}">
                                     <option value="${m.userId}" ${department.managerId == m.userId ? 'selected' : ''}>
-                                        ${m.fullName} (${m.email})
+                                        ${m.fullName} — ${m.role.roleName}
                                     </option>
                                 </c:forEach>
                             </select>
-                            <div class="form-text">Only users with role MANAGER are listed.</div>
+                            <div class="form-text">HR department must be headed by an HR Manager; other departments by a Manager.</div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-muted">Status</label>

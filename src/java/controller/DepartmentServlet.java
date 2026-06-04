@@ -3,6 +3,7 @@ package controller;
 import dao.DepartmentDAO;
 import dao.UserDAO;
 import model.Department;
+import model.User;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -77,7 +78,7 @@ public class DepartmentServlet extends HttpServlet {
             return;
         }
 
-        request.setAttribute("managers", userDAO.findActiveByRoleName("MANAGER"));
+        request.setAttribute("managers", userDAO.findActiveByRoleNames(java.util.List.of("MANAGER", "HR_MANAGER")));
         request.getRequestDispatcher("/views/department/add-department.jsp").forward(request, response);
     }
 
@@ -126,6 +127,12 @@ public class DepartmentServlet extends HttpServlet {
         d.setDescription(description.isEmpty() ? null : description);
         d.setManagerId(parseManagerId(managerIdStr));
 
+        String headError = validateHeadRole(upperCode, d.getManagerId());
+        if (headError != null) {
+            forwardAddForm(request, response, headError);
+            return;
+        }
+
         departmentDAO.insert(d);
         response.sendRedirect(request.getContextPath() + "/departments?added=success");
     }
@@ -151,7 +158,7 @@ public class DepartmentServlet extends HttpServlet {
         }
 
         request.setAttribute("department", d);
-        request.setAttribute("managers", userDAO.findActiveByRoleName("MANAGER"));
+        request.setAttribute("managers", userDAO.findActiveByRoleNames(java.util.List.of("MANAGER", "HR_MANAGER")));
         request.getRequestDispatcher("/views/department/edit-department.jsp").forward(request, response);
     }
 
@@ -188,11 +195,23 @@ public class DepartmentServlet extends HttpServlet {
             return;
         }
 
+        Department existing = departmentDAO.findById(departmentId);
+        if (existing == null) {
+            response.sendRedirect(request.getContextPath() + "/departments");
+            return;
+        }
+
         Department d = new Department();
         d.setDepartmentId(departmentId);
         d.setDepartmentName(name);
         d.setDescription(description.isEmpty() ? null : description);
         d.setManagerId(parseManagerId(managerIdStr));
+
+        String headError = validateHeadRole(existing.getDepartmentCode(), d.getManagerId());
+        if (headError != null) {
+            forwardEditForm(request, response, departmentId, headError);
+            return;
+        }
 
         departmentDAO.update(d);
         response.sendRedirect(request.getContextPath() + "/departments?updated=success");
@@ -222,7 +241,7 @@ public class DepartmentServlet extends HttpServlet {
     private void forwardAddForm(HttpServletRequest request, HttpServletResponse response, String error)
             throws SQLException, ServletException, IOException {
         request.setAttribute("error", error);
-        request.setAttribute("managers", userDAO.findActiveByRoleName("MANAGER"));
+        request.setAttribute("managers", userDAO.findActiveByRoleNames(java.util.List.of("MANAGER", "HR_MANAGER")));
         request.getRequestDispatcher("/views/department/add-department.jsp").forward(request, response);
     }
 
@@ -231,7 +250,7 @@ public class DepartmentServlet extends HttpServlet {
             throws SQLException, ServletException, IOException {
         request.setAttribute("error", error);
         request.setAttribute("department", departmentDAO.findById(departmentId));
-        request.setAttribute("managers", userDAO.findActiveByRoleName("MANAGER"));
+        request.setAttribute("managers", userDAO.findActiveByRoleNames(java.util.List.of("MANAGER", "HR_MANAGER")));
         request.getRequestDispatcher("/views/department/edit-department.jsp").forward(request, response);
     }
 
@@ -239,6 +258,29 @@ public class DepartmentServlet extends HttpServlet {
         if (managerIdStr == null || managerIdStr.isBlank()) return null;
         try { return Integer.parseInt(managerIdStr); }
         catch (NumberFormatException ex) { return null; }
+    }
+
+    private String validateHeadRole(String departmentCode, Integer managerId) throws SQLException {
+        if (managerId == null) return null;
+
+        User head = userDAO.findById(managerId);
+        if (head == null || head.getRole() == null) {
+            return "Selected department head is invalid.";
+        }
+
+        String headRole = head.getRole().getRoleName();
+        boolean isHrDept = "HR".equalsIgnoreCase(departmentCode);
+
+        if (isHrDept) {
+            if (!"HR_MANAGER".equalsIgnoreCase(headRole)) {
+                return "The HR department must be headed by an HR Manager.";
+            }
+        } else {
+            if (!"MANAGER".equalsIgnoreCase(headRole)) {
+                return "This department must be headed by a Manager.";
+            }
+        }
+        return null;
     }
 
     private boolean hasPermission(HttpServletRequest request, String permCode) {

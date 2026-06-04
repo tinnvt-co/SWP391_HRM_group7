@@ -139,6 +139,32 @@ public class UserDAO {
         return list;
     }
 
+    public List<User> findActiveByRoleNames(List<String> roleNames) throws SQLException {
+        if (roleNames == null || roleNames.isEmpty()) return new ArrayList<>();
+        StringBuilder placeholders = new StringBuilder();
+        for (int i = 0; i < roleNames.size(); i++) {
+            placeholders.append(i == 0 ? "?" : ", ?");
+        }
+        String sql = "SELECT u.*, r.role_name FROM users u "
+                   + "JOIN roles r ON u.role_id = r.role_id "
+                   + "WHERE r.role_name IN (" + placeholders + ") AND u.is_active = 1 "
+                   + "ORDER BY r.role_name, u.full_name";
+        List<User> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            for (int i = 0; i < roleNames.size(); i++) ps.setString(i + 1, roleNames.get(i));
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
     public User findByEmail(String email) throws SQLException {
         String sql = "SELECT u.*, r.role_name FROM users u "
                    + "JOIN roles r ON u.role_id = r.role_id "
