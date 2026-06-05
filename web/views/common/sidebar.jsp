@@ -83,6 +83,26 @@
                 </li>
             </c:if>
         </c:if>
+        <c:if test="${fn:contains(permissions, 'VIEW_CONTRACT_LIST')
+                   or fn:contains(permissions, 'VIEW_MY_CONTRACT')}">
+            <div class="sidebar-label mt-2">Contract</div>
+            <c:if test="${fn:contains(permissions, 'VIEW_CONTRACT_LIST')}">
+                <li class="nav-item">
+                    <a class="nav-link ${activePage == 'contracts' ? 'active' : ''}"
+                       href="${pageContext.request.contextPath}/contracts">
+                        <i class="bi bi-file-earmark-text me-2"></i>Contracts
+                    </a>
+                </li>
+            </c:if>
+            <c:if test="${fn:contains(permissions, 'VIEW_MY_CONTRACT')}">
+                <li class="nav-item">
+                    <a class="nav-link ${activePage == 'myContract' ? 'active' : ''}"
+                       href="${pageContext.request.contextPath}/my-contract">
+                        <i class="bi bi-file-earmark-person me-2"></i>My Contract
+                    </a>
+                </li>
+            </c:if>
+        </c:if>
         <div class="sidebar-label mt-2">Account</div>
         <li class="nav-item">
             <a class="nav-link ${activePage == 'profile' ? 'active' : ''}"
