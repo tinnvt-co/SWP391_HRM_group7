@@ -8,3 +8,4 @@ inspect-jar.ps1
 db/migrations/01_repermission.sql
 db/migrations/02_department_permissions.sql
 db/migrations/03_contract_permissions.sql
+db/migrations/04_hr_employee_permissions.sql

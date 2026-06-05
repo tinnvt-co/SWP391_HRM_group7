@@ -34,6 +34,14 @@
                 </a>
             </li>
         </c:if>
+        <c:if test="${fn:contains(permissions, 'VIEW_EMPLOYEE_LIST')}">
+            <li class="nav-item">
+                <a class="nav-link ${activePage == 'hrEmployees' ? 'active' : ''}"
+                   href="${pageContext.request.contextPath}/hr/employees">
+                    <i class="bi bi-person-vcard me-2"></i>Employees
+                </a>
+            </li>
+        </c:if>
         <c:if test="${fn:contains(permissions, 'SUBMIT_LEAVE_REQUEST')
                    or fn:contains(permissions, 'VIEW_LEAVE_REQUEST_STATUS')
                    or fn:contains(permissions, 'VIEW_LEAVE_REQUEST_LIST')}">
