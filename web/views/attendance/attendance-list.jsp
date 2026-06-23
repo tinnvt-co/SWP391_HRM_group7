@@ -2,6 +2,7 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <c:set var="activePage" value="attendanceList" scope="request"/>
+<c:set var="todayMax" value="<%= java.time.LocalDate.now().toString() %>"/>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -129,12 +130,12 @@
                 <div class="col-md-3">
                     <label class="form-label small text-muted mb-1">From</label>
                     <input type="date" name="fromDate" class="form-control form-control-sm"
-                           value="${fromDate}">
+                           max="${todayMax}" value="${fromDate}">
                 </div>
                 <div class="col-md-3">
                     <label class="form-label small text-muted mb-1">To</label>
                     <input type="date" name="toDate" class="form-control form-control-sm"
-                           value="${toDate}">
+                           max="${todayMax}" value="${toDate}">
                 </div>
                 <div class="col-md-2 d-flex gap-2">
                     <button type="submit" class="btn btn-sm btn-primary flex-grow-1"

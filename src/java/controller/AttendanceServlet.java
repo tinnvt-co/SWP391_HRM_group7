@@ -127,6 +127,11 @@ public class AttendanceServlet extends HttpServlet {
         LocalDate fromDate = parseDateOrNull(request.getParameter("fromDate"));
         LocalDate toDate   = parseDateOrNull(request.getParameter("toDate"));
 
+        // Attendance never exists in the future: clamp filter dates to today.
+        LocalDate today = LocalDate.now();
+        if (fromDate != null && fromDate.isAfter(today)) fromDate = today;
+        if (toDate != null && toDate.isAfter(today)) toDate = today;
+
         List<Employee> scopeEmployees;
         List<AttendanceRecord> records;
 
