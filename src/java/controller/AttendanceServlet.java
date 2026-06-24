@@ -29,6 +29,8 @@ import java.util.List;
 @WebServlet(name = "AttendanceServlet", urlPatterns = {"/attendance"})
 public class AttendanceServlet extends HttpServlet {
 
+    private static final int PAGE_SIZE = 10;
+
     private final AttendanceRecordDAO attendanceDAO = new AttendanceRecordDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
 
@@ -135,18 +137,46 @@ public class AttendanceServlet extends HttpServlet {
         List<Employee> scopeEmployees;
         List<AttendanceRecord> records;
 
+        int totalRecords;
+        int totalPages;
+        int page = 1;
+        String pageParam = request.getParameter("page");
+        if (pageParam != null && !pageParam.isBlank()) {
+            try { page = Integer.parseInt(pageParam); } catch (NumberFormatException ignored) {}
+        }
+
         if (managerScope) {
             scopeEmployees = employeeDAO.findByManagerUserId(currentUser.getUserId());
-            records = attendanceDAO.findByManagerScope(currentUser.getUserId(), employeeIdFilter, fromDate, toDate);
+            totalRecords = attendanceDAO.countByManagerScope(currentUser.getUserId(), employeeIdFilter, fromDate, toDate);
+            totalPages = Math.max(1, (int) Math.ceil(totalRecords / (double) PAGE_SIZE));
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+            records = attendanceDAO.findByManagerScope(currentUser.getUserId(), employeeIdFilter,
+                    fromDate, toDate, (page - 1) * PAGE_SIZE, PAGE_SIZE);
         } else if (orgWide) {
             scopeEmployees = employeeDAO.findAllActive();
-            records = attendanceDAO.findAll(employeeIdFilter, fromDate, toDate);
+            totalRecords = attendanceDAO.countAll(employeeIdFilter, fromDate, toDate);
+            totalPages = Math.max(1, (int) Math.ceil(totalRecords / (double) PAGE_SIZE));
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+            records = attendanceDAO.findAll(employeeIdFilter, fromDate, toDate,
+                    (page - 1) * PAGE_SIZE, PAGE_SIZE);
         } else {
             Employee me = employeeDAO.findByUserId(currentUser.getUserId());
             scopeEmployees = java.util.Collections.emptyList();
-            records = (me != null)
-                    ? attendanceDAO.findByEmployeeId(me.getEmployeeId(), fromDate, toDate)
-                    : java.util.Collections.emptyList();
+            if (me != null) {
+                totalRecords = attendanceDAO.countByEmployeeId(me.getEmployeeId(), fromDate, toDate);
+                totalPages = Math.max(1, (int) Math.ceil(totalRecords / (double) PAGE_SIZE));
+                if (page < 1) page = 1;
+                if (page > totalPages) page = totalPages;
+                records = attendanceDAO.findByEmployeeId(me.getEmployeeId(), fromDate, toDate,
+                        (page - 1) * PAGE_SIZE, PAGE_SIZE);
+            } else {
+                totalRecords = 0;
+                totalPages = 1;
+                page = 1;
+                records = java.util.Collections.emptyList();
+            }
         }
 
         request.setAttribute("records", records);
@@ -156,6 +186,9 @@ public class AttendanceServlet extends HttpServlet {
         request.setAttribute("employeeIdFilter", employeeIdFilter);
         request.setAttribute("fromDate", fromDate);
         request.setAttribute("toDate", toDate);
+        request.setAttribute("currentPage", page);
+        request.setAttribute("totalPages", totalPages);
+        request.setAttribute("totalRecords", totalRecords);
         request.getRequestDispatcher("/views/attendance/attendance-list.jsp")
                .forward(request, response);
     }

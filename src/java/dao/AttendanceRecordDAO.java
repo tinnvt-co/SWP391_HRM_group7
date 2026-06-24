@@ -151,26 +151,98 @@ public class AttendanceRecordDAO {
                                                      Integer employeeIdFilter,
                                                      LocalDate fromDate,
                                                      LocalDate toDate) throws SQLException {
-        return findByScope(managerUserId, null, employeeIdFilter, fromDate, toDate);
+        return findByScope(managerUserId, null, employeeIdFilter, fromDate, toDate, -1, -1);
     }
 
     public List<AttendanceRecord> findByEmployeeId(int employeeId,
                                                    LocalDate fromDate,
                                                    LocalDate toDate) throws SQLException {
-        return findByScope(null, employeeId, null, fromDate, toDate);
+        return findByScope(null, employeeId, null, fromDate, toDate, -1, -1);
     }
 
     public List<AttendanceRecord> findAll(Integer employeeIdFilter,
                                           LocalDate fromDate,
                                           LocalDate toDate) throws SQLException {
-        return findByScope(null, null, employeeIdFilter, fromDate, toDate);
+        return findByScope(null, null, employeeIdFilter, fromDate, toDate, -1, -1);
+    }
+
+    public List<AttendanceRecord> findByManagerScope(int managerUserId,
+                                                     Integer employeeIdFilter,
+                                                     LocalDate fromDate,
+                                                     LocalDate toDate,
+                                                     int offset, int limit) throws SQLException {
+        return findByScope(managerUserId, null, employeeIdFilter, fromDate, toDate, offset, limit);
+    }
+
+    public List<AttendanceRecord> findByEmployeeId(int employeeId,
+                                                   LocalDate fromDate,
+                                                   LocalDate toDate,
+                                                   int offset, int limit) throws SQLException {
+        return findByScope(null, employeeId, null, fromDate, toDate, offset, limit);
+    }
+
+    public List<AttendanceRecord> findAll(Integer employeeIdFilter,
+                                          LocalDate fromDate,
+                                          LocalDate toDate,
+                                          int offset, int limit) throws SQLException {
+        return findByScope(null, null, employeeIdFilter, fromDate, toDate, offset, limit);
+    }
+
+    public int countByManagerScope(int managerUserId, Integer employeeIdFilter,
+                                   LocalDate fromDate, LocalDate toDate) throws SQLException {
+        return countByScope(managerUserId, null, employeeIdFilter, fromDate, toDate);
+    }
+
+    public int countByEmployeeId(int employeeId, LocalDate fromDate, LocalDate toDate) throws SQLException {
+        return countByScope(null, employeeId, null, fromDate, toDate);
+    }
+
+    public int countAll(Integer employeeIdFilter, LocalDate fromDate, LocalDate toDate) throws SQLException {
+        return countByScope(null, null, employeeIdFilter, fromDate, toDate);
+    }
+
+    private StringBuilder buildScopeWhere(Integer managerUserId, Integer ownEmployeeId,
+                                          Integer employeeIdFilter, LocalDate fromDate,
+                                          LocalDate toDate, List<Object> params) {
+        StringBuilder where = new StringBuilder("WHERE 1=1 ");
+        if (managerUserId != null) { where.append("AND u.manager_id = ? "); params.add(managerUserId); }
+        if (ownEmployeeId != null) { where.append("AND a.employee_id = ? "); params.add(ownEmployeeId); }
+        if (employeeIdFilter != null) { where.append("AND a.employee_id = ? "); params.add(employeeIdFilter); }
+        if (fromDate != null) { where.append("AND a.work_date >= ? "); params.add(Date.valueOf(fromDate)); }
+        if (toDate != null) { where.append("AND a.work_date <= ? "); params.add(Date.valueOf(toDate)); }
+        return where;
+    }
+
+    private int countByScope(Integer managerUserId, Integer ownEmployeeId,
+                             Integer employeeIdFilter, LocalDate fromDate,
+                             LocalDate toDate) throws SQLException {
+        List<Object> params = new ArrayList<>();
+        String sql = "SELECT COUNT(*) FROM attendance_records a "
+                   + "JOIN employees e ON a.employee_id = e.employee_id "
+                   + "JOIN users u ON e.user_id = u.user_id "
+                   + buildScopeWhere(managerUserId, ownEmployeeId, employeeIdFilter, fromDate, toDate, params);
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            for (int i = 0; i < params.size(); i++) ps.setObject(i + 1, params.get(i));
+            rs = ps.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+        } finally {
+            close(conn, ps, rs);
+        }
+        return 0;
     }
 
     private List<AttendanceRecord> findByScope(Integer managerUserId,
                                                Integer ownEmployeeId,
                                                Integer employeeIdFilter,
                                                LocalDate fromDate,
-                                               LocalDate toDate) throws SQLException {
+                                               LocalDate toDate,
+                                               int offset, int limit) throws SQLException {
+        List<Object> params = new ArrayList<>();
         StringBuilder sql = new StringBuilder()
             .append("SELECT a.*, u.full_name AS emp_full_name, e.employee_code, ")
             .append("       vu.full_name AS verified_by_name ")
@@ -178,30 +250,14 @@ public class AttendanceRecordDAO {
             .append("JOIN employees e   ON a.employee_id = e.employee_id ")
             .append("JOIN users u       ON e.user_id     = u.user_id ")
             .append("LEFT JOIN users vu ON a.verified_by = vu.user_id ")
-            .append("WHERE 1=1 ");
+            .append(buildScopeWhere(managerUserId, ownEmployeeId, employeeIdFilter, fromDate, toDate, params))
+            .append("ORDER BY a.work_date DESC, u.full_name");
 
-        List<Object> params = new ArrayList<>();
-        if (managerUserId != null) {
-            sql.append("AND u.manager_id = ? ");
-            params.add(managerUserId);
+        if (limit >= 0) {
+            sql.append(" LIMIT ? OFFSET ?");
+            params.add(limit);
+            params.add(offset);
         }
-        if (ownEmployeeId != null) {
-            sql.append("AND a.employee_id = ? ");
-            params.add(ownEmployeeId);
-        }
-        if (employeeIdFilter != null) {
-            sql.append("AND a.employee_id = ? ");
-            params.add(employeeIdFilter);
-        }
-        if (fromDate != null) {
-            sql.append("AND a.work_date >= ? ");
-            params.add(Date.valueOf(fromDate));
-        }
-        if (toDate != null) {
-            sql.append("AND a.work_date <= ? ");
-            params.add(Date.valueOf(toDate));
-        }
-        sql.append("ORDER BY a.work_date DESC, u.full_name");
 
         List<AttendanceRecord> list = new ArrayList<>();
         Connection conn = null;
