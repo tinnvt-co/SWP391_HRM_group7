@@ -71,6 +71,8 @@ public class ContractServlet extends HttpServlet {
         }
     }
 
+    private static final int PAGE_SIZE = 10;
+
     private void handleList(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, ServletException, IOException {
 
@@ -81,8 +83,23 @@ public class ContractServlet extends HttpServlet {
             catch (IllegalArgumentException ignored) { statusParam = "all"; }
         }
 
-        request.setAttribute("contracts", contractDAO.findAll(statusFilter));
+        int totalContracts = contractDAO.countAll(statusFilter);
+        int totalPages = Math.max(1, (int) Math.ceil(totalContracts / (double) PAGE_SIZE));
+
+        int page = 1;
+        String pageParam = request.getParameter("page");
+        if (pageParam != null && !pageParam.isBlank()) {
+            try { page = Integer.parseInt(pageParam); } catch (NumberFormatException ignored) {}
+        }
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        int offset = (page - 1) * PAGE_SIZE;
+
+        request.setAttribute("contracts", contractDAO.findPage(statusFilter, offset, PAGE_SIZE));
         request.setAttribute("statusFilter", statusParam == null ? "all" : statusParam);
+        request.setAttribute("currentPage", page);
+        request.setAttribute("totalPages", totalPages);
+        request.setAttribute("totalContracts", totalContracts);
         request.getRequestDispatcher("/views/contract/contract-list.jsp").forward(request, response);
     }
 

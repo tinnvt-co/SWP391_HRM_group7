@@ -118,7 +118,7 @@
                     <tbody>
                         <c:forEach var="ct" items="${contracts}" varStatus="s">
                             <tr>
-                                <td class="ps-4 text-muted">${s.index + 1}</td>
+                                <td class="ps-4 text-muted">${(currentPage - 1) * 10 + s.index + 1}</td>
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
                                         <div class="avatar-sm">${fn:substring(ct.employeeFullName, 0, 1)}</div>
@@ -179,6 +179,28 @@
                 </table>
             </div>
         </div>
+        <c:if test="${totalPages > 1}">
+            <div class="d-flex align-items-center justify-content-between px-3 py-3 border-top flex-wrap gap-2">
+                <small class="text-muted">
+                    Page ${currentPage} of ${totalPages} &middot; ${totalContracts} contracts
+                </small>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item ${currentPage == 1 ? 'disabled' : ''}">
+                            <a class="page-link" href="?status=${statusFilter}&page=${currentPage - 1}">Previous</a>
+                        </li>
+                        <c:forEach var="p" begin="1" end="${totalPages}">
+                            <li class="page-item ${p == currentPage ? 'active' : ''}">
+                                <a class="page-link" href="?status=${statusFilter}&page=${p}">${p}</a>
+                            </li>
+                        </c:forEach>
+                        <li class="page-item ${currentPage == totalPages ? 'disabled' : ''}">
+                            <a class="page-link" href="?status=${statusFilter}&page=${currentPage + 1}">Next</a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </c:if>
     </div>
 </div>
 

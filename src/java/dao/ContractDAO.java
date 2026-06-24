@@ -39,6 +39,48 @@ public class ContractDAO {
         return list;
     }
 
+    public int countAll(Status statusFilter) throws SQLException {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM contracts c ");
+        if (statusFilter != null) sql.append("WHERE c.status = ? ");
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            if (statusFilter != null) ps.setString(1, statusFilter.name());
+            rs = ps.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+        } finally {
+            close(conn, ps, rs);
+        }
+        return 0;
+    }
+
+    public List<Contract> findPage(Status statusFilter, int offset, int limit) throws SQLException {
+        StringBuilder sql = new StringBuilder(BASE_SELECT);
+        if (statusFilter != null) sql.append("WHERE c.status = ? ");
+        sql.append("ORDER BY c.status, c.created_at DESC LIMIT ? OFFSET ?");
+
+        List<Contract> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int idx = 1;
+            if (statusFilter != null) ps.setString(idx++, statusFilter.name());
+            ps.setInt(idx++, limit);
+            ps.setInt(idx, offset);
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
     public Contract findById(int contractId) throws SQLException {
         String sql = BASE_SELECT + "WHERE c.contract_id = ?";
         Connection conn = null;

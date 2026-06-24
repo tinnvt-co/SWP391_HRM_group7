@@ -75,10 +75,32 @@ public class UserServlet extends HttpServlet {
         }
     }
 
+    private static final int PAGE_SIZE = 10;
+
     private void handleList(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, ServletException, IOException {
-        request.setAttribute("users", userDAO.findAll());
+
+        int totalUsers = userDAO.countAll();
+        int totalPages = Math.max(1, (int) Math.ceil(totalUsers / (double) PAGE_SIZE));
+
+        int page = parsePageParam(request.getParameter("page"), totalPages);
+        int offset = (page - 1) * PAGE_SIZE;
+
+        request.setAttribute("users", userDAO.findPage(offset, PAGE_SIZE));
+        request.setAttribute("currentPage", page);
+        request.setAttribute("totalPages", totalPages);
+        request.setAttribute("totalUsers", totalUsers);
         request.getRequestDispatcher("/views/user/user-list.jsp").forward(request, response);
+    }
+
+    private int parsePageParam(String pageParam, int totalPages) {
+        int page = 1;
+        if (pageParam != null && !pageParam.isBlank()) {
+            try { page = Integer.parseInt(pageParam); } catch (NumberFormatException ignored) {}
+        }
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        return page;
     }
 
     private void handleView(HttpServletRequest request, HttpServletResponse response)

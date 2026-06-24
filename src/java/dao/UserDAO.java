@@ -30,6 +30,44 @@ public class UserDAO {
         return list;
     }
 
+    public int countAll() throws SQLException {
+        String sql = "SELECT COUNT(*) FROM users";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            rs = ps.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+        } finally {
+            close(conn, ps, rs);
+        }
+        return 0;
+    }
+
+    public List<User> findPage(int offset, int limit) throws SQLException {
+        String sql = "SELECT u.*, r.role_name FROM users u "
+                   + "JOIN roles r ON u.role_id = r.role_id "
+                   + "ORDER BY u.user_id "
+                   + "LIMIT ? OFFSET ?";
+        List<User> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, limit);
+            ps.setInt(2, offset);
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
     public User findByUsername(String username) throws SQLException {
         String sql = "SELECT u.*, r.role_name FROM users u "
                    + "JOIN roles r ON u.role_id = r.role_id "
