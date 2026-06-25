@@ -119,28 +119,13 @@
                                     </option>
                                 </c:forEach>
                             </select>
-                            <div class="form-text">Present / Late requires check-in and check-out time.</div>
+                            <div class="form-text">Select the attendance status for this day.</div>
                         </div>
-                        <div class="col-md-3">
-                            <label for="checkInTime" class="form-label">Check-in</label>
-                            <input type="time" id="checkInTime" name="checkInTime" class="form-control"
-                                   value="${record.checkInTime}">
-                        </div>
-                        <div class="col-md-3">
-                            <label for="checkOutTime" class="form-label">Check-out</label>
-                            <input type="time" id="checkOutTime" name="checkOutTime" class="form-control"
-                                   value="${record.checkOutTime}">
-                        </div>
-                        <div class="col-md-3">
+                        <div class="col-md-6">
                             <label for="overtimeHours" class="form-label">Overtime (hours)</label>
                             <input type="number" step="0.25" min="0" id="overtimeHours" name="overtimeHours"
                                    class="form-control"
                                    value="${record.overtimeHours}">
-                        </div>
-                        <div class="col-md-9">
-                            <label class="form-label">Working Hours (auto)</label>
-                            <input type="text" id="workingHoursPreview" class="form-control bg-light"
-                                   value="${record.workingHours}" disabled>
                         </div>
                     </div>
 
@@ -171,28 +156,11 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    const checkIn   = document.getElementById('checkInTime');
-    const checkOut  = document.getElementById('checkOutTime');
-    const preview   = document.getElementById('workingHoursPreview');
     const noteInput = document.getElementById('note');
     const charCount = document.getElementById('charCount');
     const workDate  = document.getElementById('workDate');
 
     if (workDate) workDate.max = new Date().toISOString().split('T')[0];
-
-    function updateHours() {
-        if (!checkIn || !checkOut || !preview) return;
-        const a = checkIn.value, b = checkOut.value;
-        if (!a || !b) { preview.value = '0.00'; return; }
-        const [h1, m1] = a.split(':').map(Number);
-        const [h2, m2] = b.split(':').map(Number);
-        const minutes = (h2 * 60 + m2) - (h1 * 60 + m1);
-        if (minutes <= 0) { preview.value = '0.00'; return; }
-        preview.value = (minutes / 60).toFixed(2);
-    }
-    if (checkIn)  checkIn.addEventListener('change', updateHours);
-    if (checkOut) checkOut.addEventListener('change', updateHours);
-    updateHours();
 
     function updateCharCount() {
         if (!noteInput || !charCount) return;

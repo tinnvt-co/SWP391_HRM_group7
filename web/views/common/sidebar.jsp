@@ -82,14 +82,6 @@
                     </a>
                 </li>
             </c:if>
-            <c:if test="${fn:contains(permissions, 'VERIFY_STAFF_ATTENDANCE')}">
-                <li class="nav-item">
-                    <a class="nav-link ${activePage == 'attendanceAdd' ? 'active' : ''}"
-                       href="${pageContext.request.contextPath}/attendance?action=add">
-                        <i class="bi bi-plus-circle me-2"></i>New Attendance Record
-                    </a>
-                </li>
-            </c:if>
         </c:if>
         <c:if test="${fn:contains(permissions, 'VIEW_CONTRACT_LIST')
                    or fn:contains(permissions, 'VIEW_MY_CONTRACT')}">

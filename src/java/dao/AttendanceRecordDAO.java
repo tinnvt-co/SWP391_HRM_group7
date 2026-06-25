@@ -13,10 +13,10 @@ import java.util.List;
 public class AttendanceRecordDAO {
 
     public int insert(AttendanceRecord r) throws SQLException {
-        String sql = "INSERT INTO attendance_records (employee_id, work_date, check_in_time, check_out_time, "
-                   + "working_hours, overtime_hours, attendance_status, verification_status, "
+        String sql = "INSERT INTO attendance_records (employee_id, work_date, "
+                   + "overtime_hours, attendance_status, verification_status, "
                    + "verified_by, verified_at, note) "
-                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -24,18 +24,15 @@ public class AttendanceRecordDAO {
             ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
             ps.setInt(1, r.getEmployeeId());
             ps.setDate(2, Date.valueOf(r.getWorkDate()));
-            ps.setObject(3, r.getCheckInTime() != null ? Time.valueOf(r.getCheckInTime()) : null);
-            ps.setObject(4, r.getCheckOutTime() != null ? Time.valueOf(r.getCheckOutTime()) : null);
-            ps.setBigDecimal(5, r.getWorkingHours());
-            ps.setBigDecimal(6, r.getOvertimeHours());
-            ps.setString(7, r.getAttendanceStatus().getDbValue());
-            ps.setString(8, r.getVerificationStatus() == null
+            ps.setBigDecimal(3, r.getOvertimeHours() != null ? r.getOvertimeHours() : java.math.BigDecimal.ZERO);
+            ps.setString(4, r.getAttendanceStatus().getDbValue());
+            ps.setString(5, r.getVerificationStatus() == null
                     ? VerificationStatus.Pending.name() : r.getVerificationStatus().name());
-            if (r.getVerifiedBy() != null) ps.setInt(9, r.getVerifiedBy());
-            else                           ps.setNull(9, Types.INTEGER);
-            if (r.getVerifiedAt() != null) ps.setTimestamp(10, Timestamp.valueOf(r.getVerifiedAt()));
-            else                           ps.setNull(10, Types.TIMESTAMP);
-            ps.setString(11, r.getNote());
+            if (r.getVerifiedBy() != null) ps.setInt(6, r.getVerifiedBy());
+            else                           ps.setNull(6, Types.INTEGER);
+            if (r.getVerifiedAt() != null) ps.setTimestamp(7, Timestamp.valueOf(r.getVerifiedAt()));
+            else                           ps.setNull(7, Types.TIMESTAMP);
+            ps.setString(8, r.getNote());
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) return keys.getInt(1);
@@ -93,8 +90,8 @@ public class AttendanceRecordDAO {
     }
 
     public boolean update(AttendanceRecord r) throws SQLException {
-        String sql = "UPDATE attendance_records SET work_date=?, check_in_time=?, check_out_time=?, "
-                   + "working_hours=?, overtime_hours=?, attendance_status=?, note=?, "
+        String sql = "UPDATE attendance_records SET work_date=?, "
+                   + "overtime_hours=?, attendance_status=?, note=?, "
                    + "updated_at=NOW() "
                    + "WHERE attendance_id=?";
         Connection conn = null;
@@ -103,13 +100,10 @@ public class AttendanceRecordDAO {
             conn = DBContext.getConnection();
             ps = conn.prepareStatement(sql);
             ps.setDate(1, Date.valueOf(r.getWorkDate()));
-            ps.setObject(2, r.getCheckInTime() != null ? Time.valueOf(r.getCheckInTime()) : null);
-            ps.setObject(3, r.getCheckOutTime() != null ? Time.valueOf(r.getCheckOutTime()) : null);
-            ps.setBigDecimal(4, r.getWorkingHours());
-            ps.setBigDecimal(5, r.getOvertimeHours());
-            ps.setString(6, r.getAttendanceStatus().getDbValue());
-            ps.setString(7, r.getNote());
-            ps.setInt(8, r.getAttendanceId());
+            ps.setBigDecimal(2, r.getOvertimeHours() != null ? r.getOvertimeHours() : java.math.BigDecimal.ZERO);
+            ps.setString(3, r.getAttendanceStatus().getDbValue());
+            ps.setString(4, r.getNote());
+            ps.setInt(5, r.getAttendanceId());
             return ps.executeUpdate() > 0;
         } finally {
             close(conn, ps, null);
@@ -144,6 +138,59 @@ public class AttendanceRecordDAO {
             return ps.executeUpdate() > 0;
         } finally {
             close(conn, ps, null);
+        }
+    }
+
+    /**
+     * Bulk-verify every Pending record belonging to employees managed by the
+     * given manager (optionally limited to a date range). Returns the number of
+     * records updated. Used by "Send to HR Staff".
+     */
+    public int verifyAllPendingByManager(int managerUserId, int verifierUserId,
+                                         LocalDate fromDate, LocalDate toDate) throws SQLException {
+        StringBuilder sql = new StringBuilder(
+                "UPDATE attendance_records ar "
+              + "JOIN employees e ON ar.employee_id = e.employee_id "
+              + "JOIN users u     ON e.user_id      = u.user_id "
+              + "SET ar.verification_status='Verified', ar.verified_by=?, "
+              + "    ar.verified_at=NOW(), ar.updated_at=NOW() "
+              + "WHERE u.manager_id=? AND ar.verification_status='Pending'");
+        if (fromDate != null) sql.append(" AND ar.work_date >= ?");
+        if (toDate   != null) sql.append(" AND ar.work_date <= ?");
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int i = 1;
+            ps.setInt(i++, verifierUserId);
+            ps.setInt(i++, managerUserId);
+            if (fromDate != null) ps.setDate(i++, Date.valueOf(fromDate));
+            if (toDate   != null) ps.setDate(i++, Date.valueOf(toDate));
+            return ps.executeUpdate();
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
+    /** Count Pending records for employees managed by the given manager. */
+    public int countPendingByManager(int managerUserId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM attendance_records ar "
+                   + "JOIN employees e ON ar.employee_id = e.employee_id "
+                   + "JOIN users u     ON e.user_id      = u.user_id "
+                   + "WHERE u.manager_id=? AND ar.verification_status='Pending'";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, managerUserId);
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getInt(1) : 0;
+        } finally {
+            close(conn, ps, rs);
         }
     }
 
@@ -281,11 +328,6 @@ public class AttendanceRecordDAO {
         r.setEmployeeId(rs.getInt("employee_id"));
         Date wd = rs.getDate("work_date");
         if (wd != null) r.setWorkDate(wd.toLocalDate());
-        Time ci = rs.getTime("check_in_time");
-        if (ci != null) r.setCheckInTime(ci.toLocalTime());
-        Time co = rs.getTime("check_out_time");
-        if (co != null) r.setCheckOutTime(co.toLocalTime());
-        r.setWorkingHours(rs.getBigDecimal("working_hours"));
         r.setOvertimeHours(rs.getBigDecimal("overtime_hours"));
         r.setAttendanceStatus(AttendanceStatus.fromDb(rs.getString("attendance_status")));
         String vs = rs.getString("verification_status");

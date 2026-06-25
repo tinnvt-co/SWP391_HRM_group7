@@ -7,26 +7,34 @@ import model.AttendanceRecord.AttendanceStatus;
 import model.AttendanceRecord.VerificationStatus;
 import model.Employee;
 import model.User;
+import service.AttendanceImportService;
+import util.XlsxReader;
 
 import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.Part;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.sql.SQLException;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 
 @WebServlet(name = "AttendanceServlet", urlPatterns = {"/attendance"})
+@MultipartConfig(
+        fileSizeThreshold = 1024 * 1024,        // 1 MB
+        maxFileSize       = 10L * 1024 * 1024,  // 10 MB per file
+        maxRequestSize    = 12L * 1024 * 1024   // 12 MB total
+)
 public class AttendanceServlet extends HttpServlet {
 
     private static final int PAGE_SIZE = 10;
@@ -43,13 +51,6 @@ public class AttendanceServlet extends HttpServlet {
 
         try {
             switch (action) {
-                case "add" -> {
-                    if (!hasPermission(request, "VERIFY_STAFF_ATTENDANCE")) {
-                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
-                        return;
-                    }
-                    handleAddForm(request, response);
-                }
                 case "edit" -> {
                     if (!hasPermission(request, "VERIFY_STAFF_ATTENDANCE")) {
                         response.sendError(HttpServletResponse.SC_FORBIDDEN);
@@ -79,12 +80,12 @@ public class AttendanceServlet extends HttpServlet {
 
         try {
             switch (action) {
-                case "add" -> {
+                case "import" -> {
                     if (!hasPermission(request, "VERIFY_STAFF_ATTENDANCE")) {
                         response.sendError(HttpServletResponse.SC_FORBIDDEN);
                         return;
                     }
-                    handleAdd(request, response);
+                    handleImport(request, response);
                 }
                 case "edit" -> {
                     if (!hasPermission(request, "VERIFY_STAFF_ATTENDANCE")) {
@@ -93,19 +94,19 @@ public class AttendanceServlet extends HttpServlet {
                     }
                     handleEdit(request, response);
                 }
-                case "delete" -> {
-                    if (!hasPermission(request, "VERIFY_STAFF_ATTENDANCE")) {
-                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
-                        return;
-                    }
-                    handleDelete(request, response);
-                }
                 case "verify" -> {
                     if (!hasPermission(request, "VERIFY_STAFF_ATTENDANCE")) {
                         response.sendError(HttpServletResponse.SC_FORBIDDEN);
                         return;
                     }
                     handleVerify(request, response);
+                }
+                case "sendToHr" -> {
+                    if (!hasPermission(request, "VERIFY_STAFF_ATTENDANCE")) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleSendToHr(request, response);
                 }
                 default -> response.sendRedirect(request.getContextPath() + "/attendance");
             }
@@ -189,147 +190,106 @@ public class AttendanceServlet extends HttpServlet {
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalRecords", totalRecords);
+
+        // Import always targets the current month; show it (and the manager's
+        // department) in the import dialog.
+        YearMonth thisMonth = YearMonth.now();
+        request.setAttribute("importYear", thisMonth.getYear());
+        request.setAttribute("importMonth", thisMonth.getMonthValue());
+        request.setAttribute("importMonthLabel",
+                thisMonth.getMonth().getDisplayName(java.time.format.TextStyle.FULL,
+                        java.util.Locale.ENGLISH) + " " + thisMonth.getYear());
+        if (managerScope && !scopeEmployees.isEmpty()) {
+            // 1 manager : 1 department, so any team member's department is the dept.
+            request.setAttribute("managerDeptName", scopeEmployees.get(0).getDepartmentName());
+        }
+        if (managerScope) {
+            request.setAttribute("pendingCount",
+                    attendanceDAO.countPendingByManager(currentUser.getUserId()));
+        }
+
+        // Flash messages from a preceding import (PRG pattern).
+        HttpSession flashSession = request.getSession(false);
+        if (flashSession != null) {
+            Object ok = flashSession.getAttribute("importMessage");
+            Object err = flashSession.getAttribute("importError");
+            if (ok != null)  { request.setAttribute("importMessage", ok);  flashSession.removeAttribute("importMessage"); }
+            if (err != null) { request.setAttribute("importError", err);   flashSession.removeAttribute("importError"); }
+        }
+
         request.getRequestDispatcher("/views/attendance/attendance-list.jsp")
                .forward(request, response);
     }
 
-    private void handleAddForm(HttpServletRequest request, HttpServletResponse response)
+    /**
+     * Import a monthly attendance sheet (.xlsx) uploaded by a manager.
+     * Only managers may import, and only for employees they manage.
+     */
+    private void handleImport(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, ServletException, IOException {
 
         User currentUser = getCurrentUser(request);
-        List<Employee> employees = employeeDAO.findByManagerUserId(currentUser.getUserId());
+        HttpSession session = request.getSession(true);
+        String ctx = request.getContextPath();
 
-        request.setAttribute("employees", employees);
-        request.setAttribute("statuses", AttendanceStatus.values());
-        request.getRequestDispatcher("/views/attendance/add-attendance.jsp")
-               .forward(request, response);
-    }
+        // Import always targets the CURRENT month (no past/future selection).
+        YearMonth target = YearMonth.now();
 
-    private void handleAdd(HttpServletRequest request, HttpServletResponse response)
-            throws SQLException, ServletException, IOException {
-
-        User currentUser = getCurrentUser(request);
-        List<Employee> employees = employeeDAO.findByManagerUserId(currentUser.getUserId());
-
-        String employeeIdStr = request.getParameter("employeeId");
-        String workDateStr   = trim(request.getParameter("workDate"));
-        String statusStr     = request.getParameter("attendanceStatus");
-        String checkInStr    = trim(request.getParameter("checkInTime"));
-        String checkOutStr   = trim(request.getParameter("checkOutTime"));
-        String overtimeStr   = trim(request.getParameter("overtimeHours"));
-        String note          = trim(request.getParameter("note"));
-
-        if (employeeIdStr == null || employeeIdStr.isBlank()
-                || workDateStr.isEmpty() || statusStr == null || statusStr.isBlank()) {
-            forwardAddForm(request, response, employees,
-                    "Please fill in all required fields (employee, date, status).");
+        Part filePart = request.getPart("sheet");
+        if (filePart == null || filePart.getSize() == 0) {
+            session.setAttribute("importError", "Please choose a file to import.");
+            response.sendRedirect(ctx + "/attendance");
+            return;
+        }
+        String fileName = filePart.getSubmittedFileName();
+        if (fileName == null || !fileName.toLowerCase().endsWith(".xlsx")) {
+            session.setAttribute("importError", "Only .xlsx files are accepted.");
+            response.sendRedirect(ctx + "/attendance");
             return;
         }
 
-        int employeeId;
-        try { employeeId = Integer.parseInt(employeeIdStr); }
-        catch (NumberFormatException ex) {
-            forwardAddForm(request, response, employees, "Invalid employee.");
+        // Only the manager's own team is writable.
+        List<Employee> scope = employeeDAO.findByManagerUserId(currentUser.getUserId());
+        if (scope.isEmpty()) {
+            session.setAttribute("importError",
+                    "You do not manage any employees to import attendance for.");
+            response.sendRedirect(ctx + "/attendance");
             return;
         }
 
-        boolean ownsEmployee = employees.stream().anyMatch(e -> e.getEmployeeId() == employeeId);
-        if (!ownsEmployee) {
-            forwardAddForm(request, response, employees,
-                    "You can only create attendance for your own subordinates.");
+        AttendanceImportService.Result result;
+        try (InputStream in = filePart.getInputStream()) {
+            XlsxReader.Sheet sheet = XlsxReader.readFirstSheet(in);
+            AttendanceImportService importer = new AttendanceImportService();
+            result = importer.importSheet(sheet, scope, target,
+                    currentUser.getUserId(), /*overwrite*/ false);
+        } catch (IOException ex) {
+            session.setAttribute("importError",
+                    "Could not read the Excel file: " + ex.getMessage());
+            response.sendRedirect(ctx + "/attendance");
             return;
         }
 
-        LocalDate workDate;
-        try { workDate = LocalDate.parse(workDateStr); }
-        catch (DateTimeParseException ex) {
-            forwardAddForm(request, response, employees, "Invalid work date.");
-            return;
+        StringBuilder msg = new StringBuilder();
+        msg.append("Import ").append(target.getMonthValue()).append("/").append(target.getYear())
+           .append(": added ").append(result.inserted).append(" record(s)");
+        if (result.skippedExisting > 0)
+            msg.append(", skipped ").append(result.skippedExisting).append(" existing record(s)");
+        msg.append(".");
+        if (!result.warnings.isEmpty())
+            msg.append(" Warnings: ").append(result.warnings.size()).append(" cell(s).");
+
+        if (result.hasErrors()) {
+            StringBuilder err = new StringBuilder(msg).append(" Errors: ");
+            int show = Math.min(5, result.errors.size());
+            for (int i = 0; i < show; i++) err.append(result.errors.get(i)).append(" ");
+            if (result.errors.size() > show)
+                err.append("(+").append(result.errors.size() - show).append(" more)");
+            session.setAttribute("importError", err.toString());
+        } else {
+            session.setAttribute("importMessage", msg.toString());
         }
-
-        if (workDate.isAfter(LocalDate.now())) {
-            forwardAddForm(request, response, employees, "Work date cannot be in the future.");
-            return;
-        }
-
-        AttendanceStatus status;
-        try { status = AttendanceStatus.valueOf(statusStr); }
-        catch (IllegalArgumentException ex) {
-            forwardAddForm(request, response, employees, "Invalid attendance status.");
-            return;
-        }
-
-        LocalTime checkIn  = parseTimeOrNull(checkInStr);
-        LocalTime checkOut = parseTimeOrNull(checkOutStr);
-
-        boolean requiresTime =
-                status == AttendanceStatus.Present || status == AttendanceStatus.Late;
-        if (requiresTime && (checkIn == null || checkOut == null)) {
-            forwardAddForm(request, response, employees,
-                    "Check-in and check-out time are required when status is Present or Late.");
-            return;
-        }
-        if (checkIn != null && checkOut != null && checkOut.isBefore(checkIn)) {
-            forwardAddForm(request, response, employees,
-                    "Check-out time must be after check-in time.");
-            return;
-        }
-
-        BigDecimal overtimeHours = BigDecimal.ZERO;
-        if (!overtimeStr.isEmpty()) {
-            try {
-                overtimeHours = new BigDecimal(overtimeStr);
-                if (overtimeHours.signum() < 0) {
-                    forwardAddForm(request, response, employees, "Overtime hours cannot be negative.");
-                    return;
-                }
-            } catch (NumberFormatException ex) {
-                forwardAddForm(request, response, employees, "Invalid overtime hours.");
-                return;
-            }
-        }
-
-        if (note.length() > 255) {
-            forwardAddForm(request, response, employees, "Note must be 255 characters or fewer.");
-            return;
-        }
-
-        if (attendanceDAO.existsByEmployeeAndDate(employeeId, workDate)) {
-            forwardAddForm(request, response, employees,
-                    "An attendance record for this employee on this date already exists.");
-            return;
-        }
-
-        BigDecimal workingHours = BigDecimal.ZERO;
-        if (checkIn != null && checkOut != null) {
-            long minutes = Duration.between(checkIn, checkOut).toMinutes();
-            workingHours = BigDecimal.valueOf(minutes)
-                    .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
-        }
-
-        AttendanceRecord r = new AttendanceRecord();
-        r.setEmployeeId(employeeId);
-        r.setWorkDate(workDate);
-        r.setCheckInTime(checkIn);
-        r.setCheckOutTime(checkOut);
-        r.setWorkingHours(workingHours);
-        r.setOvertimeHours(overtimeHours);
-        r.setAttendanceStatus(status);
-        r.setVerificationStatus(VerificationStatus.Pending);
-        r.setNote(note);
-
-        attendanceDAO.insert(r);
-        response.sendRedirect(request.getContextPath() + "/attendance?created=success");
-    }
-
-    private void forwardAddForm(HttpServletRequest request, HttpServletResponse response,
-                                List<Employee> employees, String error)
-            throws ServletException, IOException {
-        request.setAttribute("error", error);
-        request.setAttribute("employees", employees);
-        request.setAttribute("statuses", AttendanceStatus.values());
-        request.getRequestDispatcher("/views/attendance/add-attendance.jsp")
-               .forward(request, response);
+        response.sendRedirect(ctx + "/attendance");
     }
 
     private void handleEditForm(HttpServletRequest request, HttpServletResponse response)
@@ -364,8 +324,6 @@ public class AttendanceServlet extends HttpServlet {
 
         String workDateStr  = trim(request.getParameter("workDate"));
         String statusStr    = request.getParameter("attendanceStatus");
-        String checkInStr   = trim(request.getParameter("checkInTime"));
-        String checkOutStr  = trim(request.getParameter("checkOutTime"));
         String overtimeStr  = trim(request.getParameter("overtimeHours"));
         String note         = trim(request.getParameter("note"));
 
@@ -391,22 +349,6 @@ public class AttendanceServlet extends HttpServlet {
         try { status = AttendanceStatus.valueOf(statusStr); }
         catch (IllegalArgumentException ex) {
             forwardEditForm(request, response, existing, "Invalid attendance status.");
-            return;
-        }
-
-        LocalTime checkIn  = parseTimeOrNull(checkInStr);
-        LocalTime checkOut = parseTimeOrNull(checkOutStr);
-
-        boolean requiresTime =
-                status == AttendanceStatus.Present || status == AttendanceStatus.Late;
-        if (requiresTime && (checkIn == null || checkOut == null)) {
-            forwardEditForm(request, response, existing,
-                    "Check-in and check-out time are required when status is Present or Late.");
-            return;
-        }
-        if (checkIn != null && checkOut != null && checkOut.isBefore(checkIn)) {
-            forwardEditForm(request, response, existing,
-                    "Check-out time must be after check-in time.");
             return;
         }
 
@@ -438,17 +380,7 @@ public class AttendanceServlet extends HttpServlet {
             return;
         }
 
-        BigDecimal workingHours = BigDecimal.ZERO;
-        if (checkIn != null && checkOut != null) {
-            long minutes = Duration.between(checkIn, checkOut).toMinutes();
-            workingHours = BigDecimal.valueOf(minutes)
-                    .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
-        }
-
         existing.setWorkDate(workDate);
-        existing.setCheckInTime(checkIn);
-        existing.setCheckOutTime(checkOut);
-        existing.setWorkingHours(workingHours);
         existing.setOvertimeHours(overtimeHours);
         existing.setAttendanceStatus(status);
         existing.setNote(note);
@@ -467,22 +399,6 @@ public class AttendanceServlet extends HttpServlet {
                .forward(request, response);
     }
 
-    private void handleDelete(HttpServletRequest request, HttpServletResponse response)
-            throws SQLException, IOException {
-
-        AttendanceRecord existing = loadOwnedRecordOrError(request, response);
-        if (existing == null) return;
-
-        if (existing.getVerificationStatus() == VerificationStatus.Verified) {
-            response.sendRedirect(request.getContextPath()
-                    + "/attendance?error=already-verified");
-            return;
-        }
-
-        attendanceDAO.deleteById(existing.getAttendanceId());
-        response.sendRedirect(request.getContextPath() + "/attendance?deleted=success");
-    }
-
     private void handleVerify(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, IOException {
 
@@ -498,6 +414,37 @@ public class AttendanceServlet extends HttpServlet {
         User currentUser = getCurrentUser(request);
         attendanceDAO.verify(existing.getAttendanceId(), currentUser.getUserId());
         response.sendRedirect(request.getContextPath() + "/attendance?verified=success");
+    }
+
+    /**
+     * "Send to HR Staff": bulk-verify every Pending record of the manager's team.
+     * Managers only; the action turns Pending -> Verified for all their staff.
+     */
+    private void handleSendToHr(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, IOException {
+
+        User currentUser = getCurrentUser(request);
+        String ctx = request.getContextPath();
+        HttpSession session = request.getSession(true);
+
+        String roleName = currentUser.getRole() != null ? currentUser.getRole().getRoleName() : "";
+        if (!"MANAGER".equalsIgnoreCase(roleName)) {
+            session.setAttribute("importError", "Only managers can send attendance to HR Staff.");
+            response.sendRedirect(ctx + "/attendance");
+            return;
+        }
+
+        int updated = attendanceDAO.verifyAllPendingByManager(
+                currentUser.getUserId(), currentUser.getUserId(), null, null);
+
+        if (updated > 0) {
+            session.setAttribute("importMessage",
+                    "Sent to HR Staff: " + updated + " record(s) verified.");
+        } else {
+            session.setAttribute("importError",
+                    "There are no pending records to send.");
+        }
+        response.sendRedirect(ctx + "/attendance");
     }
 
     private AttendanceRecord loadOwnedRecordOrError(HttpServletRequest request,
@@ -552,17 +499,14 @@ public class AttendanceServlet extends HttpServlet {
         try { return Integer.parseInt(s); } catch (NumberFormatException ex) { return null; }
     }
 
+    private int parseIntOr(String s, int dflt) {
+        if (s == null || s.isBlank()) return dflt;
+        try { return Integer.parseInt(s.trim()); } catch (NumberFormatException ex) { return dflt; }
+    }
+
     private LocalDate parseDateOrNull(String s) {
         if (s == null || s.isBlank()) return null;
         try { return LocalDate.parse(s); } catch (DateTimeParseException ex) { return null; }
-    }
-
-    private LocalTime parseTimeOrNull(String s) {
-        if (s == null || s.isBlank()) return null;
-        try {
-            if (s.length() == 5) return LocalTime.parse(s);
-            return LocalTime.parse(s);
-        } catch (DateTimeParseException ex) { return null; }
     }
 
     private String trim(String value) {

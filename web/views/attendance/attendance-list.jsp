@@ -71,30 +71,47 @@
             </small>
         </div>
         <c:if test="${fn:contains(permissions, 'VERIFY_STAFF_ATTENDANCE')}">
-            <a href="${pageContext.request.contextPath}/attendance?action=add"
-               class="btn btn-primary btn-sm px-3 fw-medium"
-               style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;">
-                <i class="bi bi-plus-circle me-2"></i>New Record
-            </a>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-primary btn-sm px-3 fw-medium"
+                        style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;"
+                        data-bs-toggle="modal" data-bs-target="#importModal">
+                    <i class="bi bi-upload me-2"></i>Import Attendance
+                </button>
+                <c:if test="${managerScope}">
+                    <form method="post"
+                          action="${pageContext.request.contextPath}/attendance?action=sendToHr"
+                          class="d-inline"
+                          onsubmit="return confirm('Send all pending attendance records to HR Staff? This will mark ${pendingCount} record(s) as verified.');">
+                        <button type="submit" class="btn btn-success btn-sm px-3 fw-medium"
+                                ${pendingCount > 0 ? '' : 'disabled'}
+                                title="${pendingCount > 0 ? 'Verify and send pending records to HR Staff' : 'No pending records to send'}">
+                            <i class="bi bi-send me-2"></i>Send to HR Staff
+                            <c:if test="${pendingCount > 0}">
+                                <span class="badge bg-light text-success ms-1">${pendingCount}</span>
+                            </c:if>
+                        </button>
+                    </form>
+                </c:if>
+            </div>
         </c:if>
     </div>
 
-    <c:if test="${param.created == 'success'}">
-        <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
-            <i class="bi bi-check-circle-fill"></i>
-            <span>Attendance record created successfully.</span>
-        </div>
-    </c:if>
     <c:if test="${param.updated == 'success'}">
         <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
             <i class="bi bi-check-circle-fill"></i>
             <span>Attendance record updated successfully.</span>
         </div>
     </c:if>
-    <c:if test="${param.deleted == 'success'}">
+    <c:if test="${not empty importMessage}">
         <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
             <i class="bi bi-check-circle-fill"></i>
-            <span>Attendance record deleted successfully.</span>
+            <span>${importMessage}</span>
+        </div>
+    </c:if>
+    <c:if test="${not empty importError}">
+        <div class="alert alert-danger d-flex align-items-start gap-2 py-2 mb-3">
+            <i class="bi bi-exclamation-octagon-fill mt-1"></i>
+            <span>${importError}</span>
         </div>
     </c:if>
     <c:if test="${param.verified == 'success'}">
@@ -164,9 +181,6 @@
                             <th class="ps-4">#</th>
                             <th>Employee</th>
                             <th>Date</th>
-                            <th>Check-in</th>
-                            <th>Check-out</th>
-                            <th>Hours</th>
                             <th>OT</th>
                             <th>Status</th>
                             <th>Verified</th>
@@ -188,19 +202,6 @@
                                     </div>
                                 </td>
                                 <td class="fw-medium">${r.workDate}</td>
-                                <td class="text-muted">
-                                    <c:choose>
-                                        <c:when test="${not empty r.checkInTime}">${r.checkInTime}</c:when>
-                                        <c:otherwise>&mdash;</c:otherwise>
-                                    </c:choose>
-                                </td>
-                                <td class="text-muted">
-                                    <c:choose>
-                                        <c:when test="${not empty r.checkOutTime}">${r.checkOutTime}</c:when>
-                                        <c:otherwise>&mdash;</c:otherwise>
-                                    </c:choose>
-                                </td>
-                                <td>${r.workingHours}</td>
                                 <td>${r.overtimeHours}</td>
                                 <td>
                                     <c:choose>
@@ -264,15 +265,6 @@
                                                class="btn btn-sm btn-outline-primary" title="Edit">
                                                 <i class="bi bi-pencil me-1"></i>Edit
                                             </a>
-                                            <form method="post"
-                                                  action="${pageContext.request.contextPath}/attendance?action=delete"
-                                                  class="d-inline"
-                                                  onsubmit="return confirm('Delete attendance for ${r.employeeFullName} on ${r.workDate}? This cannot be undone.')">
-                                                <input type="hidden" name="id" value="${r.attendanceId}">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
-                                                    <i class="bi bi-trash me-1"></i>Delete
-                                                </button>
-                                            </form>
                                         </div>
                                     </c:if>
                                 </td>
@@ -280,7 +272,7 @@
                         </c:forEach>
                         <c:if test="${empty records}">
                             <tr>
-                                <td colspan="11" class="text-center text-muted py-5">
+                                <td colspan="8" class="text-center text-muted py-5">
                                     <i class="bi bi-calendar2-x fs-2 d-block mb-2 opacity-25"></i>
                                     No attendance records found for this filter.
                                 </td>
@@ -319,6 +311,58 @@
         </div>
     </div>
 </div>
+
+<%-- ===== Import attendance sheet modal (managers only) ===== --%>
+<c:if test="${fn:contains(permissions, 'VERIFY_STAFF_ATTENDANCE')}">
+<div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <form method="post" enctype="multipart/form-data"
+            action="${pageContext.request.contextPath}/attendance?action=import">
+        <div class="modal-header" style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);">
+          <h6 class="modal-title text-white mb-0">
+            <i class="bi bi-upload me-2"></i>Import Attendance Sheet
+          </h6>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted mb-3">
+            Import the attendance file for
+            <strong>${not empty managerDeptName ? managerDeptName : 'your'}</strong>
+            department employees, for <strong>${importMonthLabel}</strong>.
+          </p>
+
+          <div class="alert alert-light border d-flex align-items-center gap-2 py-2 small mb-3">
+            <i class="bi bi-calendar-event text-primary"></i>
+            <span>Records are imported into the current month only
+              (<strong>${importMonthLabel}</strong>).</span>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label small text-muted mb-1">Attendance file (.xlsx)</label>
+            <input type="file" name="sheet" accept=".xlsx" required
+                   class="form-control form-control-sm">
+          </div>
+
+          <div class="border rounded p-2 bg-light small text-muted">
+            <strong>Legend:</strong>
+            P = Present &middot; A = Absent &middot; L = Leave &middot;
+            T = Late &middot; O = Overtime &middot; H = Holiday.
+            <br>Blank cells are skipped. Existing records will not be overwritten.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-sm btn-primary"
+                  style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;">
+            <i class="bi bi-upload me-1"></i>Import
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+</c:if>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
