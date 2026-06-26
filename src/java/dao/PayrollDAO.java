@@ -113,34 +113,6 @@ public class PayrollDAO {
              + "JOIN payroll_periods pp ON p.payroll_period_id = pp.payroll_period_id ";
     }
 
-    /**
-     * Edit KPI bonus + advance for one line, then recompute gross/deduction/net.
-     * advance is folded into total_deduction (net = gross - deduction).
-     * deductionExclAdvance = the statutory deduction (e.g. insurance) without advance.
-     */
-    public boolean updateKpiAndAdvance(int payrollId,
-                                       BigDecimal kpiBonus,
-                                       BigDecimal grossSalary,
-                                       BigDecimal totalDeduction,
-                                       BigDecimal netSalary) throws SQLException {
-        String sql = "UPDATE payrolls SET kpi_bonus=?, gross_salary=?, total_deduction=?, "
-                   + "net_salary=?, updated_at=NOW() WHERE payroll_id=?";
-        Connection conn = null;
-        PreparedStatement ps = null;
-        try {
-            conn = DBContext.getConnection();
-            ps = conn.prepareStatement(sql);
-            ps.setBigDecimal(1, nz(kpiBonus));
-            ps.setBigDecimal(2, nz(grossSalary));
-            ps.setBigDecimal(3, nz(totalDeduction));
-            ps.setBigDecimal(4, nz(netSalary));
-            ps.setInt(5, payrollId);
-            return ps.executeUpdate() > 0;
-        } finally {
-            close(conn, ps, null);
-        }
-    }
-
     /** Move every line of a period to a new status (follows the parent period). */
     public int updateStatusByPeriod(int periodId, Status newStatus) throws SQLException {
         String sql = "UPDATE payrolls SET status=?, updated_at=NOW() WHERE payroll_period_id=?";

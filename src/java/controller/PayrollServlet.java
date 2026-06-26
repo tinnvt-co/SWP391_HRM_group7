@@ -17,7 +17,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.YearMonth;
 import java.time.format.TextStyle;
@@ -58,10 +57,6 @@ public class PayrollServlet extends HttpServlet {
                     if (!hasPerm(request, "APPROVE_REJECT_PAYROLL")) { forbid(response); return; }
                     handleApprovalList(request, response);
                 }
-                case "editForm" -> {
-                    if (!hasPerm(request, "VIEW_PAYROLL")) { forbid(response); return; }
-                    handleEditForm(request, response);
-                }
                 default -> {
                     if (!hasPerm(request, "VIEW_PAYROLL")) { forbid(response); return; }
                     handleList(request, response);
@@ -98,10 +93,6 @@ public class PayrollServlet extends HttpServlet {
                 case "confirmPayment" -> {
                     if (!hasPerm(request, "GENERATE_PAYROLL")) { forbid(response); return; }
                     handleConfirmPayment(request, response);
-                }
-                case "editPayroll" -> {
-                    if (!hasPerm(request, "VIEW_PAYROLL")) { forbid(response); return; }
-                    handleEditPayroll(request, response);
                 }
                 default -> response.sendRedirect(request.getContextPath() + "/payroll");
             }
@@ -311,84 +302,6 @@ public class PayrollServlet extends HttpServlet {
         response.sendRedirect(redirectApproval(ctx, period));
     }
 
-    // ---------- Edit one payroll line (KPI + advance) ----------
-
-    private void handleEditForm(HttpServletRequest request, HttpServletResponse response)
-            throws SQLException, ServletException, IOException {
-        int payrollId = parseIntOr(request.getParameter("id"), -1);
-        Payroll pr = payrollId > 0 ? payrollDAO.findById(payrollId) : null;
-        if (pr == null) { response.sendError(HttpServletResponse.SC_NOT_FOUND); return; }
-        PayrollPeriod period = periodDAO.findById(pr.getPayrollPeriodId());
-        if (period == null || !canEdit(request, period)) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN);
-            return;
-        }
-        // Derive current advance from total_deduction (deduction = insurance + advance).
-        request.setAttribute("payroll", pr);
-        request.setAttribute("period", period);
-        request.setAttribute("currentAdvance", deriveAdvance(pr));
-        readFlash(request);
-        request.getRequestDispatcher("/views/payroll/payroll-edit.jsp")
-               .forward(request, response);
-    }
-
-    private void handleEditPayroll(HttpServletRequest request, HttpServletResponse response)
-            throws SQLException, IOException {
-        HttpSession session = request.getSession(true);
-        String ctx = request.getContextPath();
-        int payrollId = parseIntOr(request.getParameter("id"), -1);
-        Payroll pr = payrollId > 0 ? payrollDAO.findById(payrollId) : null;
-        if (pr == null) { flashError(session, "Payroll line not found."); response.sendRedirect(ctx + "/payroll"); return; }
-        PayrollPeriod period = periodDAO.findById(pr.getPayrollPeriodId());
-        if (period == null || !canEdit(request, period)) {
-            forbid(response);
-            return;
-        }
-
-        BigDecimal kpi = parseMoney(request.getParameter("kpiBonus"));
-        BigDecimal advance = parseMoney(request.getParameter("advancePayment"));
-        if (kpi == null || advance == null || kpi.signum() < 0 || advance.signum() < 0) {
-            flashError(session, "KPI bonus and advance must be valid non-negative numbers.");
-            response.sendRedirect(ctx + "/payroll?action=editForm&id=" + payrollId);
-            return;
-        }
-
-        BigDecimal[] g = calc.recompute(pr, kpi, advance);
-        payrollDAO.updateKpiAndAdvance(payrollId, kpi, g[0], g[1], g[2]);
-        flashMessage(session, "Updated payroll for " + pr.getEmployeeFullName() + ".");
-
-        // Back to the relevant screen depending on who edited.
-        if (period.getStatus() == PayrollPeriod.Status.PendingApproval) {
-            response.sendRedirect(redirectApproval(ctx, period));
-        } else {
-            response.sendRedirect(redirectTo(ctx, period));
-        }
-    }
-
-    /** Edit allowed: HR Staff in Draft/Rejected, HR Manager in Pending Approval. */
-    private boolean canEdit(HttpServletRequest request, PayrollPeriod period) {
-        PayrollPeriod.Status st = period.getStatus();
-        if (hasPerm(request, "GENERATE_PAYROLL")
-                && (st == PayrollPeriod.Status.Draft || st == PayrollPeriod.Status.Rejected)) {
-            return true;
-        }
-        if (hasPerm(request, "APPROVE_REJECT_PAYROLL")
-                && st == PayrollPeriod.Status.PendingApproval) {
-            return true;
-        }
-        return false;
-    }
-
-    /** advance = total_deduction - gross*10.5% (we fold advance into deduction). */
-    private BigDecimal deriveAdvance(Payroll p) {
-        BigDecimal gross = p.getGrossSalary() != null ? p.getGrossSalary() : BigDecimal.ZERO;
-        BigDecimal insurance = gross.multiply(PayrollCalculationService.INSURANCE_RATE);
-        BigDecimal ded = p.getTotalDeduction() != null ? p.getTotalDeduction() : BigDecimal.ZERO;
-        BigDecimal adv = ded.subtract(insurance);
-        return adv.signum() < 0 ? BigDecimal.ZERO
-                : adv.setScale(0, java.math.RoundingMode.HALF_UP);
-    }
-
     // ---------- helpers ----------
 
     private PayrollPeriod loadPeriod(HttpServletRequest request) throws SQLException {
@@ -440,12 +353,6 @@ public class PayrollServlet extends HttpServlet {
     private int parseIntOr(String s, int dflt) {
         if (s == null || s.isBlank()) return dflt;
         try { return Integer.parseInt(s.trim()); } catch (NumberFormatException ex) { return dflt; }
-    }
-
-    private BigDecimal parseMoney(String s) {
-        if (s == null || s.isBlank()) return BigDecimal.ZERO;
-        try { return new BigDecimal(s.trim().replace(",", "")); }
-        catch (NumberFormatException ex) { return null; }
     }
 
     private String trim(String s) { return s == null ? "" : s.trim(); }

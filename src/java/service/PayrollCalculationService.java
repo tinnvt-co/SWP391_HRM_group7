@@ -95,26 +95,6 @@ public class PayrollCalculationService {
         return BuildResult.ok(p);
     }
 
-    /**
-     * Recompute gross/deduction/net after an edit to kpi_bonus and/or advance.
-     * Reuses the already-stored work salary, allowance and OT salary (those don't
-     * depend on KPI/advance). Returns a 3-element array [gross, deduction, net].
-     */
-    public BigDecimal[] recompute(Payroll existing, BigDecimal newKpi, BigDecimal newAdvance) {
-        BigDecimal basic      = nz(existing.getBasicSalary());
-        BigDecimal stdDays    = new BigDecimal("26");
-        BigDecimal actualDays = nz(existing.getActualWorkingDays());
-        BigDecimal workSalary = basic.divide(stdDays, 4, RoundingMode.HALF_UP).multiply(actualDays);
-        BigDecimal allowance  = nz(existing.getTotalAllowance());
-        BigDecimal otSalary   = nz(existing.getOvertimeSalary());
-
-        BigDecimal gross     = workSalary.add(allowance).add(nz(newKpi)).add(otSalary);
-        BigDecimal insurance = gross.multiply(INSURANCE_RATE);
-        BigDecimal deduction = insurance.add(nz(newAdvance));
-        BigDecimal net       = gross.subtract(deduction);
-        return new BigDecimal[]{ round(gross), round(deduction), round(net) };
-    }
-
     private static BigDecimal nz(BigDecimal v) { return v != null ? v : BigDecimal.ZERO; }
     private static BigDecimal round(BigDecimal v) { return v.setScale(SCALE, RoundingMode.HALF_UP); }
 }

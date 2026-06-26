@@ -145,8 +145,6 @@
         </div>
     </div>
 
-    <c:set var="editable" value="${not empty period and (period.status == 'Draft' or period.status == 'Rejected')}"/>
-
     <div class="card border-0 shadow-sm rounded-3">
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -164,7 +162,6 @@
                             <th class="text-end">Gross</th>
                             <th class="text-end">Deduction</th>
                             <th class="text-end">Net</th>
-                            <c:if test="${editable}"><th class="text-end pe-4">Action</th></c:if>
                         </tr>
                     </thead>
                     <tbody>
@@ -184,19 +181,11 @@
                                 <td class="text-end"><fmt:formatNumber value="${p.grossSalary}" type="number" maxFractionDigits="0"/></td>
                                 <td class="text-end text-danger"><fmt:formatNumber value="${p.totalDeduction}" type="number" maxFractionDigits="0"/></td>
                                 <td class="text-end fw-bold"><fmt:formatNumber value="${p.netSalary}" type="number" maxFractionDigits="0"/></td>
-                                <c:if test="${editable}">
-                                    <td class="text-end pe-4">
-                                        <a href="${pageContext.request.contextPath}/payroll?action=editForm&id=${p.payrollId}"
-                                           class="btn btn-sm btn-outline-primary" title="Edit KPI / advance">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
-                                    </td>
-                                </c:if>
                             </tr>
                         </c:forEach>
                         <c:if test="${empty payrolls}">
                             <tr>
-                                <td colspan="${editable ? 12 : 11}" class="text-center text-muted py-5">
+                                <td colspan="11" class="text-center text-muted py-5">
                                     <i class="bi bi-cash-stack fs-2 d-block mb-2 opacity-25"></i>
                                     No payroll for ${monthLabel}.
                                     <c:if test="${not hasReports}">
