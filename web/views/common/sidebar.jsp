@@ -113,7 +113,8 @@
             </c:if>
         </c:if>
         <c:if test="${fn:contains(permissions, 'VIEW_PAYROLL')
-                   or fn:contains(permissions, 'APPROVE_REJECT_PAYROLL')}">
+                   or fn:contains(permissions, 'APPROVE_REJECT_PAYROLL')
+                   or fn:contains(permissions, 'VIEW_PAYSLIP')}">
             <div class="sidebar-label mt-2">Payroll</div>
             <c:if test="${fn:contains(permissions, 'GENERATE_PAYROLL')}">
                 <li class="nav-item">
@@ -128,6 +129,14 @@
                     <a class="nav-link ${activePage == 'payrollApproval' ? 'active' : ''}"
                        href="${pageContext.request.contextPath}/payroll?action=approval">
                         <i class="bi bi-check2-square me-2"></i>Payroll Approval
+                    </a>
+                </li>
+            </c:if>
+            <c:if test="${fn:contains(permissions, 'VIEW_PAYSLIP')}">
+                <li class="nav-item">
+                    <a class="nav-link ${activePage == 'payslip' ? 'active' : ''}"
+                       href="${pageContext.request.contextPath}/payslip">
+                        <i class="bi bi-receipt me-2"></i>My Payslip
                     </a>
                 </li>
             </c:if>
