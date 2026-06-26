@@ -116,6 +116,25 @@ public class ContractDAO {
         return list;
     }
 
+    /** The Active contract for an employee (most recent if several). Null if none. */
+    public Contract findActiveByEmployeeId(int employeeId) throws SQLException {
+        String sql = BASE_SELECT
+                   + "WHERE c.employee_id = ? AND c.status = 'Active' "
+                   + "ORDER BY c.start_date DESC LIMIT 1";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, employeeId);
+            rs = ps.executeQuery();
+            return rs.next() ? mapRow(rs) : null;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
     public boolean existsByCode(String code) throws SQLException {
         String sql = "SELECT 1 FROM contracts WHERE contract_code = ?";
         Connection conn = null;

@@ -112,6 +112,26 @@
                 </li>
             </c:if>
         </c:if>
+        <c:if test="${fn:contains(permissions, 'VIEW_PAYROLL')
+                   or fn:contains(permissions, 'APPROVE_REJECT_PAYROLL')}">
+            <div class="sidebar-label mt-2">Payroll</div>
+            <c:if test="${fn:contains(permissions, 'GENERATE_PAYROLL')}">
+                <li class="nav-item">
+                    <a class="nav-link ${activePage == 'payroll' ? 'active' : ''}"
+                       href="${pageContext.request.contextPath}/payroll">
+                        <i class="bi bi-cash-stack me-2"></i>Payroll
+                    </a>
+                </li>
+            </c:if>
+            <c:if test="${fn:contains(permissions, 'APPROVE_REJECT_PAYROLL')}">
+                <li class="nav-item">
+                    <a class="nav-link ${activePage == 'payrollApproval' ? 'active' : ''}"
+                       href="${pageContext.request.contextPath}/payroll?action=approval">
+                        <i class="bi bi-check2-square me-2"></i>Payroll Approval
+                    </a>
+                </li>
+            </c:if>
+        </c:if>
         <div class="sidebar-label mt-2">Account</div>
         <li class="nav-item">
             <a class="nav-link ${activePage == 'profile' ? 'active' : ''}"

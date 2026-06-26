@@ -1,0 +1,452 @@
+package controller;
+
+import dao.AttendanceReportDAO;
+import dao.PayrollDAO;
+import dao.PayrollPeriodDAO;
+import model.AttendanceReport;
+import model.Payroll;
+import model.PayrollPeriod;
+import model.User;
+import service.PayrollCalculationService;
+
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.sql.SQLException;
+import java.time.YearMonth;
+import java.time.format.TextStyle;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Payroll workflow.
+ *
+ * Status flow on a payroll_period (whole company, one per month):
+ *   Generate (HR Staff)            -> Draft
+ *   Submit for Approval (HR Staff) -> Pending Approval   (only from Draft/Rejected)
+ *   Approve (HR Manager)           -> Approved           (only from Pending Approval)
+ *   Reject  (HR Manager, +reason)  -> Rejected           (only from Pending Approval)
+ *   Confirm Payment (HR Staff)     -> Paid               (only from Approved)
+ *
+ * Editing a single payroll line (kpi_bonus + advance):
+ *   HR Staff   when period is Draft or Rejected
+ *   HR Manager when period is Pending Approval
+ *   Locked once Approved or Paid.
+ */
+@WebServlet(name = "PayrollServlet", urlPatterns = {"/payroll"})
+public class PayrollServlet extends HttpServlet {
+
+    private final PayrollPeriodDAO periodDAO = new PayrollPeriodDAO();
+    private final PayrollDAO payrollDAO = new PayrollDAO();
+    private final AttendanceReportDAO reportDAO = new AttendanceReportDAO();
+    private final PayrollCalculationService calc = new PayrollCalculationService();
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        String action = request.getParameter("action");
+        if (action == null) action = "list";
+        try {
+            switch (action) {
+                case "approval" -> {
+                    if (!hasPerm(request, "APPROVE_REJECT_PAYROLL")) { forbid(response); return; }
+                    handleApprovalList(request, response);
+                }
+                case "editForm" -> {
+                    if (!hasPerm(request, "VIEW_PAYROLL")) { forbid(response); return; }
+                    handleEditForm(request, response);
+                }
+                default -> {
+                    if (!hasPerm(request, "VIEW_PAYROLL")) { forbid(response); return; }
+                    handleList(request, response);
+                }
+            }
+        } catch (SQLException e) {
+            throw new ServletException(e);
+        }
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        String action = request.getParameter("action");
+        if (action == null) action = "";
+        try {
+            switch (action) {
+                case "generate" -> {
+                    if (!hasPerm(request, "GENERATE_PAYROLL")) { forbid(response); return; }
+                    handleGenerate(request, response);
+                }
+                case "submit" -> {
+                    if (!hasPerm(request, "SUBMIT_PAYROLL_FOR_APPROVAL")) { forbid(response); return; }
+                    handleSubmit(request, response);
+                }
+                case "approve" -> {
+                    if (!hasPerm(request, "APPROVE_REJECT_PAYROLL")) { forbid(response); return; }
+                    handleApprove(request, response);
+                }
+                case "reject" -> {
+                    if (!hasPerm(request, "APPROVE_REJECT_PAYROLL")) { forbid(response); return; }
+                    handleReject(request, response);
+                }
+                case "confirmPayment" -> {
+                    if (!hasPerm(request, "GENERATE_PAYROLL")) { forbid(response); return; }
+                    handleConfirmPayment(request, response);
+                }
+                case "editPayroll" -> {
+                    if (!hasPerm(request, "VIEW_PAYROLL")) { forbid(response); return; }
+                    handleEditPayroll(request, response);
+                }
+                default -> response.sendRedirect(request.getContextPath() + "/payroll");
+            }
+        } catch (SQLException e) {
+            throw new ServletException(e);
+        }
+    }
+
+    // ---------- HR Staff: list + generate ----------
+
+    private void handleList(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, ServletException, IOException {
+        YearMonth now = YearMonth.now();
+        int year  = parseIntOr(request.getParameter("year"),  now.getYear());
+        int month = parseIntOr(request.getParameter("month"), now.getMonthValue());
+        if (month < 1 || month > 12) month = now.getMonthValue();
+
+        PayrollPeriod period = periodDAO.findByMonth(year, month);
+        List<Payroll> payrolls = period != null
+                ? payrollDAO.findByPeriod(period.getPayrollPeriodId())
+                : List.of();
+
+        // Can we generate? Only if no period yet AND there are submitted reports.
+        boolean hasReports = !reportDAO.findSubmittedByMonth(year, month, null).isEmpty();
+
+        request.setAttribute("period", period);
+        request.setAttribute("payrolls", payrolls);
+        request.setAttribute("hasReports", hasReports);
+        request.setAttribute("selectedYear", year);
+        request.setAttribute("selectedMonth", month);
+        request.setAttribute("monthLabel", monthLabel(year, month));
+        readFlash(request);
+        request.getRequestDispatcher("/views/payroll/payroll-list.jsp")
+               .forward(request, response);
+    }
+
+    private void handleGenerate(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, IOException {
+        User user = currentUser(request);
+        HttpSession session = request.getSession(true);
+        String ctx = request.getContextPath();
+
+        YearMonth now = YearMonth.now();
+        int year  = parseIntOr(request.getParameter("year"),  now.getYear());
+        int month = parseIntOr(request.getParameter("month"), now.getMonthValue());
+
+        // Must have attendance reports submitted for that month.
+        List<AttendanceReport> reports = reportDAO.findSubmittedByMonth(year, month, null);
+        if (reports.isEmpty()) {
+            flashError(session, "No submitted attendance reports for " + monthLabel(year, month)
+                    + ". Ask managers to send attendance first.");
+            response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month);
+            return;
+        }
+
+        // A period must not already exist (avoid regenerating an approved/paid batch).
+        PayrollPeriod existing = periodDAO.findByMonth(year, month);
+        if (existing != null) {
+            flashError(session, "A payroll for " + monthLabel(year, month)
+                    + " already exists (status: " + existing.getStatus().getDbValue() + ").");
+            response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month);
+            return;
+        }
+
+        // Create the Draft period.
+        PayrollPeriod p = new PayrollPeriod();
+        p.setPeriodName("Payroll " + monthLabel(year, month));
+        p.setPayrollMonth(month);
+        p.setPayrollYear(year);
+        p.setCreatedBy(user.getUserId());
+        int periodId = periodDAO.createDraft(p);
+        if (periodId < 0) {
+            flashError(session, "Could not create payroll (it may already exist).");
+            response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month);
+            return;
+        }
+
+        // Build one payroll line per report.
+        int created = 0;
+        StringBuilder skipped = new StringBuilder();
+        for (AttendanceReport r : reports) {
+            PayrollCalculationService.BuildResult res = calc.build(periodId, r);
+            if (res.payroll != null) {
+                payrollDAO.insert(res.payroll);
+                created++;
+            } else {
+                skipped.append(res.skipReason).append("; ");
+            }
+        }
+
+        String msg = "Generated payroll for " + monthLabel(year, month)
+                + ": " + created + " employee(s).";
+        if (skipped.length() > 0) msg += " Skipped: " + skipped;
+        flashMessage(session, msg);
+        response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month);
+    }
+
+    // ---------- HR Staff: submit / confirm payment ----------
+
+    private void handleSubmit(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, IOException {
+        HttpSession session = request.getSession(true);
+        String ctx = request.getContextPath();
+        PayrollPeriod period = loadPeriod(request);
+        if (period == null) { flashError(session, "Payroll not found."); response.sendRedirect(ctx + "/payroll"); return; }
+
+        if (period.getStatus() != PayrollPeriod.Status.Draft
+                && period.getStatus() != PayrollPeriod.Status.Rejected) {
+            flashError(session, "Only a Draft or Rejected payroll can be submitted for approval.");
+            response.sendRedirect(redirectTo(ctx, period));
+            return;
+        }
+        periodDAO.updateStatus(period.getPayrollPeriodId(),
+                PayrollPeriod.Status.PendingApproval, null, null);
+        payrollDAO.updateStatusByPeriod(period.getPayrollPeriodId(), Payroll.Status.PendingApproval);
+        flashMessage(session, "Payroll submitted to HR Manager for approval.");
+        response.sendRedirect(redirectTo(ctx, period));
+    }
+
+    private void handleConfirmPayment(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, IOException {
+        User user = currentUser(request);
+        HttpSession session = request.getSession(true);
+        String ctx = request.getContextPath();
+        PayrollPeriod period = loadPeriod(request);
+        if (period == null) { flashError(session, "Payroll not found."); response.sendRedirect(ctx + "/payroll"); return; }
+
+        if (period.getStatus() != PayrollPeriod.Status.Approved) {
+            flashError(session, "Only an Approved payroll can be marked as paid.");
+            response.sendRedirect(redirectTo(ctx, period));
+            return;
+        }
+        periodDAO.updateStatus(period.getPayrollPeriodId(),
+                PayrollPeriod.Status.Paid, user.getUserId(), null);
+        payrollDAO.updateStatusByPeriod(period.getPayrollPeriodId(), Payroll.Status.Paid);
+        flashMessage(session, "Payment confirmed. Payslips are now available to employees.");
+        response.sendRedirect(redirectTo(ctx, period));
+    }
+
+    // ---------- HR Manager: approval list / approve / reject ----------
+
+    private void handleApprovalList(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, ServletException, IOException {
+        YearMonth now = YearMonth.now();
+        int year  = parseIntOr(request.getParameter("year"),  now.getYear());
+        int month = parseIntOr(request.getParameter("month"), now.getMonthValue());
+        if (month < 1 || month > 12) month = now.getMonthValue();
+
+        PayrollPeriod period = periodDAO.findByMonth(year, month);
+        List<Payroll> payrolls = period != null
+                ? payrollDAO.findByPeriod(period.getPayrollPeriodId())
+                : List.of();
+
+        request.setAttribute("period", period);
+        request.setAttribute("payrolls", payrolls);
+        request.setAttribute("selectedYear", year);
+        request.setAttribute("selectedMonth", month);
+        request.setAttribute("monthLabel", monthLabel(year, month));
+        readFlash(request);
+        request.getRequestDispatcher("/views/payroll/payroll-approval.jsp")
+               .forward(request, response);
+    }
+
+    private void handleApprove(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, IOException {
+        User user = currentUser(request);
+        HttpSession session = request.getSession(true);
+        String ctx = request.getContextPath();
+        PayrollPeriod period = loadPeriod(request);
+        if (period == null) { flashError(session, "Payroll not found."); response.sendRedirect(ctx + "/payroll?action=approval"); return; }
+
+        if (period.getStatus() != PayrollPeriod.Status.PendingApproval) {
+            flashError(session, "Only a payroll Pending Approval can be approved.");
+            response.sendRedirect(redirectApproval(ctx, period));
+            return;
+        }
+        periodDAO.updateStatus(period.getPayrollPeriodId(),
+                PayrollPeriod.Status.Approved, user.getUserId(), null);
+        payrollDAO.updateStatusByPeriod(period.getPayrollPeriodId(), Payroll.Status.Approved);
+        flashMessage(session, "Payroll approved.");
+        response.sendRedirect(redirectApproval(ctx, period));
+    }
+
+    private void handleReject(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, IOException {
+        User user = currentUser(request);
+        HttpSession session = request.getSession(true);
+        String ctx = request.getContextPath();
+        PayrollPeriod period = loadPeriod(request);
+        if (period == null) { flashError(session, "Payroll not found."); response.sendRedirect(ctx + "/payroll?action=approval"); return; }
+
+        String reason = trim(request.getParameter("rejectReason"));
+        if (reason.isEmpty()) {
+            flashError(session, "A reject reason is required.");
+            response.sendRedirect(redirectApproval(ctx, period));
+            return;
+        }
+        if (period.getStatus() != PayrollPeriod.Status.PendingApproval) {
+            flashError(session, "Only a payroll Pending Approval can be rejected.");
+            response.sendRedirect(redirectApproval(ctx, period));
+            return;
+        }
+        periodDAO.updateStatus(period.getPayrollPeriodId(),
+                PayrollPeriod.Status.Rejected, user.getUserId(), reason);
+        payrollDAO.updateStatusByPeriod(period.getPayrollPeriodId(), Payroll.Status.Rejected);
+        flashMessage(session, "Payroll rejected and sent back to HR Staff.");
+        response.sendRedirect(redirectApproval(ctx, period));
+    }
+
+    // ---------- Edit one payroll line (KPI + advance) ----------
+
+    private void handleEditForm(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, ServletException, IOException {
+        int payrollId = parseIntOr(request.getParameter("id"), -1);
+        Payroll pr = payrollId > 0 ? payrollDAO.findById(payrollId) : null;
+        if (pr == null) { response.sendError(HttpServletResponse.SC_NOT_FOUND); return; }
+        PayrollPeriod period = periodDAO.findById(pr.getPayrollPeriodId());
+        if (period == null || !canEdit(request, period)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+            return;
+        }
+        // Derive current advance from total_deduction (deduction = insurance + advance).
+        request.setAttribute("payroll", pr);
+        request.setAttribute("period", period);
+        request.setAttribute("currentAdvance", deriveAdvance(pr));
+        readFlash(request);
+        request.getRequestDispatcher("/views/payroll/payroll-edit.jsp")
+               .forward(request, response);
+    }
+
+    private void handleEditPayroll(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, IOException {
+        HttpSession session = request.getSession(true);
+        String ctx = request.getContextPath();
+        int payrollId = parseIntOr(request.getParameter("id"), -1);
+        Payroll pr = payrollId > 0 ? payrollDAO.findById(payrollId) : null;
+        if (pr == null) { flashError(session, "Payroll line not found."); response.sendRedirect(ctx + "/payroll"); return; }
+        PayrollPeriod period = periodDAO.findById(pr.getPayrollPeriodId());
+        if (period == null || !canEdit(request, period)) {
+            forbid(response);
+            return;
+        }
+
+        BigDecimal kpi = parseMoney(request.getParameter("kpiBonus"));
+        BigDecimal advance = parseMoney(request.getParameter("advancePayment"));
+        if (kpi == null || advance == null || kpi.signum() < 0 || advance.signum() < 0) {
+            flashError(session, "KPI bonus and advance must be valid non-negative numbers.");
+            response.sendRedirect(ctx + "/payroll?action=editForm&id=" + payrollId);
+            return;
+        }
+
+        BigDecimal[] g = calc.recompute(pr, kpi, advance);
+        payrollDAO.updateKpiAndAdvance(payrollId, kpi, g[0], g[1], g[2]);
+        flashMessage(session, "Updated payroll for " + pr.getEmployeeFullName() + ".");
+
+        // Back to the relevant screen depending on who edited.
+        if (period.getStatus() == PayrollPeriod.Status.PendingApproval) {
+            response.sendRedirect(redirectApproval(ctx, period));
+        } else {
+            response.sendRedirect(redirectTo(ctx, period));
+        }
+    }
+
+    /** Edit allowed: HR Staff in Draft/Rejected, HR Manager in Pending Approval. */
+    private boolean canEdit(HttpServletRequest request, PayrollPeriod period) {
+        PayrollPeriod.Status st = period.getStatus();
+        if (hasPerm(request, "GENERATE_PAYROLL")
+                && (st == PayrollPeriod.Status.Draft || st == PayrollPeriod.Status.Rejected)) {
+            return true;
+        }
+        if (hasPerm(request, "APPROVE_REJECT_PAYROLL")
+                && st == PayrollPeriod.Status.PendingApproval) {
+            return true;
+        }
+        return false;
+    }
+
+    /** advance = total_deduction - gross*10.5% (we fold advance into deduction). */
+    private BigDecimal deriveAdvance(Payroll p) {
+        BigDecimal gross = p.getGrossSalary() != null ? p.getGrossSalary() : BigDecimal.ZERO;
+        BigDecimal insurance = gross.multiply(PayrollCalculationService.INSURANCE_RATE);
+        BigDecimal ded = p.getTotalDeduction() != null ? p.getTotalDeduction() : BigDecimal.ZERO;
+        BigDecimal adv = ded.subtract(insurance);
+        return adv.signum() < 0 ? BigDecimal.ZERO
+                : adv.setScale(0, java.math.RoundingMode.HALF_UP);
+    }
+
+    // ---------- helpers ----------
+
+    private PayrollPeriod loadPeriod(HttpServletRequest request) throws SQLException {
+        int id = parseIntOr(request.getParameter("periodId"), -1);
+        return id > 0 ? periodDAO.findById(id) : null;
+    }
+
+    private String redirectTo(String ctx, PayrollPeriod p) {
+        return ctx + "/payroll?year=" + p.getPayrollYear() + "&month=" + p.getPayrollMonth();
+    }
+    private String redirectApproval(String ctx, PayrollPeriod p) {
+        return ctx + "/payroll?action=approval&year=" + p.getPayrollYear()
+                + "&month=" + p.getPayrollMonth();
+    }
+
+    private String monthLabel(int year, int month) {
+        return YearMonth.of(year, month).getMonth()
+                .getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + year;
+    }
+
+    private User currentUser(HttpServletRequest request) {
+        HttpSession s = request.getSession(false);
+        return s == null ? null : (User) s.getAttribute("currentUser");
+    }
+
+    private boolean hasPerm(HttpServletRequest request, String code) {
+        HttpSession s = request.getSession(false);
+        if (s == null) return false;
+        List<?> perms = (List<?>) s.getAttribute("permissions");
+        return perms != null && perms.contains(code);
+    }
+
+    private void forbid(HttpServletResponse response) throws IOException {
+        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+    }
+
+    private void flashMessage(HttpSession s, String m) { s.setAttribute("payrollMessage", m); }
+    private void flashError(HttpSession s, String m)   { s.setAttribute("payrollError", m); }
+
+    private void readFlash(HttpServletRequest request) {
+        HttpSession s = request.getSession(false);
+        if (s == null) return;
+        Object ok = s.getAttribute("payrollMessage");
+        Object err = s.getAttribute("payrollError");
+        if (ok != null)  { request.setAttribute("payrollMessage", ok);  s.removeAttribute("payrollMessage"); }
+        if (err != null) { request.setAttribute("payrollError", err);   s.removeAttribute("payrollError"); }
+    }
+
+    private int parseIntOr(String s, int dflt) {
+        if (s == null || s.isBlank()) return dflt;
+        try { return Integer.parseInt(s.trim()); } catch (NumberFormatException ex) { return dflt; }
+    }
+
+    private BigDecimal parseMoney(String s) {
+        if (s == null || s.isBlank()) return BigDecimal.ZERO;
+        try { return new BigDecimal(s.trim().replace(",", "")); }
+        catch (NumberFormatException ex) { return null; }
+    }
+
+    private String trim(String s) { return s == null ? "" : s.trim(); }
+}
