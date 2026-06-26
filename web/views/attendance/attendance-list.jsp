@@ -70,7 +70,7 @@
                 </c:choose>
             </small>
         </div>
-        <c:if test="${fn:contains(permissions, 'VERIFY_STAFF_ATTENDANCE')}">
+        <c:if test="${permissions.contains('VERIFY_STAFF_ATTENDANCE')}">
             <div class="d-flex gap-2">
                 <button type="button" class="btn btn-primary btn-sm px-3 fw-medium"
                         style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;"
@@ -249,7 +249,7 @@
                                     </c:choose>
                                 </td>
                                 <td class="text-end pe-4">
-                                    <c:if test="${fn:contains(permissions, 'VERIFY_STAFF_ATTENDANCE')
+                                    <c:if test="${permissions.contains('VERIFY_STAFF_ATTENDANCE')
                                               and r.verificationStatus != 'Verified'}">
                                         <div class="d-flex justify-content-end gap-1">
                                             <form method="post"
@@ -313,7 +313,7 @@
 </div>
 
 <%-- ===== Import attendance sheet modal (managers only) ===== --%>
-<c:if test="${fn:contains(permissions, 'VERIFY_STAFF_ATTENDANCE')}">
+<c:if test="${permissions.contains('VERIFY_STAFF_ATTENDANCE')}">
 <div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow">

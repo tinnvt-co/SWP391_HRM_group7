@@ -48,7 +48,7 @@
             <h5 class="fw-bold text-dark mb-0">Department Management</h5>
             <small class="text-muted">View and manage company departments</small>
         </div>
-        <c:if test="${fn:contains(permissions, 'CREATE_DEPARTMENT')}">
+        <c:if test="${permissions.contains('CREATE_DEPARTMENT')}">
             <a href="${pageContext.request.contextPath}/departments?action=add"
                class="btn btn-primary btn-sm px-3 fw-medium"
                style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;">
@@ -134,13 +134,13 @@
                                 </td>
                                 <td class="text-end pe-4">
                                     <div class="d-flex justify-content-end gap-1">
-                                        <c:if test="${fn:contains(permissions, 'UPDATE_DEPARTMENT')}">
+                                        <c:if test="${permissions.contains('UPDATE_DEPARTMENT')}">
                                             <a href="${pageContext.request.contextPath}/departments?action=edit&id=${d.departmentId}"
                                                class="btn btn-sm btn-outline-primary" title="Edit">
                                                 <i class="bi bi-pencil me-1"></i>Edit
                                             </a>
                                         </c:if>
-                                        <c:if test="${fn:contains(permissions, 'ACTIVE_DEACTIVE_DEPARTMENT')}">
+                                        <c:if test="${permissions.contains('ACTIVE_DEACTIVE_DEPARTMENT')}">
                                             <form method="post" action="${pageContext.request.contextPath}/departments?action=toggle"
                                                   class="d-inline"
                                                   onsubmit="return confirm('${d.active ? 'Deactivate' : 'Activate'} department \'${d.departmentName}\'?')">

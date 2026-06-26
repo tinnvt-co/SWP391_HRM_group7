@@ -237,13 +237,13 @@
                                     </c:choose>
                                 </td>
                                 <td class="text-end pe-4">
-                                    <c:if test="${fn:contains(permissions, 'VIEW_LEAVE_REQUEST_DETAIL')}">
+                                    <c:if test="${permissions.contains('VIEW_LEAVE_REQUEST_DETAIL')}">
                                         <a href="${pageContext.request.contextPath}/leave-requests?action=detail&id=${lr.leaveRequestId}"
                                            class="btn btn-sm btn-outline-primary">
                                             <i class="bi bi-eye me-1"></i>View
                                         </a>
                                     </c:if>
-                                    <c:if test="${fn:contains(permissions, 'APPROVE_REJECT_LEAVE_REQUEST') && lr.status == 'Pending'}">
+                                    <c:if test="${permissions.contains('APPROVE_REJECT_LEAVE_REQUEST') && lr.status == 'Pending'}">
                                         <form method="post" action="${pageContext.request.contextPath}/leave-requests?action=approve"
                                               class="d-inline"
                                               onsubmit="return confirm('Approve leave request from ${lr.employeeFullName}?')">

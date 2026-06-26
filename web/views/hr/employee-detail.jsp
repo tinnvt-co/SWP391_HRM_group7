@@ -100,7 +100,7 @@
                 </div>
             </div>
 
-            <c:if test="${fn:contains(permissions, 'UPDATE_EMPLOYMENT_STATUS')}">
+            <c:if test="${permissions.contains('UPDATE_EMPLOYMENT_STATUS')}">
                 <div class="card border-0 shadow-sm rounded-3 p-4 mt-3">
                     <h6 class="fw-semibold mb-3 text-secondary">
                         <i class="bi bi-pencil-square me-2"></i>Update Employment Status

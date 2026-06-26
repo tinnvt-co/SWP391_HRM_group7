@@ -56,7 +56,7 @@
             <h5 class="fw-bold text-dark mb-0">Contract Management</h5>
             <small class="text-muted">Manage all employee contracts</small>
         </div>
-        <c:if test="${fn:contains(permissions, 'CREATE_CONTRACT')}">
+        <c:if test="${permissions.contains('CREATE_CONTRACT')}">
             <a href="${pageContext.request.contextPath}/contracts?action=add"
                class="btn btn-primary btn-sm px-3 fw-medium"
                style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;">
@@ -152,11 +152,11 @@
                                     <div class="d-flex justify-content-end gap-1">
                                         <a href="${pageContext.request.contextPath}/contracts?action=view&id=${ct.contractId}"
                                            class="btn btn-sm btn-outline-primary"><i class="bi bi-eye me-1"></i>View</a>
-                                        <c:if test="${fn:contains(permissions, 'UPDATE_CONTRACT') && ct.status == 'Active'}">
+                                        <c:if test="${permissions.contains('UPDATE_CONTRACT') && ct.status == 'Active'}">
                                             <a href="${pageContext.request.contextPath}/contracts?action=edit&id=${ct.contractId}"
                                                class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit</a>
                                         </c:if>
-                                        <c:if test="${fn:contains(permissions, 'TERMINATE_CONTRACT') && ct.status == 'Active'}">
+                                        <c:if test="${permissions.contains('TERMINATE_CONTRACT') && ct.status == 'Active'}">
                                             <form method="post" action="${pageContext.request.contextPath}/contracts?action=terminate"
                                                   class="d-inline"
                                                   onsubmit="return confirm('Terminate contract ${ct.contractCode} of ${ct.employeeFullName}? This cannot be undone.')">

@@ -48,7 +48,7 @@
             <h5 class="fw-bold text-dark mb-0">User Management</h5>
             <small class="text-muted">Manage all system users</small>
         </div>
-        <c:if test="${fn:contains(permissions, 'ADD_NEW_USER')}">
+        <c:if test="${permissions.contains('ADD_NEW_USER')}">
             <a href="${pageContext.request.contextPath}/users?action=add"
                class="btn btn-primary btn-sm px-3 fw-medium"
                style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;">
@@ -126,19 +126,19 @@
                                 </td>
                                 <td class="text-end pe-4">
                                     <div class="d-flex justify-content-end gap-1">
-                                        <c:if test="${fn:contains(permissions, 'VIEW_USER_INFORMATION')}">
+                                        <c:if test="${permissions.contains('VIEW_USER_INFORMATION')}">
                                             <a href="${pageContext.request.contextPath}/users?action=view&id=${u.userId}"
                                                class="btn btn-sm btn-outline-primary">
                                                 <i class="bi bi-eye me-1"></i>View
                                             </a>
                                         </c:if>
-                                        <c:if test="${fn:contains(permissions, 'UPDATE_USER_INFORMATION')}">
+                                        <c:if test="${permissions.contains('UPDATE_USER_INFORMATION')}">
                                             <a href="${pageContext.request.contextPath}/users?action=edit&id=${u.userId}"
                                                class="btn btn-sm btn-outline-secondary">
                                                 <i class="bi bi-pencil me-1"></i>Edit
                                             </a>
                                         </c:if>
-                                        <c:if test="${fn:contains(permissions, 'ACTIVE_DEACTIVE_USER')}">
+                                        <c:if test="${permissions.contains('ACTIVE_DEACTIVE_USER')}">
                                             <form method="post" action="${pageContext.request.contextPath}/users?action=toggle"
                                                   class="d-inline"
                                                   onsubmit="return confirm('${u.active ? 'Deactivate' : 'Activate'} user \'${u.fullName}\'?')">

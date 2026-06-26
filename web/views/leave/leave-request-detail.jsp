@@ -235,7 +235,7 @@
                             This request is awaiting manager review.
                         </div>
 
-                        <c:if test="${fn:contains(permissions, 'APPROVE_REJECT_LEAVE_REQUEST') && backTo == 'list'}">
+                        <c:if test="${permissions.contains('APPROVE_REJECT_LEAVE_REQUEST') && backTo == 'list'}">
                             <hr>
                             <form method="post" action="${pageContext.request.contextPath}/leave-requests?action=approve"
                                   class="mb-3"

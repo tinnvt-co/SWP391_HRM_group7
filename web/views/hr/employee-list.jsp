@@ -106,7 +106,7 @@
                                     </c:choose>
                                 </td>
                                 <td class="text-end pe-4">
-                                    <c:if test="${fn:contains(permissions, 'VIEW_EMPLOYEE_INFORMATION')}">
+                                    <c:if test="${permissions.contains('VIEW_EMPLOYEE_INFORMATION')}">
                                         <a href="${pageContext.request.contextPath}/hr/employees?action=view&id=${e.employeeId}"
                                            class="btn btn-sm btn-outline-primary">
                                             <i class="bi bi-eye me-1"></i>View

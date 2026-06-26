@@ -72,7 +72,7 @@
             <h5 class="fw-bold text-dark mb-0">My Leave Requests</h5>
             <small class="text-muted">View approval status of your leave requests</small>
         </div>
-        <c:if test="${fn:contains(permissions, 'SUBMIT_LEAVE_REQUEST')}">
+        <c:if test="${permissions.contains('SUBMIT_LEAVE_REQUEST')}">
             <a href="${pageContext.request.contextPath}/leave-requests"
                class="btn btn-primary btn-sm px-3 fw-medium"
                style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;">
@@ -243,7 +243,7 @@
                                     </c:choose>
                                 </td>
                                 <td class="text-end pe-4">
-                                    <c:if test="${fn:contains(permissions, 'VIEW_LEAVE_REQUEST_DETAIL')}">
+                                    <c:if test="${permissions.contains('VIEW_LEAVE_REQUEST_DETAIL')}">
                                         <a href="${pageContext.request.contextPath}/leave-requests?action=detail&id=${lr.leaveRequestId}"
                                            class="btn btn-sm btn-outline-primary">
                                             <i class="bi bi-eye me-1"></i>View

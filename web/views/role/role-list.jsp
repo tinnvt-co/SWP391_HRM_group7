@@ -99,25 +99,25 @@
                                 </td>
                                 <td class="text-end pe-4">
                                     <div class="d-flex justify-content-end gap-1">
-                                        <c:if test="${fn:contains(permissions, 'VIEW_ROLE_PERMISSIONS')}">
+                                        <c:if test="${permissions.contains('VIEW_ROLE_PERMISSIONS')}">
                                             <a href="${pageContext.request.contextPath}/roles?action=permissions&id=${r.roleId}"
                                                class="btn btn-sm btn-outline-info" title="View Permissions">
                                                 <i class="bi bi-key me-1"></i>Permissions
                                             </a>
                                         </c:if>
-                                        <c:if test="${fn:contains(permissions, 'EDIT_ROLE_PERMISSIONS')}">
+                                        <c:if test="${permissions.contains('EDIT_ROLE_PERMISSIONS')}">
                                             <a href="${pageContext.request.contextPath}/roles?action=editPerms&id=${r.roleId}"
                                                class="btn btn-sm btn-outline-warning" title="Edit Permissions">
                                                 <i class="bi bi-pencil-square me-1"></i>Edit Perms
                                             </a>
                                         </c:if>
-                                        <c:if test="${fn:contains(permissions, 'UPDATE_ROLE_INFORMATION')}">
+                                        <c:if test="${permissions.contains('UPDATE_ROLE_INFORMATION')}">
                                             <a href="${pageContext.request.contextPath}/roles?action=edit&id=${r.roleId}"
                                                class="btn btn-sm btn-outline-primary" title="Edit Role">
                                                 <i class="bi bi-pencil me-1"></i>Edit
                                             </a>
                                         </c:if>
-                                        <c:if test="${fn:contains(permissions, 'ACTIVE_DEACTIVE_ROLE')}">
+                                        <c:if test="${permissions.contains('ACTIVE_DEACTIVE_ROLE')}">
                                             <form method="post" action="${pageContext.request.contextPath}/roles?action=toggle"
                                                   class="d-inline" onsubmit="return confirmToggle('${r.roleName}', ${r.active})">
                                                 <input type="hidden" name="roleId" value="${r.roleId}">

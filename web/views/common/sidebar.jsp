@@ -10,7 +10,7 @@
                 <i class="bi bi-house-door me-2"></i>Dashboard
             </a>
         </li>
-        <c:if test="${fn:contains(permissions, 'VIEW_USER_LIST')}">
+        <c:if test="${permissions.contains('VIEW_USER_LIST')}">
             <li class="nav-item">
                 <a class="nav-link ${activePage == 'users' ? 'active' : ''}"
                    href="${pageContext.request.contextPath}/users">
@@ -18,7 +18,7 @@
                 </a>
             </li>
         </c:if>
-        <c:if test="${fn:contains(permissions, 'VIEW_ROLE_LIST')}">
+        <c:if test="${permissions.contains('VIEW_ROLE_LIST')}">
             <li class="nav-item">
                 <a class="nav-link ${activePage == 'roles' ? 'active' : ''}"
                    href="${pageContext.request.contextPath}/roles">
@@ -26,7 +26,7 @@
                 </a>
             </li>
         </c:if>
-        <c:if test="${fn:contains(permissions, 'VIEW_DEPARTMENT_LIST')}">
+        <c:if test="${permissions.contains('VIEW_DEPARTMENT_LIST')}">
             <li class="nav-item">
                 <a class="nav-link ${activePage == 'departments' ? 'active' : ''}"
                    href="${pageContext.request.contextPath}/departments">
@@ -34,7 +34,7 @@
                 </a>
             </li>
         </c:if>
-        <c:if test="${fn:contains(permissions, 'VIEW_EMPLOYEE_LIST')}">
+        <c:if test="${permissions.contains('VIEW_EMPLOYEE_LIST')}">
             <li class="nav-item">
                 <a class="nav-link ${activePage == 'hrEmployees' ? 'active' : ''}"
                    href="${pageContext.request.contextPath}/hr/employees">
@@ -42,11 +42,11 @@
                 </a>
             </li>
         </c:if>
-        <c:if test="${fn:contains(permissions, 'SUBMIT_LEAVE_REQUEST')
-                   or fn:contains(permissions, 'VIEW_LEAVE_REQUEST_STATUS')
-                   or fn:contains(permissions, 'VIEW_LEAVE_REQUEST_LIST')}">
+        <c:if test="${permissions.contains('SUBMIT_LEAVE_REQUEST')
+                   or permissions.contains('VIEW_LEAVE_REQUEST_STATUS')
+                   or permissions.contains('VIEW_LEAVE_REQUEST_LIST')}">
             <div class="sidebar-label mt-2">Leave</div>
-            <c:if test="${fn:contains(permissions, 'SUBMIT_LEAVE_REQUEST')}">
+            <c:if test="${permissions.contains('SUBMIT_LEAVE_REQUEST')}">
                 <li class="nav-item">
                     <a class="nav-link ${activePage == 'leaveSubmit' ? 'active' : ''}"
                        href="${pageContext.request.contextPath}/leave-requests">
@@ -54,7 +54,7 @@
                     </a>
                 </li>
             </c:if>
-            <c:if test="${fn:contains(permissions, 'VIEW_LEAVE_REQUEST_STATUS')}">
+            <c:if test="${permissions.contains('VIEW_LEAVE_REQUEST_STATUS')}">
                 <li class="nav-item">
                     <a class="nav-link ${activePage == 'leaveStatus' ? 'active' : ''}"
                        href="${pageContext.request.contextPath}/leave-requests?action=status">
@@ -62,7 +62,7 @@
                     </a>
                 </li>
             </c:if>
-            <c:if test="${fn:contains(permissions, 'VIEW_LEAVE_REQUEST_LIST')}">
+            <c:if test="${permissions.contains('VIEW_LEAVE_REQUEST_LIST')}">
                 <li class="nav-item">
                     <a class="nav-link ${activePage == 'leaveList' ? 'active' : ''}"
                        href="${pageContext.request.contextPath}/leave-requests?action=list">
@@ -71,11 +71,11 @@
                 </li>
             </c:if>
         </c:if>
-        <c:if test="${fn:contains(permissions, 'VIEW_ATTENDANCE')
-                   or fn:contains(permissions, 'VERIFY_STAFF_ATTENDANCE')
-                   or fn:contains(permissions, 'VIEW_ATTENDANCE_REPORT')}">
+        <c:if test="${permissions.contains('VIEW_ATTENDANCE')
+                   or permissions.contains('VERIFY_STAFF_ATTENDANCE')
+                   or permissions.contains('VIEW_ATTENDANCE_REPORT')}">
             <div class="sidebar-label mt-2">Attendance</div>
-            <c:if test="${fn:contains(permissions, 'VIEW_ATTENDANCE')}">
+            <c:if test="${permissions.contains('VIEW_ATTENDANCE')}">
                 <li class="nav-item">
                     <a class="nav-link ${activePage == 'attendanceList' ? 'active' : ''}"
                        href="${pageContext.request.contextPath}/attendance">
@@ -83,7 +83,7 @@
                     </a>
                 </li>
             </c:if>
-            <c:if test="${fn:contains(permissions, 'VIEW_ATTENDANCE_REPORT')}">
+            <c:if test="${permissions.contains('VIEW_ATTENDANCE_REPORT')}">
                 <li class="nav-item">
                     <a class="nav-link ${activePage == 'attendanceReport' ? 'active' : ''}"
                        href="${pageContext.request.contextPath}/attendance-report">
@@ -92,10 +92,10 @@
                 </li>
             </c:if>
         </c:if>
-        <c:if test="${fn:contains(permissions, 'VIEW_CONTRACT_LIST')
-                   or fn:contains(permissions, 'VIEW_MY_CONTRACT')}">
+        <c:if test="${permissions.contains('VIEW_CONTRACT_LIST')
+                   or permissions.contains('VIEW_MY_CONTRACT')}">
             <div class="sidebar-label mt-2">Contract</div>
-            <c:if test="${fn:contains(permissions, 'VIEW_CONTRACT_LIST')}">
+            <c:if test="${permissions.contains('VIEW_CONTRACT_LIST')}">
                 <li class="nav-item">
                     <a class="nav-link ${activePage == 'contracts' ? 'active' : ''}"
                        href="${pageContext.request.contextPath}/contracts">
@@ -103,7 +103,7 @@
                     </a>
                 </li>
             </c:if>
-            <c:if test="${fn:contains(permissions, 'VIEW_MY_CONTRACT')}">
+            <c:if test="${permissions.contains('VIEW_MY_CONTRACT')}">
                 <li class="nav-item">
                     <a class="nav-link ${activePage == 'myContract' ? 'active' : ''}"
                        href="${pageContext.request.contextPath}/my-contract">
@@ -112,11 +112,11 @@
                 </li>
             </c:if>
         </c:if>
-        <c:if test="${fn:contains(permissions, 'VIEW_PAYROLL')
-                   or fn:contains(permissions, 'APPROVE_REJECT_PAYROLL')
-                   or fn:contains(permissions, 'VIEW_PAYSLIP')}">
+        <c:if test="${permissions.contains('VIEW_PAYROLL')
+                   or permissions.contains('APPROVE_REJECT_PAYROLL')
+                   or permissions.contains('VIEW_PAYSLIP')}">
             <div class="sidebar-label mt-2">Payroll</div>
-            <c:if test="${fn:contains(permissions, 'GENERATE_PAYROLL')}">
+            <c:if test="${permissions.contains('GENERATE_PAYROLL')}">
                 <li class="nav-item">
                     <a class="nav-link ${activePage == 'payroll' ? 'active' : ''}"
                        href="${pageContext.request.contextPath}/payroll">
@@ -124,7 +124,7 @@
                     </a>
                 </li>
             </c:if>
-            <c:if test="${fn:contains(permissions, 'APPROVE_REJECT_PAYROLL')}">
+            <c:if test="${permissions.contains('APPROVE_REJECT_PAYROLL')}">
                 <li class="nav-item">
                     <a class="nav-link ${activePage == 'payrollApproval' ? 'active' : ''}"
                        href="${pageContext.request.contextPath}/payroll?action=approval">
@@ -132,7 +132,7 @@
                     </a>
                 </li>
             </c:if>
-            <c:if test="${fn:contains(permissions, 'VIEW_PAYSLIP')}">
+            <c:if test="${permissions.contains('VIEW_PAYSLIP')}">
                 <li class="nav-item">
                     <a class="nav-link ${activePage == 'payslip' ? 'active' : ''}"
                        href="${pageContext.request.contextPath}/payslip">
