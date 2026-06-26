@@ -194,6 +194,62 @@ public class AttendanceRecordDAO {
         }
     }
 
+    /** Monthly attendance aggregate for one employee (used to build a report). */
+    public static final class MonthlySummary {
+        public int employeeId;
+        public int departmentId;
+        public int actualWorkingDays;   // Present + Late + days that have OT
+        public int paidLeaveDays;       // Leave
+        public int unpaidLeaveDays;     // Unpaid Leave
+        public java.math.BigDecimal overtimeHours = java.math.BigDecimal.ZERO;
+    }
+
+    /**
+     * Aggregate verified attendance for every employee managed by {@code managerUserId}
+     * in the given month. Returns one MonthlySummary per employee that has at least
+     * one verified record in that month.
+     */
+    public List<MonthlySummary> aggregateMonthByManager(int managerUserId,
+                                                        int year, int month) throws SQLException {
+        String sql =
+            "SELECT ar.employee_id, e.department_id, "
+          + "  SUM(CASE WHEN ar.attendance_status IN ('Present','Late') THEN 1 ELSE 0 END) AS work_days, "
+          + "  SUM(CASE WHEN ar.attendance_status='Leave' THEN 1 ELSE 0 END) AS paid_leave, "
+          + "  SUM(CASE WHEN ar.attendance_status='Unpaid Leave' THEN 1 ELSE 0 END) AS unpaid_leave, "
+          + "  COALESCE(SUM(ar.overtime_hours),0) AS ot_hours "
+          + "FROM attendance_records ar "
+          + "JOIN employees e ON ar.employee_id = e.employee_id "
+          + "JOIN users u     ON e.user_id      = u.user_id "
+          + "WHERE u.manager_id=? AND ar.verification_status='Verified' "
+          + "  AND YEAR(ar.work_date)=? AND MONTH(ar.work_date)=? "
+          + "GROUP BY ar.employee_id, e.department_id";
+        List<MonthlySummary> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, managerUserId);
+            ps.setInt(2, year);
+            ps.setInt(3, month);
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                MonthlySummary s = new MonthlySummary();
+                s.employeeId      = rs.getInt("employee_id");
+                s.departmentId    = rs.getInt("department_id");
+                s.actualWorkingDays = rs.getInt("work_days");
+                s.paidLeaveDays   = rs.getInt("paid_leave");
+                s.unpaidLeaveDays = rs.getInt("unpaid_leave");
+                s.overtimeHours   = rs.getBigDecimal("ot_hours");
+                list.add(s);
+            }
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
     public List<AttendanceRecord> findByManagerScope(int managerUserId,
                                                      Integer employeeIdFilter,
                                                      LocalDate fromDate,

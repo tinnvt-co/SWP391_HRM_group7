@@ -1,10 +1,12 @@
 package controller;
 
 import dao.AttendanceRecordDAO;
+import dao.AttendanceReportDAO;
 import dao.EmployeeDAO;
 import model.AttendanceRecord;
 import model.AttendanceRecord.AttendanceStatus;
 import model.AttendanceRecord.VerificationStatus;
+import model.AttendanceReport;
 import model.Employee;
 import model.User;
 import service.AttendanceImportService;
@@ -41,6 +43,7 @@ public class AttendanceServlet extends HttpServlet {
 
     private final AttendanceRecordDAO attendanceDAO = new AttendanceRecordDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
+    private final AttendanceReportDAO reportDAO = new AttendanceReportDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -417,8 +420,9 @@ public class AttendanceServlet extends HttpServlet {
     }
 
     /**
-     * "Send to HR Staff": bulk-verify every Pending record of the manager's team.
-     * Managers only; the action turns Pending -> Verified for all their staff.
+     * "Send to HR Staff": bulk-verify every Pending record of the manager's team,
+     * then build one monthly attendance_report per employee (current month) and
+     * submit it to HR Staff. Managers only.
      */
     private void handleSendToHr(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, IOException {
@@ -434,16 +438,41 @@ public class AttendanceServlet extends HttpServlet {
             return;
         }
 
-        int updated = attendanceDAO.verifyAllPendingByManager(
-                currentUser.getUserId(), currentUser.getUserId(), null, null);
+        int mgrId = currentUser.getUserId();
+        // 1) Verify any still-pending records.
+        attendanceDAO.verifyAllPendingByManager(mgrId, mgrId, null, null);
 
-        if (updated > 0) {
-            session.setAttribute("importMessage",
-                    "Sent to HR Staff: " + updated + " record(s) verified.");
-        } else {
+        // 2) Aggregate the CURRENT month and submit one report per employee.
+        YearMonth month = YearMonth.now();
+        List<AttendanceRecordDAO.MonthlySummary> summaries =
+                attendanceDAO.aggregateMonthByManager(mgrId, month.getYear(), month.getMonthValue());
+
+        if (summaries.isEmpty()) {
             session.setAttribute("importError",
-                    "There are no pending records to send.");
+                    "There is no verified attendance for " + month + " to send.");
+            response.sendRedirect(ctx + "/attendance");
+            return;
         }
+
+        int reports = 0;
+        for (AttendanceRecordDAO.MonthlySummary s : summaries) {
+            AttendanceReport rpt = new AttendanceReport();
+            rpt.setEmployeeId(s.employeeId);
+            rpt.setManagerId(mgrId);
+            rpt.setDepartmentId(s.departmentId);
+            rpt.setReportMonth(month.getMonthValue());
+            rpt.setReportYear(month.getYear());
+            rpt.setActualWorkingDays(java.math.BigDecimal.valueOf(s.actualWorkingDays));
+            rpt.setPaidLeaveDays(java.math.BigDecimal.valueOf(s.paidLeaveDays));
+            rpt.setUnpaidLeaveDays(java.math.BigDecimal.valueOf(s.unpaidLeaveDays));
+            rpt.setOvertimeHours(s.overtimeHours);
+            if (reportDAO.upsertSubmitted(rpt)) reports++;
+        }
+
+        session.setAttribute("importMessage",
+                "Sent to HR Staff: " + reports + " attendance report(s) submitted for "
+                        + month.getMonth().getDisplayName(java.time.format.TextStyle.FULL,
+                                java.util.Locale.ENGLISH) + " " + month.getYear() + ".");
         response.sendRedirect(ctx + "/attendance");
     }
 

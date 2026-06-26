@@ -72,13 +72,22 @@
             </c:if>
         </c:if>
         <c:if test="${fn:contains(permissions, 'VIEW_ATTENDANCE')
-                   or fn:contains(permissions, 'VERIFY_STAFF_ATTENDANCE')}">
+                   or fn:contains(permissions, 'VERIFY_STAFF_ATTENDANCE')
+                   or fn:contains(permissions, 'VIEW_ATTENDANCE_REPORT')}">
             <div class="sidebar-label mt-2">Attendance</div>
             <c:if test="${fn:contains(permissions, 'VIEW_ATTENDANCE')}">
                 <li class="nav-item">
                     <a class="nav-link ${activePage == 'attendanceList' ? 'active' : ''}"
                        href="${pageContext.request.contextPath}/attendance">
                         <i class="bi bi-calendar2-week me-2"></i>Attendance Records
+                    </a>
+                </li>
+            </c:if>
+            <c:if test="${fn:contains(permissions, 'VIEW_ATTENDANCE_REPORT')}">
+                <li class="nav-item">
+                    <a class="nav-link ${activePage == 'attendanceReport' ? 'active' : ''}"
+                       href="${pageContext.request.contextPath}/attendance-report">
+                        <i class="bi bi-file-earmark-bar-graph me-2"></i>Attendance Reports
                     </a>
                 </li>
             </c:if>
