@@ -26,10 +26,7 @@ public class LoginServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         HttpSession session = request.getSession(false);
-        if (session != null && session.getAttribute("currentUser") != null) {
-            response.sendRedirect(request.getContextPath() + "/home");
-            return;
-        }
+        if (session != null) session.invalidate();
         request.getRequestDispatcher("/views/auth/login.jsp").forward(request, response);
     }
 
@@ -63,7 +60,10 @@ public class LoginServlet extends HttpServlet {
             List<String> permissions = permissionDAO.findCodesByUserId(user.getUserId());
             userDAO.updateLastLogin(user.getUserId());
 
-            HttpSession session = request.getSession();
+            HttpSession oldSession = request.getSession(false);
+            if (oldSession != null) oldSession.invalidate();
+
+            HttpSession session = request.getSession(true);
             session.setAttribute("currentUser", user);
             session.setAttribute("permissions", permissions);
 

@@ -24,7 +24,10 @@ public class AuthFilter implements Filter {
             "/login",
             "/logout",
             "/forgot-password",
-            "/auth/google",
+            "/auth/google"
+    );
+
+    private static final List<String> PUBLIC_PREFIXES = List.of(
             "/assets/"
     );
 
@@ -40,6 +43,8 @@ public class AuthFilter implements Filter {
 
         String contextPath  = request.getContextPath();
         String relativePath = request.getRequestURI().substring(contextPath.length());
+
+        applyNoCacheHeaders(response);
 
         if (isPublicPath(relativePath)) {
             chain.doFilter(req, res);
@@ -61,9 +66,19 @@ public class AuthFilter implements Filter {
     public void destroy() {}
 
     private boolean isPublicPath(String path) {
+        if (path == null || path.isEmpty()) return true;
         for (String pub : PUBLIC_PATHS) {
+            if (path.equals(pub)) return true;
+        }
+        for (String pub : PUBLIC_PREFIXES) {
             if (path.startsWith(pub)) return true;
         }
         return false;
+    }
+
+    private void applyNoCacheHeaders(HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+        response.setHeader("Pragma", "no-cache");
+        response.setDateHeader("Expires", 0);
     }
 }
