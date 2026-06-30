@@ -50,7 +50,12 @@
     <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
         <div>
             <h5 class="fw-bold text-dark mb-0">Attendance Reports</h5>
-            <small class="text-muted">Monthly attendance reports submitted by managers</small>
+            <small class="text-muted">
+                <c:choose>
+                    <c:when test="${managerScope}">Monthly attendance reports for your employees</c:when>
+                    <c:otherwise>Monthly attendance reports submitted by managers</c:otherwise>
+                </c:choose>
+            </small>
         </div>
     </div>
 
@@ -61,7 +66,14 @@
                     <label class="form-label small text-muted mb-1">Month</label>
                     <select name="month" class="form-select form-select-sm">
                         <c:forEach var="m" begin="1" end="12">
-                            <option value="${m}" ${m == selectedMonth ? 'selected' : ''}>Month ${m}</option>
+                            <c:choose>
+                                <c:when test="${m == selectedMonth}">
+                                    <option value="${m}" selected="selected">Month ${m}</option>
+                                </c:when>
+                                <c:otherwise>
+                                    <option value="${m}">Month ${m}</option>
+                                </c:otherwise>
+                            </c:choose>
                         </c:forEach>
                     </select>
                 </div>
@@ -85,7 +97,7 @@
             <div class="p-3 border-bottom d-flex align-items-center gap-2">
                 <i class="bi bi-calendar-check text-muted"></i>
                 <span class="fw-medium">${monthLabel}</span>
-                <span class="text-muted">&middot; ${fn:length(reports)} report(s)</span>
+                <span class="text-muted">&middot; ${totalReports} report(s)</span>
             </div>
 
             <div class="table-responsive">
@@ -107,7 +119,7 @@
                     <tbody>
                         <c:forEach var="r" items="${reports}" varStatus="s">
                             <tr>
-                                <td class="ps-4 text-muted">${s.index + 1}</td>
+                                <td class="ps-4 text-muted">${(currentPage - 1) * 10 + s.index + 1}</td>
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
                                         <div class="avatar-sm">${fn:substring(r.employeeFullName, 0, 1)}</div>
@@ -155,6 +167,31 @@
                 </table>
             </div>
         </div>
+        <c:if test="${totalPages > 1}">
+            <div class="d-flex align-items-center justify-content-between px-3 py-3 border-top flex-wrap gap-2">
+                <small class="text-muted">
+                    Page ${currentPage} of ${totalPages} &middot; ${totalReports} report(s)
+                </small>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item ${currentPage == 1 ? 'disabled' : ''}">
+                            <a class="page-link"
+                               href="?month=${selectedMonth}&year=${selectedYear}&page=${currentPage - 1}">Previous</a>
+                        </li>
+                        <c:forEach var="p" begin="1" end="${totalPages}">
+                            <li class="page-item ${p == currentPage ? 'active' : ''}">
+                                <a class="page-link"
+                                   href="?month=${selectedMonth}&year=${selectedYear}&page=${p}">${p}</a>
+                            </li>
+                        </c:forEach>
+                        <li class="page-item ${currentPage == totalPages ? 'disabled' : ''}">
+                            <a class="page-link"
+                               href="?month=${selectedMonth}&year=${selectedYear}&page=${currentPage + 1}">Next</a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </c:if>
     </div>
 </div>
 

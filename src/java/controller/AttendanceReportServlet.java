@@ -26,6 +26,8 @@ import java.util.Locale;
 @WebServlet(name = "AttendanceReportServlet", urlPatterns = {"/attendance-report"})
 public class AttendanceReportServlet extends HttpServlet {
 
+    private static final int PAGE_SIZE = 10;
+
     private final AttendanceReportDAO reportDAO = new AttendanceReportDAO();
 
     @Override
@@ -43,11 +45,26 @@ public class AttendanceReportServlet extends HttpServlet {
         if (month < 1 || month > 12) month = now.getMonthValue();
 
         try {
+            User currentUser = getCurrentUser(request);
+            String roleName = currentUser != null && currentUser.getRole() != null
+                    ? currentUser.getRole().getRoleName() : "";
+            Integer managerUserId = "MANAGER".equalsIgnoreCase(roleName)
+                    ? currentUser.getUserId() : null;
+
+            int totalReports = reportDAO.countSubmittedByMonth(year, month, null, managerUserId);
+            int totalPages = Math.max(1, (int) Math.ceil(totalReports / (double) PAGE_SIZE));
+            int page = parsePageParam(request.getParameter("page"), totalPages);
+            int offset = (page - 1) * PAGE_SIZE;
+
             List<AttendanceReport> reports =
-                    reportDAO.findSubmittedByMonth(year, month, null);
+                    reportDAO.findSubmittedByMonthPage(year, month, null, managerUserId, offset, PAGE_SIZE);
             request.setAttribute("reports", reports);
             request.setAttribute("selectedYear", year);
             request.setAttribute("selectedMonth", month);
+            request.setAttribute("currentPage", page);
+            request.setAttribute("totalPages", totalPages);
+            request.setAttribute("totalReports", totalReports);
+            request.setAttribute("managerScope", managerUserId != null);
             request.setAttribute("monthLabel",
                     YearMonth.of(year, month).getMonth()
                             .getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + year);
@@ -56,6 +73,11 @@ public class AttendanceReportServlet extends HttpServlet {
         } catch (SQLException e) {
             throw new ServletException(e);
         }
+    }
+
+    private User getCurrentUser(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        return session == null ? null : (User) session.getAttribute("currentUser");
     }
 
     private boolean hasPermission(HttpServletRequest request, String permCode) {
@@ -68,5 +90,12 @@ public class AttendanceReportServlet extends HttpServlet {
     private int parseIntOr(String s, int dflt) {
         if (s == null || s.isBlank()) return dflt;
         try { return Integer.parseInt(s.trim()); } catch (NumberFormatException ex) { return dflt; }
+    }
+
+    private int parsePageParam(String pageParam, int totalPages) {
+        int page = parseIntOr(pageParam, 1);
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        return page;
     }
 }

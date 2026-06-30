@@ -2,7 +2,6 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <c:set var="activePage" value="attendanceList" scope="request"/>
-<c:set var="todayMax" value="<%= java.time.LocalDate.now().toString() %>"/>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,45 +12,31 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
         body { background-color: #f4f6f9; }
-        .sidebar {
-            width: 240px; min-height: calc(100vh - 56px); background-color: #1a3c5e;
-            position: fixed; top: 56px; left: 0; padding-top: 1rem; z-index: 100;
-        }
-        .sidebar .nav-link {
-            color: rgba(255,255,255,0.75); padding: 0.6rem 1.25rem;
-            border-radius: 6px; margin: 2px 10px; font-size: 0.9rem; transition: all 0.2s;
-        }
+        .sidebar { width: 240px; min-height: calc(100vh - 56px); background-color: #1a3c5e;
+            position: fixed; top: 56px; left: 0; padding-top: 1rem; z-index: 100; }
+        .sidebar .nav-link { color: rgba(255,255,255,0.75); padding: 0.6rem 1.25rem;
+            border-radius: 6px; margin: 2px 10px; font-size: 0.9rem; transition: all 0.2s; }
         .sidebar .nav-link:hover, .sidebar .nav-link.active { color: #fff; background-color: rgba(255,255,255,0.12); }
         .sidebar .nav-link i { width: 20px; }
-        .sidebar-label {
-            font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;
-            color: rgba(255,255,255,0.4); padding: 0.75rem 1.25rem 0.25rem;
-        }
+        .sidebar-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;
+            color: rgba(255,255,255,0.4); padding: 0.75rem 1.25rem 0.25rem; }
         .main-content { margin-left: 240px; padding: 2rem; }
-        .table th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; font-weight: 600; }
-        .table td { vertical-align: middle; font-size: 0.9rem; }
-        .avatar-sm {
-            width: 34px; height: 34px; border-radius: 50%;
+        .emp-card { border: none; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: transform 0.15s, box-shadow 0.15s; cursor: pointer; text-decoration: none; color: inherit; }
+        .emp-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); color: inherit; }
+        .avatar-md { width: 48px; height: 48px; border-radius: 50%;
             background: linear-gradient(135deg, #1a3c5e, #2d6a9f);
             display: inline-flex; align-items: center; justify-content: center;
-            font-size: 0.8rem; font-weight: 700; color: white; flex-shrink: 0;
-        }
-        .att-pill {
-            padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;
-            display: inline-flex; align-items: center; gap: 0.35rem;
-        }
-        .att-present  { background:#e6f9f0; color:#166534; }
-        .att-absent   { background:#fee2e2; color:#b91c1c; }
-        .att-late     { background:#fff8e1; color:#a16207; }
-        .att-leave    { background:#e3f0fb; color:#1a3c5e; }
-        .att-holiday  { background:#fef3c7; color:#854d0e; }
-        .att-unpaid   { background:#f3e8ff; color:#6b21a8; }
-        .verify-pill {
-            padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 600;
-        }
-        .verify-pending  { background:#fff8e1; color:#a16207; }
-        .verify-verified { background:#e6f9f0; color:#166534; }
-        .verify-rejected { background:#fee2e2; color:#b91c1c; }
+            font-size: 1.1rem; font-weight: 700; color: white; flex-shrink: 0; }
+        .stat-badge { padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+        .stat-pending  { background:#fff8e1; color:#a16207; }
+        .stat-verified { background:#e6f9f0; color:#166534; }
+        .stat-present  { background:#e6f9f0; color:#166534; }
+        .stat-absent   { background:#fee2e2; color:#b91c1c; }
+        .stat-leave    { background:#e3f0fb; color:#1a3c5e; }
+        .dept-card { border: none; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: transform 0.15s, box-shadow 0.15s; }
+        .dept-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body>
@@ -64,261 +49,210 @@
             <h5 class="fw-bold text-dark mb-0">Attendance Records</h5>
             <small class="text-muted">
                 <c:choose>
-                    <c:when test="${managerScope}">Daily attendance of employees you manage</c:when>
-                    <c:when test="${orgWide}">Daily attendance across the organization</c:when>
-                    <c:otherwise>Your daily attendance records</c:otherwise>
+                    <c:when test="${managerScope}">Review and confirm attendance of your team &mdash; ${importMonthLabel}</c:when>
+                    <c:when test="${hrScope}">Attendance across the organization &mdash; ${importMonthLabel}</c:when>
+                    <c:otherwise>Your attendance records</c:otherwise>
                 </c:choose>
             </small>
         </div>
-        <c:if test="${permissions.contains('VERIFY_STAFF_ATTENDANCE')}">
-            <div class="d-flex gap-2">
+        <div class="d-flex align-items-center justify-content-end gap-2 flex-wrap">
+            <form method="get" action="${pageContext.request.contextPath}/attendance"
+                  class="d-flex align-items-center gap-2">
+                <c:if test="${not empty selectedDeptId}">
+                    <input type="hidden" name="deptId" value="${selectedDeptId}">
+                </c:if>
+                <select name="month" class="form-select form-select-sm" style="width:130px;" aria-label="Month">
+                    <c:forEach var="m" begin="1" end="12">
+                        <c:choose>
+                            <c:when test="${m == selectedMonth}">
+                                <option value="${m}" selected="selected">Month ${m}</option>
+                            </c:when>
+                            <c:otherwise>
+                                <option value="${m}">Month ${m}</option>
+                            </c:otherwise>
+                        </c:choose>
+                    </c:forEach>
+                </select>
+                <select name="year" class="form-select form-select-sm" style="width:100px;" aria-label="Year">
+                    <c:forEach var="y" items="${yearOptions}">
+                        <c:choose>
+                            <c:when test="${y == selectedYear}">
+                                <option value="${y}" selected="selected">${y}</option>
+                            </c:when>
+                            <c:otherwise>
+                                <option value="${y}">${y}</option>
+                            </c:otherwise>
+                        </c:choose>
+                    </c:forEach>
+                </select>
+                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-funnel me-1"></i>Apply
+                </button>
+            </form>
+            <%-- Import button: HR Staff only --%>
+            <c:if test="${canImportAttendance}">
                 <button type="button" class="btn btn-primary btn-sm px-3 fw-medium"
                         style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;"
                         data-bs-toggle="modal" data-bs-target="#importModal">
                     <i class="bi bi-upload me-2"></i>Import Attendance
                 </button>
-                <c:if test="${managerScope}">
-                    <form method="post"
-                          action="${pageContext.request.contextPath}/attendance?action=sendToHr"
-                          class="d-inline"
-                          onsubmit="return confirm('Send all pending attendance records to HR Staff? This will mark ${pendingCount} record(s) as verified.');">
-                        <button type="submit" class="btn btn-success btn-sm px-3 fw-medium"
-                                ${pendingCount > 0 ? '' : 'disabled'}
-                                title="${pendingCount > 0 ? 'Verify and send pending records to HR Staff' : 'No pending records to send'}">
-                            <i class="bi bi-send me-2"></i>Send to HR Staff
-                            <c:if test="${pendingCount > 0}">
-                                <span class="badge bg-light text-success ms-1">${pendingCount}</span>
-                            </c:if>
-                        </button>
-                    </form>
-                </c:if>
-            </div>
-        </c:if>
+            </c:if>
+            <%-- Confirm button: Manager only --%>
+            <c:if test="${managerScope}">
+                <form method="post"
+                      action="${pageContext.request.contextPath}/attendance?action=confirmToHr"
+                      class="d-inline"
+                      onsubmit="return confirm('Confirm attendance and send to HR Staff? This will verify ${pendingCount} pending record(s) and generate reports.');">
+                    <input type="hidden" name="month" value="${selectedMonth}">
+                    <input type="hidden" name="year" value="${selectedYear}">
+                    <button type="submit" class="btn btn-success btn-sm px-3 fw-medium"
+                            ${pendingCount > 0 ? '' : 'disabled'}
+                            title="${pendingCount > 0 ? 'Verify and send attendance reports to HR Staff' : 'No pending records to confirm'}">
+                        <i class="bi bi-check2-all me-2"></i>Confirm Attendance
+                        <c:if test="${pendingCount > 0}">
+                            <span class="badge bg-light text-success ms-1">${pendingCount}</span>
+                        </c:if>
+                    </button>
+                </form>
+            </c:if>
+        </div>
     </div>
 
-    <c:if test="${param.updated == 'success'}">
-        <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
-            <i class="bi bi-check-circle-fill"></i>
-            <span>Attendance record updated successfully.</span>
-        </div>
-    </c:if>
+    <%-- Flash messages --%>
     <c:if test="${not empty importMessage}">
         <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
-            <i class="bi bi-check-circle-fill"></i>
-            <span>${importMessage}</span>
+            <i class="bi bi-check-circle-fill"></i><span>${importMessage}</span>
         </div>
     </c:if>
     <c:if test="${not empty importError}">
         <div class="alert alert-danger d-flex align-items-start gap-2 py-2 mb-3">
-            <i class="bi bi-exclamation-octagon-fill mt-1"></i>
-            <span>${importError}</span>
-        </div>
-    </c:if>
-    <c:if test="${param.verified == 'success'}">
-        <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
-            <i class="bi bi-check-circle-fill"></i>
-            <span>Attendance record verified successfully.</span>
-        </div>
-    </c:if>
-    <c:if test="${param.error == 'already-verified'}">
-        <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
-            <i class="bi bi-exclamation-triangle-fill"></i>
-            <span>This record is already verified and cannot be modified or deleted.</span>
+            <i class="bi bi-exclamation-octagon-fill mt-1"></i><span>${importError}</span>
         </div>
     </c:if>
 
-    <div class="card border-0 shadow-sm rounded-3 mb-3">
-        <div class="card-body">
-            <form method="get" class="row g-2 align-items-end">
-                <c:if test="${managerScope or orgWide}">
-                    <div class="col-md-4">
-                        <label class="form-label small text-muted mb-1">Employee</label>
-                        <select name="employeeId" class="form-select form-select-sm">
-                            <option value="">-- All employees --</option>
-                            <c:forEach var="e" items="${scopeEmployees}">
-                                <option value="${e.employeeId}"
-                                        ${employeeIdFilter == e.employeeId ? 'selected' : ''}>
-                                    ${e.fullName} (${e.employeeCode})
-                                </option>
-                            </c:forEach>
-                        </select>
-                    </div>
-                </c:if>
-                <div class="col-md-3">
-                    <label class="form-label small text-muted mb-1">From</label>
-                    <input type="date" name="fromDate" class="form-control form-control-sm"
-                           max="${todayMax}" value="${fromDate}">
+    <%-- ============ HR Staff: Department selector ============ --%>
+    <c:if test="${hrScope}">
+        <div class="card border-0 shadow-sm rounded-3 mb-4">
+            <div class="card-body">
+                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-diagram-3 me-2"></i>Departments</h6>
+                <div class="row g-3">
+                    <c:forEach var="dept" items="${departments}">
+                        <div class="col-md-3 col-sm-6">
+                            <a href="${pageContext.request.contextPath}/attendance?deptId=${dept.departmentId}&year=${selectedYear}&month=${selectedMonth}"
+                               class="card dept-card h-100 text-decoration-none
+                                      ${selectedDeptId == dept.departmentId ? 'border border-primary border-2' : ''}">
+                                <div class="card-body text-center py-3">
+                                    <div class="rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center"
+                                         style="width:44px;height:44px;background:linear-gradient(135deg,#1a3c5e,#2d6a9f);">
+                                        <i class="bi bi-building text-white"></i>
+                                    </div>
+                                    <div class="fw-medium" style="font-size:0.88rem;">${dept.departmentName}</div>
+                                </div>
+                            </a>
+                        </div>
+                    </c:forEach>
+                    <c:if test="${empty departments}">
+                        <div class="col-12 text-center text-muted py-3">
+                            <i class="bi bi-diagram-3 fs-2 d-block mb-2 opacity-25"></i>
+                            No departments found.
+                        </div>
+                    </c:if>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label small text-muted mb-1">To</label>
-                    <input type="date" name="toDate" class="form-control form-control-sm"
-                           max="${todayMax}" value="${toDate}">
-                </div>
-                <div class="col-md-2 d-flex gap-2">
-                    <button type="submit" class="btn btn-sm btn-primary flex-grow-1"
-                            style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;">
-                        <i class="bi bi-funnel me-1"></i>Filter
-                    </button>
-                    <a href="${pageContext.request.contextPath}/attendance"
-                       class="btn btn-sm btn-outline-secondary">Clear</a>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div class="card border-0 shadow-sm rounded-3">
-        <div class="card-body p-0">
-            <div class="p-3 border-bottom d-flex align-items-center gap-2">
-                <i class="bi bi-search text-muted"></i>
-                <input type="text" id="searchInput" class="form-control form-control-sm border-0 shadow-none"
-                       placeholder="Search by employee, status, note..." style="max-width:340px;">
             </div>
+        </div>
+    </c:if>
 
-            <div class="table-responsive">
-                <table class="table table-hover mb-0" id="attendanceTable">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="ps-4">#</th>
-                            <th>Employee</th>
-                            <th>Date</th>
-                            <th>OT</th>
-                            <th>Status</th>
-                            <th>Verified</th>
-                            <th>Note</th>
-                            <th class="text-end pe-4">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <c:forEach var="r" items="${records}" varStatus="s">
-                            <tr>
-                                <td class="ps-4 text-muted">${(currentPage - 1) * 10 + s.index + 1}</td>
-                                <td>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <div class="avatar-sm">${fn:substring(r.employeeFullName, 0, 1)}</div>
-                                        <div>
-                                            <div class="fw-medium">${r.employeeFullName}</div>
-                                            <div class="text-muted" style="font-size:0.78rem;">${r.employeeCode}</div>
+    <%-- ============ Employee cards ============ --%>
+    <c:if test="${not empty employeeCards}">
+        <div class="card border-0 shadow-sm rounded-3 mb-3">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h6 class="fw-bold text-dark mb-0">
+                        <i class="bi bi-people me-2"></i>Employees
+                        <span class="badge bg-secondary ms-1" style="font-size:0.72rem;">${fn:length(employeeCards)}</span>
+                    </h6>
+                    <input type="text" id="searchInput" class="form-control form-control-sm border-0 shadow-none"
+                           placeholder="Search employee..." style="max-width:260px;">
+                </div>
+                <div class="row g-3" id="employeeGrid">
+                    <c:forEach var="c" items="${employeeCards}">
+                        <div class="col-lg-4 col-md-6 emp-item">
+                            <a href="${pageContext.request.contextPath}/attendance?action=employeeDetail&employeeId=${c.employeeId}&fromDate=${monthStart}&toDate=${monthEnd}"
+                               class="card emp-card h-100">
+                                <div class="card-body d-flex align-items-start gap-3">
+                                    <div class="avatar-md">${fn:substring(c.fullName, 0, 1)}</div>
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold" style="font-size:0.92rem;">${c.fullName}</div>
+                                        <div class="text-muted" style="font-size:0.78rem;">${c.employeeCode} &middot; ${c.departmentName}</div>
+                                        <div class="d-flex flex-wrap gap-1 mt-2">
+                                            <span class="stat-badge stat-present">
+                                                <i class="bi bi-check-circle-fill me-1"></i>${c.presentDays} days
+                                            </span>
+                                            <c:if test="${c.absentDays > 0}">
+                                                <span class="stat-badge stat-absent">
+                                                    <i class="bi bi-x-circle-fill me-1"></i>${c.absentDays} absent
+                                                </span>
+                                            </c:if>
+                                            <c:if test="${c.leaveDays > 0}">
+                                                <span class="stat-badge stat-leave">
+                                                    <i class="bi bi-calendar-check me-1"></i>${c.leaveDays} leave
+                                                </span>
+                                            </c:if>
+                                        </div>
+                                        <div class="d-flex flex-wrap gap-1 mt-1">
+                                            <c:if test="${c.pendingCount > 0}">
+                                                <span class="stat-badge stat-pending">
+                                                    <i class="bi bi-clock me-1"></i>${c.pendingCount} pending
+                                                </span>
+                                            </c:if>
+                                            <c:if test="${c.verifiedCount > 0}">
+                                                <span class="stat-badge stat-verified">
+                                                    <i class="bi bi-patch-check me-1"></i>${c.verifiedCount} verified
+                                                </span>
+                                            </c:if>
                                         </div>
                                     </div>
-                                </td>
-                                <td class="fw-medium">${r.workDate}</td>
-                                <td>${r.overtimeHours}</td>
-                                <td>
-                                    <c:choose>
-                                        <c:when test="${r.attendanceStatus == 'Present'}">
-                                            <span class="att-pill att-present"><i class="bi bi-check-circle-fill"></i>Present</span>
-                                        </c:when>
-                                        <c:when test="${r.attendanceStatus == 'Absent'}">
-                                            <span class="att-pill att-absent"><i class="bi bi-x-circle-fill"></i>Absent</span>
-                                        </c:when>
-                                        <c:when test="${r.attendanceStatus == 'Late'}">
-                                            <span class="att-pill att-late"><i class="bi bi-clock-fill"></i>Late</span>
-                                        </c:when>
-                                        <c:when test="${r.attendanceStatus == 'Leave'}">
-                                            <span class="att-pill att-leave"><i class="bi bi-calendar-check"></i>Leave</span>
-                                        </c:when>
-                                        <c:when test="${r.attendanceStatus == 'Holiday'}">
-                                            <span class="att-pill att-holiday"><i class="bi bi-flag-fill"></i>Holiday</span>
-                                        </c:when>
-                                        <c:when test="${r.attendanceStatus == 'UnpaidLeave'}">
-                                            <span class="att-pill att-unpaid"><i class="bi bi-cash-stack"></i>Unpaid Leave</span>
-                                        </c:when>
-                                        <c:otherwise>${r.attendanceStatus}</c:otherwise>
-                                    </c:choose>
-                                </td>
-                                <td>
-                                    <c:choose>
-                                        <c:when test="${r.verificationStatus == 'Verified'}">
-                                            <span class="verify-pill verify-verified">Verified</span>
-                                            <c:if test="${not empty r.verifiedByFullName}">
-                                                <div class="text-muted" style="font-size:0.72rem;">by ${r.verifiedByFullName}</div>
-                                            </c:if>
-                                        </c:when>
-                                        <c:when test="${r.verificationStatus == 'Pending'}">
-                                            <span class="verify-pill verify-pending">Pending</span>
-                                        </c:when>
-                                        <c:when test="${r.verificationStatus == 'Rejected'}">
-                                            <span class="verify-pill verify-rejected">Rejected</span>
-                                        </c:when>
-                                    </c:choose>
-                                </td>
-                                <td class="pe-4 small text-muted" style="max-width:200px;">
-                                    <c:choose>
-                                        <c:when test="${not empty r.note}">${r.note}</c:when>
-                                        <c:otherwise>&mdash;</c:otherwise>
-                                    </c:choose>
-                                </td>
-                                <td class="text-end pe-4">
-                                    <c:if test="${permissions.contains('VERIFY_STAFF_ATTENDANCE')
-                                              and r.verificationStatus != 'Verified'}">
-                                        <div class="d-flex justify-content-end gap-1">
-                                            <form method="post"
-                                                  action="${pageContext.request.contextPath}/attendance?action=verify"
-                                                  class="d-inline"
-                                                  onsubmit="return confirm('Verify attendance for ${r.employeeFullName} on ${r.workDate}?')">
-                                                <input type="hidden" name="id" value="${r.attendanceId}">
-                                                <button type="submit" class="btn btn-sm btn-outline-success" title="Verify">
-                                                    <i class="bi bi-check2-circle me-1"></i>Verify
-                                                </button>
-                                            </form>
-                                            <a href="${pageContext.request.contextPath}/attendance?action=edit&id=${r.attendanceId}"
-                                               class="btn btn-sm btn-outline-primary" title="Edit">
-                                                <i class="bi bi-pencil me-1"></i>Edit
-                                            </a>
-                                        </div>
-                                    </c:if>
-                                </td>
-                            </tr>
-                        </c:forEach>
-                        <c:if test="${empty records}">
-                            <tr>
-                                <td colspan="8" class="text-center text-muted py-5">
-                                    <i class="bi bi-calendar2-x fs-2 d-block mb-2 opacity-25"></i>
-                                    No attendance records found for this filter.
-                                </td>
-                            </tr>
-                        </c:if>
-                    </tbody>
-                </table>
-            </div>
-            <c:if test="${totalPages > 1}">
-                <c:url var="baseUrl" value="/attendance">
-                    <c:if test="${not empty employeeIdFilter}"><c:param name="employeeId" value="${employeeIdFilter}"/></c:if>
-                    <c:if test="${not empty fromDate}"><c:param name="fromDate" value="${fromDate}"/></c:if>
-                    <c:if test="${not empty toDate}"><c:param name="toDate" value="${toDate}"/></c:if>
-                </c:url>
-                <div class="d-flex align-items-center justify-content-between px-3 py-3 border-top flex-wrap gap-2">
-                    <small class="text-muted">
-                        Page ${currentPage} of ${totalPages} &middot; ${totalRecords} records
-                    </small>
-                    <nav>
-                        <ul class="pagination pagination-sm mb-0">
-                            <li class="page-item ${currentPage == 1 ? 'disabled' : ''}">
-                                <a class="page-link" href="${baseUrl}${fn:contains(baseUrl,'?') ? '&' : '?'}page=${currentPage - 1}">Previous</a>
-                            </li>
-                            <c:forEach var="p" begin="1" end="${totalPages}">
-                                <li class="page-item ${p == currentPage ? 'active' : ''}">
-                                    <a class="page-link" href="${baseUrl}${fn:contains(baseUrl,'?') ? '&' : '?'}page=${p}">${p}</a>
-                                </li>
-                            </c:forEach>
-                            <li class="page-item ${currentPage == totalPages ? 'disabled' : ''}">
-                                <a class="page-link" href="${baseUrl}${fn:contains(baseUrl,'?') ? '&' : '?'}page=${currentPage + 1}">Next</a>
-                            </li>
-                        </ul>
-                    </nav>
+                                    <i class="bi bi-chevron-right text-muted mt-1"></i>
+                                </div>
+                            </a>
+                        </div>
+                    </c:forEach>
                 </div>
-            </c:if>
+            </div>
         </div>
-    </div>
+    </c:if>
+
+    <%-- Empty state when HR selected dept but no records --%>
+    <c:if test="${hrScope and not empty selectedDeptId and empty employeeCards}">
+        <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-calendar2-x fs-2 d-block mb-2 opacity-25"></i>
+                No attendance records found for this department in ${importMonthLabel}.
+            </div>
+        </div>
+    </c:if>
+
+    <%-- Empty state for Manager with no cards --%>
+    <c:if test="${managerScope and empty employeeCards}">
+        <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-calendar2-x fs-2 d-block mb-2 opacity-25"></i>
+                No attendance records for your team in ${importMonthLabel}.
+                <div class="small mt-1">Attendance data will appear here after HR Staff imports the attendance sheet.</div>
+            </div>
+        </div>
+    </c:if>
 </div>
 
-<%-- ===== Import attendance sheet modal (managers only) ===== --%>
-<c:if test="${permissions.contains('VERIFY_STAFF_ATTENDANCE')}">
+<%-- ===== Import attendance sheet modal (HR Staff only) ===== --%>
+<c:if test="${canImportAttendance}">
 <div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow">
       <form method="post" enctype="multipart/form-data"
             action="${pageContext.request.contextPath}/attendance?action=import">
+        <input type="hidden" name="month" value="${selectedMonth}">
+        <input type="hidden" name="year" value="${selectedYear}">
         <div class="modal-header" style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);">
           <h6 class="modal-title text-white mb-0">
             <i class="bi bi-upload me-2"></i>Import Attendance Sheet
@@ -327,15 +261,15 @@
         </div>
         <div class="modal-body">
           <p class="small text-muted mb-3">
-            Import the attendance file for
-            <strong>${not empty managerDeptName ? managerDeptName : 'your'}</strong>
-            department employees, for <strong>${importMonthLabel}</strong>.
+            Import the attendance file for <strong>attendance departments</strong>,
+            for <strong>${importMonthLabel}</strong>.
+            Department managers will review and confirm their team's records.
           </p>
 
           <div class="alert alert-light border d-flex align-items-center gap-2 py-2 small mb-3">
             <i class="bi bi-calendar-event text-primary"></i>
-            <span>Records are imported into the current month only
-              (<strong>${importMonthLabel}</strong>).</span>
+            <span>Records are imported into the selected month
+              (<strong>${importMonthLabel}</strong>). All records start as <strong>Pending</strong>.</span>
           </div>
 
           <div class="mb-2">
@@ -347,7 +281,8 @@
           <div class="border rounded p-2 bg-light small text-muted">
             <strong>Legend:</strong>
             P = Present &middot; A = Absent &middot; L = Leave &middot;
-            T = Late &middot; O = Overtime &middot; H = Holiday.
+            T = Late &middot; H = Holiday.
+            <br>A number (e.g. 2) = worked that day + overtime hours.
             <br>Blank cells are skipped. Existing records will not be overwritten.
           </div>
         </div>
@@ -370,8 +305,8 @@
     if (searchInput) {
         searchInput.addEventListener('input', function () {
             const q = this.value.toLowerCase();
-            document.querySelectorAll('#attendanceTable tbody tr').forEach(row => {
-                row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+            document.querySelectorAll('.emp-item').forEach(item => {
+                item.style.display = item.textContent.toLowerCase().includes(q) ? '' : 'none';
             });
         });
     }

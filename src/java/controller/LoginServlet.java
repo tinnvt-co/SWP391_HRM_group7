@@ -3,6 +3,7 @@ package controller;
 import dao.PermissionDAO;
 import dao.UserDAO;
 import model.User;
+import util.PasswordUtil;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -45,12 +46,18 @@ public class LoginServlet extends HttpServlet {
         }
 
         try {
-            User user = userDAO.findByUsernameAndPassword(username.trim(), password);
-            if (user == null) {
+            User user = userDAO.findActiveByUsername(username.trim());
+            if (user == null || !PasswordUtil.verify(password, user.getPasswordHash())) {
                 request.setAttribute("error", "Invalid username or password.");
                 request.setAttribute("username", username);
                 request.getRequestDispatcher("/views/auth/login.jsp").forward(request, response);
                 return;
+            }
+
+            if (PasswordUtil.needsRehash(user.getPasswordHash())) {
+                String hashedPassword = PasswordUtil.hash(password);
+                userDAO.updatePassword(user.getUserId(), hashedPassword);
+                user.setPasswordHash(hashedPassword);
             }
 
             List<String> permissions = permissionDAO.findCodesByUserId(user.getUserId());

@@ -2,11 +2,13 @@ package controller;
 
 import dao.AttendanceRecordDAO;
 import dao.AttendanceReportDAO;
+import dao.DepartmentDAO;
 import dao.EmployeeDAO;
 import model.AttendanceRecord;
 import model.AttendanceRecord.AttendanceStatus;
 import model.AttendanceRecord.VerificationStatus;
 import model.AttendanceReport;
+import model.Department;
 import model.Employee;
 import model.User;
 import service.AttendanceImportService;
@@ -29,6 +31,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
 
 @WebServlet(name = "AttendanceServlet", urlPatterns = {"/attendance"})
@@ -44,6 +47,7 @@ public class AttendanceServlet extends HttpServlet {
     private final AttendanceRecordDAO attendanceDAO = new AttendanceRecordDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
     private final AttendanceReportDAO reportDAO = new AttendanceReportDAO();
+    private final DepartmentDAO departmentDAO = new DepartmentDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -60,6 +64,13 @@ public class AttendanceServlet extends HttpServlet {
                         return;
                     }
                     handleEditForm(request, response);
+                }
+                case "employeeDetail" -> {
+                    if (!hasPermission(request, "VIEW_ATTENDANCE")) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleEmployeeDetail(request, response);
                 }
                 default -> {
                     if (!hasPermission(request, "VIEW_ATTENDANCE")) {
@@ -84,7 +95,7 @@ public class AttendanceServlet extends HttpServlet {
         try {
             switch (action) {
                 case "import" -> {
-                    if (!hasPermission(request, "VERIFY_STAFF_ATTENDANCE")) {
+                    if (!hasPermission(request, "IMPORT_ATTENDANCE")) {
                         response.sendError(HttpServletResponse.SC_FORBIDDEN);
                         return;
                     }
@@ -104,12 +115,12 @@ public class AttendanceServlet extends HttpServlet {
                     }
                     handleVerify(request, response);
                 }
-                case "sendToHr" -> {
+                case "confirmToHr" -> {
                     if (!hasPermission(request, "VERIFY_STAFF_ATTENDANCE")) {
                         response.sendError(HttpServletResponse.SC_FORBIDDEN);
                         return;
                     }
-                    handleSendToHr(request, response);
+                    handleConfirmToHr(request, response);
                 }
                 default -> response.sendRedirect(request.getContextPath() + "/attendance");
             }
@@ -125,93 +136,73 @@ public class AttendanceServlet extends HttpServlet {
         String roleName  = currentUser.getRole() != null ? currentUser.getRole().getRoleName() : "";
 
         boolean managerScope = "MANAGER".equalsIgnoreCase(roleName);
-        boolean orgWide      = "ADMIN".equalsIgnoreCase(roleName)
-                            || "HR_STAFF".equalsIgnoreCase(roleName)
-                            || "HR_MANAGER".equalsIgnoreCase(roleName);
+        boolean hrScope      = "HR_STAFF".equalsIgnoreCase(roleName)
+                            || "HR_MANAGER".equalsIgnoreCase(roleName)
+                            || "ADMIN".equalsIgnoreCase(roleName);
 
-        Integer employeeIdFilter = parseIntOrNull(request.getParameter("employeeId"));
-        LocalDate fromDate = parseDateOrNull(request.getParameter("fromDate"));
-        LocalDate toDate   = parseDateOrNull(request.getParameter("toDate"));
-
-        // Attendance never exists in the future: clamp filter dates to today.
-        LocalDate today = LocalDate.now();
-        if (fromDate != null && fromDate.isAfter(today)) fromDate = today;
-        if (toDate != null && toDate.isAfter(today)) toDate = today;
-
-        List<Employee> scopeEmployees;
-        List<AttendanceRecord> records;
-
-        int totalRecords;
-        int totalPages;
-        int page = 1;
-        String pageParam = request.getParameter("page");
-        if (pageParam != null && !pageParam.isBlank()) {
-            try { page = Integer.parseInt(pageParam); } catch (NumberFormatException ignored) {}
-        }
-
-        if (managerScope) {
-            scopeEmployees = employeeDAO.findByManagerUserId(currentUser.getUserId());
-            totalRecords = attendanceDAO.countByManagerScope(currentUser.getUserId(), employeeIdFilter, fromDate, toDate);
-            totalPages = Math.max(1, (int) Math.ceil(totalRecords / (double) PAGE_SIZE));
-            if (page < 1) page = 1;
-            if (page > totalPages) page = totalPages;
-            records = attendanceDAO.findByManagerScope(currentUser.getUserId(), employeeIdFilter,
-                    fromDate, toDate, (page - 1) * PAGE_SIZE, PAGE_SIZE);
-        } else if (orgWide) {
-            scopeEmployees = employeeDAO.findAllActive();
-            totalRecords = attendanceDAO.countAll(employeeIdFilter, fromDate, toDate);
-            totalPages = Math.max(1, (int) Math.ceil(totalRecords / (double) PAGE_SIZE));
-            if (page < 1) page = 1;
-            if (page > totalPages) page = totalPages;
-            records = attendanceDAO.findAll(employeeIdFilter, fromDate, toDate,
-                    (page - 1) * PAGE_SIZE, PAGE_SIZE);
-        } else {
-            Employee me = employeeDAO.findByUserId(currentUser.getUserId());
-            scopeEmployees = java.util.Collections.emptyList();
-            if (me != null) {
-                totalRecords = attendanceDAO.countByEmployeeId(me.getEmployeeId(), fromDate, toDate);
-                totalPages = Math.max(1, (int) Math.ceil(totalRecords / (double) PAGE_SIZE));
-                if (page < 1) page = 1;
-                if (page > totalPages) page = totalPages;
-                records = attendanceDAO.findByEmployeeId(me.getEmployeeId(), fromDate, toDate,
-                        (page - 1) * PAGE_SIZE, PAGE_SIZE);
-            } else {
-                totalRecords = 0;
-                totalPages = 1;
-                page = 1;
-                records = java.util.Collections.emptyList();
+        Integer deptId = parseIntOrNull(request.getParameter("deptId"));
+        List<Department> attendanceDepartments = null;
+        if (hrScope) {
+            attendanceDepartments = departmentDAO.findAttendanceDepartments();
+            if (!containsDepartment(attendanceDepartments, deptId)) {
+                deptId = attendanceDepartments.isEmpty() ? null : attendanceDepartments.get(0).getDepartmentId();
             }
         }
 
-        request.setAttribute("records", records);
-        request.setAttribute("scopeEmployees", scopeEmployees);
+        YearMonth selectedMonth = parseYearMonth(request.getParameter("year"), request.getParameter("month"));
+        if (selectedMonth == null) {
+            YearMonth latest = null;
+            if (managerScope) {
+                latest = attendanceDAO.findLatestMonth(currentUser.getUserId(), null);
+            } else if (hrScope) {
+                latest = attendanceDAO.findLatestMonth(null, deptId);
+            }
+            selectedMonth = latest != null ? latest : YearMonth.now();
+        }
+
+        LocalDate monthStart = selectedMonth.atDay(1);
+        LocalDate monthEnd   = selectedMonth.atEndOfMonth();
+
         request.setAttribute("managerScope", managerScope);
-        request.setAttribute("orgWide", orgWide);
-        request.setAttribute("employeeIdFilter", employeeIdFilter);
-        request.setAttribute("fromDate", fromDate);
-        request.setAttribute("toDate", toDate);
-        request.setAttribute("currentPage", page);
-        request.setAttribute("totalPages", totalPages);
-        request.setAttribute("totalRecords", totalRecords);
+        request.setAttribute("hrScope", hrScope);
+        request.setAttribute("selectedYear", selectedMonth.getYear());
+        request.setAttribute("selectedMonth", selectedMonth.getMonthValue());
+        request.setAttribute("yearOptions", buildYearOptions(selectedMonth.getYear()));
+        request.setAttribute("monthStart", monthStart);
+        request.setAttribute("monthEnd", monthEnd);
+        request.setAttribute("importMonthLabel", monthLabel(selectedMonth));
+        request.setAttribute("canImportAttendance", hasPermission(request, "IMPORT_ATTENDANCE"));
 
-        // Import always targets the current month; show it (and the manager's
-        // department) in the import dialog.
-        YearMonth thisMonth = YearMonth.now();
-        request.setAttribute("importYear", thisMonth.getYear());
-        request.setAttribute("importMonth", thisMonth.getMonthValue());
-        request.setAttribute("importMonthLabel",
-                thisMonth.getMonth().getDisplayName(java.time.format.TextStyle.FULL,
-                        java.util.Locale.ENGLISH) + " " + thisMonth.getYear());
-        if (managerScope && !scopeEmployees.isEmpty()) {
-            // 1 manager : 1 department, so any team member's department is the dept.
-            request.setAttribute("managerDeptName", scopeEmployees.get(0).getDepartmentName());
-        }
         if (managerScope) {
+            // Manager: show employee cards of their team
+            List<AttendanceRecordDAO.EmployeeAttSummary> cards =
+                    attendanceDAO.summaryByManager(currentUser.getUserId(), monthStart, monthEnd);
+            request.setAttribute("employeeCards", cards);
             request.setAttribute("pendingCount",
-                    attendanceDAO.countPendingByManager(currentUser.getUserId()));
+                    attendanceDAO.countPendingByManager(currentUser.getUserId(), monthStart, monthEnd));
+
+        } else if (hrScope) {
+            // HR Staff / HR Manager: show department list first, then cards if dept selected
+            request.setAttribute("departments", attendanceDepartments);
+
+            if (deptId != null) {
+                List<AttendanceRecordDAO.EmployeeAttSummary> cards =
+                        attendanceDAO.summaryByDepartment(deptId, monthStart, monthEnd);
+                request.setAttribute("employeeCards", cards);
+                request.setAttribute("selectedDeptId", deptId);
+            }
+
+        } else {
+            // Regular employee: go straight to their own detail
+            Employee me = employeeDAO.findByUserId(currentUser.getUserId());
+            if (me != null) {
+                response.sendRedirect(request.getContextPath()
+                        + "/attendance?action=employeeDetail&employeeId=" + me.getEmployeeId());
+                return;
+            }
         }
 
-        // Flash messages from a preceding import (PRG pattern).
+        // Flash messages from a preceding import/confirm (PRG pattern).
         HttpSession flashSession = request.getSession(false);
         if (flashSession != null) {
             Object ok = flashSession.getAttribute("importMessage");
@@ -225,8 +216,70 @@ public class AttendanceServlet extends HttpServlet {
     }
 
     /**
-     * Import a monthly attendance sheet (.xlsx) uploaded by a manager.
-     * Only managers may import, and only for employees they manage.
+     * Show attendance records for a single employee.
+     * Used when clicking an employee card (Manager or HR Staff drills down).
+     */
+    private void handleEmployeeDetail(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, ServletException, IOException {
+
+        User currentUser = getCurrentUser(request);
+        String roleName  = currentUser.getRole() != null ? currentUser.getRole().getRoleName() : "";
+
+        Integer employeeId = parseIntOrNull(request.getParameter("employeeId"));
+        if (employeeId == null) {
+            response.sendRedirect(request.getContextPath() + "/attendance");
+            return;
+        }
+
+        // Regular employee can only see their own records.
+        boolean managerScope = "MANAGER".equalsIgnoreCase(roleName);
+        boolean hrScope      = "HR_STAFF".equalsIgnoreCase(roleName)
+                            || "HR_MANAGER".equalsIgnoreCase(roleName)
+                            || "ADMIN".equalsIgnoreCase(roleName);
+        if (!managerScope && !hrScope) {
+            Employee me = employeeDAO.findByUserId(currentUser.getUserId());
+            if (me == null || me.getEmployeeId() != employeeId) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                return;
+            }
+        }
+
+        LocalDate fromDate = parseDateOrNull(request.getParameter("fromDate"));
+        LocalDate toDate   = parseDateOrNull(request.getParameter("toDate"));
+        LocalDate today = LocalDate.now();
+        if (fromDate != null && fromDate.isAfter(today)) fromDate = today;
+        if (toDate != null && toDate.isAfter(today)) toDate = today;
+
+        int totalRecords = attendanceDAO.countByEmployeeId(employeeId, fromDate, toDate);
+        int totalPages = Math.max(1, (int) Math.ceil(totalRecords / (double) PAGE_SIZE));
+        int page = parseIntOr(request.getParameter("page"), 1);
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+
+        List<AttendanceRecord> records = attendanceDAO.findByEmployeeId(
+                employeeId, fromDate, toDate, (page - 1) * PAGE_SIZE, PAGE_SIZE);
+
+        Employee emp = employeeDAO.findById(employeeId);
+
+        request.setAttribute("records", records);
+        request.setAttribute("detailEmployee", emp);
+        request.setAttribute("employeeId", employeeId);
+        request.setAttribute("fromDate", fromDate);
+        request.setAttribute("toDate", toDate);
+        request.setAttribute("currentPage", page);
+        request.setAttribute("totalPages", totalPages);
+        request.setAttribute("totalRecords", totalRecords);
+        request.setAttribute("managerScope", managerScope);
+        request.setAttribute("hrScope", hrScope);
+
+        request.getRequestDispatcher("/views/attendance/attendance-detail.jsp")
+               .forward(request, response);
+    }
+
+    /**
+     * Import a monthly attendance sheet (.xlsx) uploaded by HR Staff.
+     * HR Staff imports the ALL-department sheet; every employee code found in
+     * the system is accepted. Records start as Pending.
      */
     private void handleImport(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, ServletException, IOException {
@@ -235,8 +288,8 @@ public class AttendanceServlet extends HttpServlet {
         HttpSession session = request.getSession(true);
         String ctx = request.getContextPath();
 
-        // Import always targets the CURRENT month (no past/future selection).
-        YearMonth target = YearMonth.now();
+        YearMonth target = parseYearMonth(request.getParameter("year"), request.getParameter("month"));
+        if (target == null) target = YearMonth.now();
 
         Part filePart = request.getPart("sheet");
         if (filePart == null || filePart.getSize() == 0) {
@@ -251,20 +304,20 @@ public class AttendanceServlet extends HttpServlet {
             return;
         }
 
-        // Only the manager's own team is writable.
-        List<Employee> scope = employeeDAO.findByManagerUserId(currentUser.getUserId());
-        if (scope.isEmpty()) {
+        // HR Staff can import for active attendance departments only (Admin/HR/IT excluded).
+        List<Employee> allEmps = employeeDAO.findAttendanceActive();
+        if (allEmps.isEmpty()) {
             session.setAttribute("importError",
-                    "You do not manage any employees to import attendance for.");
+                    "No active employees found in the system.");
             response.sendRedirect(ctx + "/attendance");
             return;
         }
 
         AttendanceImportService.Result result;
         try (InputStream in = filePart.getInputStream()) {
-            XlsxReader.Sheet sheet = XlsxReader.readFirstSheet(in);
+            java.util.List<XlsxReader.Sheet> sheets = XlsxReader.readAllSheets(in);
             AttendanceImportService importer = new AttendanceImportService();
-            result = importer.importSheet(sheet, scope, target,
+            result = importer.importAllSheets(sheets, allEmps, target,
                     currentUser.getUserId(), /*overwrite*/ false);
         } catch (IOException ex) {
             session.setAttribute("importError",
@@ -389,7 +442,8 @@ public class AttendanceServlet extends HttpServlet {
         existing.setNote(note);
 
         attendanceDAO.update(existing);
-        response.sendRedirect(request.getContextPath() + "/attendance?updated=success");
+        response.sendRedirect(request.getContextPath()
+                + "/attendance?action=employeeDetail&employeeId=" + existing.getEmployeeId());
     }
 
     private void forwardEditForm(HttpServletRequest request, HttpServletResponse response,
@@ -416,15 +470,16 @@ public class AttendanceServlet extends HttpServlet {
 
         User currentUser = getCurrentUser(request);
         attendanceDAO.verify(existing.getAttendanceId(), currentUser.getUserId());
-        response.sendRedirect(request.getContextPath() + "/attendance?verified=success");
+        response.sendRedirect(request.getContextPath()
+                + "/attendance?action=employeeDetail&employeeId=" + existing.getEmployeeId());
     }
 
     /**
-     * "Send to HR Staff": bulk-verify every Pending record of the manager's team,
-     * then build one monthly attendance_report per employee (current month) and
-     * submit it to HR Staff. Managers only.
+     * "Confirm Attendance": a manager bulk-verifies every Pending record of
+     * their team for the selected month, then builds one monthly
+     * attendance_report per employee and submits it to HR Staff. Managers only.
      */
-    private void handleSendToHr(HttpServletRequest request, HttpServletResponse response)
+    private void handleConfirmToHr(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, IOException {
 
         User currentUser = getCurrentUser(request);
@@ -438,12 +493,16 @@ public class AttendanceServlet extends HttpServlet {
             return;
         }
 
-        int mgrId = currentUser.getUserId();
-        // 1) Verify any still-pending records.
-        attendanceDAO.verifyAllPendingByManager(mgrId, mgrId, null, null);
+        YearMonth month = parseYearMonth(request.getParameter("year"), request.getParameter("month"));
+        if (month == null) month = YearMonth.now();
+        LocalDate monthStart = month.atDay(1);
+        LocalDate monthEnd = month.atEndOfMonth();
 
-        // 2) Aggregate the CURRENT month and submit one report per employee.
-        YearMonth month = YearMonth.now();
+        int mgrId = currentUser.getUserId();
+        // 1) Verify any still-pending records for the selected month.
+        attendanceDAO.verifyAllPendingByManager(mgrId, mgrId, monthStart, monthEnd);
+
+        // 2) Aggregate the selected month and submit one report per employee.
         List<AttendanceRecordDAO.MonthlySummary> summaries =
                 attendanceDAO.aggregateMonthByManager(mgrId, month.getYear(), month.getMonthValue());
 
@@ -536,6 +595,32 @@ public class AttendanceServlet extends HttpServlet {
     private LocalDate parseDateOrNull(String s) {
         if (s == null || s.isBlank()) return null;
         try { return LocalDate.parse(s); } catch (DateTimeParseException ex) { return null; }
+    }
+
+    private YearMonth parseYearMonth(String yearStr, String monthStr) {
+        int year = parseIntOr(yearStr, -1);
+        int month = parseIntOr(monthStr, -1);
+        if (year < 2000 || year > 2100 || month < 1 || month > 12) return null;
+        return YearMonth.of(year, month);
+    }
+
+    private String monthLabel(YearMonth month) {
+        return month.getMonth().getDisplayName(java.time.format.TextStyle.FULL,
+                java.util.Locale.ENGLISH) + " " + month.getYear();
+    }
+
+    private boolean containsDepartment(List<Department> departments, Integer departmentId) {
+        if (departmentId == null || departments == null) return false;
+        for (Department d : departments) {
+            if (d.getDepartmentId() == departmentId) return true;
+        }
+        return false;
+    }
+
+    private List<Integer> buildYearOptions(int selectedYear) {
+        List<Integer> years = new ArrayList<>();
+        for (int y = selectedYear - 2; y <= selectedYear + 1; y++) years.add(y);
+        return years;
     }
 
     private String trim(String value) {

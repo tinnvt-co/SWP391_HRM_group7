@@ -54,6 +54,13 @@ public class DepartmentDAO {
                 + "ORDER BY d.department_name");
     }
 
+    public List<Department> findAttendanceDepartments() throws SQLException {
+        return findList(BASE_SELECT
+                + "WHERE d.is_active = 1 "
+                + "AND d.department_code NOT IN ('ADMIN_DEPT', 'HR', 'IT') "
+                + "ORDER BY d.department_name");
+    }
+
     public List<Department> findAllActive() throws SQLException {
         return findList(BASE_SELECT + "WHERE d.is_active = 1 ORDER BY d.department_name");
     }

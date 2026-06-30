@@ -31,6 +31,10 @@ import java.util.Map;
  *
  * Only the status and overtime hours are stored. Cells left blank are skipped.
  * Existing (employee, date) rows are skipped (not overwritten) unless overwrite=true.
+ *
+ * Flow: HR Staff imports the ALL-department sheet; every attendance-scoped
+ * employee code is accepted (Admin/HR/IT excluded). Records start as Pending. Department managers then
+ * confirm (verify) their own team's records.
  */
 public class AttendanceImportService {
 
@@ -52,24 +56,48 @@ public class AttendanceImportService {
 
         public boolean hasErrors() { return !errors.isEmpty(); }
         public int totalProcessed() { return inserted + skippedExisting; }
+
+        /** Merge another result into this one (for multi-sheet import). */
+        public void merge(Result other) {
+            this.inserted += other.inserted;
+            this.skippedExisting += other.skippedExisting;
+            this.skippedBlank += other.skippedBlank;
+            this.errors.addAll(other.errors);
+            this.warnings.addAll(other.warnings);
+        }
+    }
+
+    /**
+     * Import ALL sheets from a multi-tab .xlsx file (e.g. the ALL-department template).
+     * Iterates every Sheet and merges the results.
+     */
+    public Result importAllSheets(List<XlsxReader.Sheet> sheets, List<Employee> allEmps,
+                                  YearMonth month, int importerUid, boolean overwrite)
+            throws SQLException {
+        Result merged = new Result();
+        for (int i = 0; i < sheets.size(); i++) {
+            Result r = importSheet(sheets.get(i), allEmps, month, importerUid, overwrite);
+            merged.merge(r);
+        }
+        return merged;
     }
 
     /**
      * @param sheet       parsed worksheet
-     * @param scopeEmps   employees the importer is allowed to write (manager's team)
+     * @param allEmps     active employees in departments that use attendance
      * @param month       the month the sheet belongs to (year+month)
-     * @param verifierUid user id recorded as verifier (the importing manager)
+     * @param importerUid user id recorded as the importer (HR Staff)
      * @param overwrite   if true, replace an existing row for the same (emp, date)
      */
-    public Result importSheet(XlsxReader.Sheet sheet, List<Employee> scopeEmps,
-                              YearMonth month, int verifierUid, boolean overwrite)
+    public Result importSheet(XlsxReader.Sheet sheet, List<Employee> allEmps,
+                              YearMonth month, int importerUid, boolean overwrite)
             throws SQLException {
 
         Result result = new Result();
 
-        // code -> employee, for fast lookup and scope enforcement
+        // code -> employee, for fast lookup
         Map<String, Employee> byCode = new HashMap<>();
-        for (Employee e : scopeEmps) {
+        for (Employee e : allEmps) {
             if (e.getEmployeeCode() != null) {
                 byCode.put(e.getEmployeeCode().trim().toUpperCase(), e);
             }
@@ -90,14 +118,15 @@ public class AttendanceImportService {
             String code = sheet.get(r, CODE_COL).trim();
             if (code.isEmpty()) continue; // blank row or the total row
 
-            // Stop at the total row ("TONG CONG...") which has no employee code.
+            // Stop at the total row ("DEPARTMENT TOTAL" / "TONG CONG...").
             String first = sheet.get(r, 0).trim();
-            if (first.toUpperCase().startsWith("TONG")) break;
+            if (first.toUpperCase().startsWith("TONG")
+                    || first.toUpperCase().startsWith("DEPARTMENT TOTAL")) break;
 
             Employee emp = byCode.get(code.toUpperCase());
             if (emp == null) {
                 result.errors.add("Row " + (r + 1) + ": employee code '" + code
-                        + "' is not within your managed team (skipped).");
+                        + "' not found in the system (skipped).");
                 continue;
             }
 

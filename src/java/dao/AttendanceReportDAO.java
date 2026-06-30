@@ -58,6 +58,46 @@ public class AttendanceReportDAO {
      */
     public List<AttendanceReport> findSubmittedByMonth(int year, int month,
                                                        Integer departmentId) throws SQLException {
+        return findSubmittedByMonth(year, month, departmentId, null);
+    }
+
+    public int countSubmittedByMonth(int year, int month,
+                                     Integer departmentId, Integer managerUserId) throws SQLException {
+        StringBuilder sql = new StringBuilder(
+            "SELECT COUNT(*) "
+          + "FROM attendance_reports ar "
+          + "WHERE ar.report_year=? AND ar.report_month=? "
+          + "  AND ar.status <> 'Draft' ");
+        if (departmentId != null) sql.append("AND ar.department_id=? ");
+        if (managerUserId != null) sql.append("AND ar.manager_id=? ");
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int idx = 1;
+            ps.setInt(idx++, year);
+            ps.setInt(idx++, month);
+            if (departmentId != null) ps.setInt(idx++, departmentId);
+            if (managerUserId != null) ps.setInt(idx, managerUserId);
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getInt(1) : 0;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public List<AttendanceReport> findSubmittedByMonth(int year, int month,
+                                                       Integer departmentId, Integer managerUserId)
+            throws SQLException {
+        return findSubmittedByMonthPage(year, month, departmentId, managerUserId, 0, Integer.MAX_VALUE);
+    }
+
+    public List<AttendanceReport> findSubmittedByMonthPage(int year, int month,
+                                                           Integer departmentId, Integer managerUserId,
+                                                           int offset, int limit) throws SQLException {
         StringBuilder sql = new StringBuilder(
             "SELECT ar.*, "
           + "  eu.full_name AS emp_full_name, e.employee_code, "
@@ -70,7 +110,9 @@ public class AttendanceReportDAO {
           + "WHERE ar.report_year=? AND ar.report_month=? "
           + "  AND ar.status <> 'Draft' ");
         if (departmentId != null) sql.append("AND ar.department_id=? ");
+        if (managerUserId != null) sql.append("AND ar.manager_id=? ");
         sql.append("ORDER BY d.department_name, eu.full_name");
+        sql.append(" LIMIT ? OFFSET ?");
 
         List<AttendanceReport> list = new ArrayList<>();
         Connection conn = null;
@@ -79,9 +121,13 @@ public class AttendanceReportDAO {
         try {
             conn = DBContext.getConnection();
             ps = conn.prepareStatement(sql.toString());
-            ps.setInt(1, year);
-            ps.setInt(2, month);
-            if (departmentId != null) ps.setInt(3, departmentId);
+            int idx = 1;
+            ps.setInt(idx++, year);
+            ps.setInt(idx++, month);
+            if (departmentId != null) ps.setInt(idx++, departmentId);
+            if (managerUserId != null) ps.setInt(idx++, managerUserId);
+            ps.setInt(idx++, limit);
+            ps.setInt(idx, offset);
             rs = ps.executeQuery();
             while (rs.next()) list.add(mapRow(rs));
         } finally {

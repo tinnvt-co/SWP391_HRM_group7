@@ -2,6 +2,7 @@ package controller;
 
 import dao.UserDAO;
 import model.User;
+import util.PasswordUtil;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -55,14 +56,14 @@ public class ChangePasswordServlet extends HttpServlet {
         }
 
         try {
-            User dbUser = userDAO.findByUsernameAndPassword(currentUser.getUsername(), currentPass);
-            if (dbUser == null) {
+            User dbUser = userDAO.findById(currentUser.getUserId());
+            if (dbUser == null || !PasswordUtil.verify(currentPass, dbUser.getPasswordHash())) {
                 request.setAttribute("error", "Current password is incorrect.");
                 request.getRequestDispatcher("/views/profile/change-password.jsp").forward(request, response);
                 return;
             }
 
-            userDAO.updatePassword(currentUser.getUserId(), newPass);
+            userDAO.updatePassword(currentUser.getUserId(), PasswordUtil.hash(newPass));
 
             session.invalidate();
             response.sendRedirect(request.getContextPath() + "/login?changed=success");

@@ -41,6 +41,8 @@ import java.util.Locale;
 @WebServlet(name = "PayrollServlet", urlPatterns = {"/payroll"})
 public class PayrollServlet extends HttpServlet {
 
+    private static final int PAGE_SIZE = 10;
+
     private final PayrollPeriodDAO periodDAO = new PayrollPeriodDAO();
     private final PayrollDAO payrollDAO = new PayrollDAO();
     private final AttendanceReportDAO reportDAO = new AttendanceReportDAO();
@@ -111,8 +113,12 @@ public class PayrollServlet extends HttpServlet {
         if (month < 1 || month > 12) month = now.getMonthValue();
 
         PayrollPeriod period = periodDAO.findByMonth(year, month);
+        int totalPayrolls = period != null ? payrollDAO.countByPeriod(period.getPayrollPeriodId()) : 0;
+        int totalPages = Math.max(1, (int) Math.ceil(totalPayrolls / (double) PAGE_SIZE));
+        int page = parsePageParam(request.getParameter("page"), totalPages);
+        int offset = (page - 1) * PAGE_SIZE;
         List<Payroll> payrolls = period != null
-                ? payrollDAO.findByPeriod(period.getPayrollPeriodId())
+                ? payrollDAO.findByPeriodPage(period.getPayrollPeriodId(), offset, PAGE_SIZE)
                 : List.of();
 
         // Can we generate? Only if no period yet AND there are submitted reports.
@@ -121,6 +127,9 @@ public class PayrollServlet extends HttpServlet {
         request.setAttribute("period", period);
         request.setAttribute("payrolls", payrolls);
         request.setAttribute("hasReports", hasReports);
+        request.setAttribute("currentPage", page);
+        request.setAttribute("totalPages", totalPages);
+        request.setAttribute("totalPayrolls", totalPayrolls);
         request.setAttribute("selectedYear", year);
         request.setAttribute("selectedMonth", month);
         request.setAttribute("monthLabel", monthLabel(year, month));
@@ -242,12 +251,19 @@ public class PayrollServlet extends HttpServlet {
         if (month < 1 || month > 12) month = now.getMonthValue();
 
         PayrollPeriod period = periodDAO.findByMonth(year, month);
+        int totalPayrolls = period != null ? payrollDAO.countByPeriod(period.getPayrollPeriodId()) : 0;
+        int totalPages = Math.max(1, (int) Math.ceil(totalPayrolls / (double) PAGE_SIZE));
+        int page = parsePageParam(request.getParameter("page"), totalPages);
+        int offset = (page - 1) * PAGE_SIZE;
         List<Payroll> payrolls = period != null
-                ? payrollDAO.findByPeriod(period.getPayrollPeriodId())
+                ? payrollDAO.findByPeriodPage(period.getPayrollPeriodId(), offset, PAGE_SIZE)
                 : List.of();
 
         request.setAttribute("period", period);
         request.setAttribute("payrolls", payrolls);
+        request.setAttribute("currentPage", page);
+        request.setAttribute("totalPages", totalPages);
+        request.setAttribute("totalPayrolls", totalPayrolls);
         request.setAttribute("selectedYear", year);
         request.setAttribute("selectedMonth", month);
         request.setAttribute("monthLabel", monthLabel(year, month));
@@ -353,6 +369,13 @@ public class PayrollServlet extends HttpServlet {
     private int parseIntOr(String s, int dflt) {
         if (s == null || s.isBlank()) return dflt;
         try { return Integer.parseInt(s.trim()); } catch (NumberFormatException ex) { return dflt; }
+    }
+
+    private int parsePageParam(String pageParam, int totalPages) {
+        int page = parseIntOr(pageParam, 1);
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        return page;
     }
 
     private String trim(String s) { return s == null ? "" : s.trim(); }

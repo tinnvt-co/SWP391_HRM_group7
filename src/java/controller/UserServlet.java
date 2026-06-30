@@ -10,6 +10,7 @@ import model.Employee.EmploymentStatus;
 import model.Role;
 import model.User;
 import model.User.Gender;
+import util.PasswordUtil;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -191,7 +192,7 @@ public class UserServlet extends HttpServlet {
 
         User user = new User();
         user.setUsername(username);
-        user.setPasswordHash(password);
+        user.setPasswordHash(PasswordUtil.hash(password));
         user.setFullName(fullName);
         user.setEmail(email);
         user.setPhone(phone);

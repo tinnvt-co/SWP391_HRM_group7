@@ -87,6 +87,25 @@ public class UserDAO {
         return null;
     }
 
+    public User findActiveByUsername(String username) throws SQLException {
+        String sql = "SELECT u.*, r.role_name FROM users u "
+                   + "JOIN roles r ON u.role_id = r.role_id "
+                   + "WHERE u.username = ? AND u.is_active = 1";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, username);
+            rs = ps.executeQuery();
+            if (rs.next()) return mapRow(rs);
+        } finally {
+            close(conn, ps, rs);
+        }
+        return null;
+    }
+
     public int insert(User user) throws SQLException {
         String sql = "INSERT INTO users (username, password_hash, full_name, email, phone, "
                    + "gender, date_of_birth, address, role_id, manager_id, is_active) "
@@ -117,6 +136,7 @@ public class UserDAO {
         return -1;
     }
 
+    @Deprecated
     public User findByUsernameAndPassword(String username, String password) throws SQLException {
         String sql = "SELECT u.*, r.role_name FROM users u "
                    + "JOIN roles r ON u.role_id = r.role_id "

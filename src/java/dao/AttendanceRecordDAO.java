@@ -7,6 +7,7 @@ import model.AttendanceRecord.VerificationStatus;
 
 import java.sql.*;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -194,6 +195,65 @@ public class AttendanceRecordDAO {
         }
     }
 
+    public int countPendingByManager(int managerUserId, LocalDate fromDate, LocalDate toDate)
+            throws SQLException {
+        StringBuilder sql = new StringBuilder(
+                "SELECT COUNT(*) FROM attendance_records ar "
+              + "JOIN employees e ON ar.employee_id = e.employee_id "
+              + "JOIN users u     ON e.user_id      = u.user_id "
+              + "WHERE u.manager_id=? AND ar.verification_status='Pending'");
+        if (fromDate != null) sql.append(" AND ar.work_date >= ?");
+        if (toDate != null) sql.append(" AND ar.work_date <= ?");
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int i = 1;
+            ps.setInt(i++, managerUserId);
+            if (fromDate != null) ps.setDate(i++, Date.valueOf(fromDate));
+            if (toDate != null) ps.setDate(i++, Date.valueOf(toDate));
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getInt(1) : 0;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public YearMonth findLatestMonth(Integer managerUserId, Integer departmentId) throws SQLException {
+        StringBuilder sql = new StringBuilder(
+                "SELECT MAX(a.work_date) AS latest_date "
+              + "FROM attendance_records a "
+              + "JOIN employees e ON a.employee_id = e.employee_id "
+              + "JOIN users u ON e.user_id = u.user_id "
+              + "WHERE 1=1 ");
+        List<Object> params = new ArrayList<>();
+        if (managerUserId != null) { sql.append("AND u.manager_id = ? "); params.add(managerUserId); }
+        if (departmentId != null) { sql.append("AND e.department_id = ? "); params.add(departmentId); }
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            for (int i = 0; i < params.size(); i++) ps.setObject(i + 1, params.get(i));
+            rs = ps.executeQuery();
+            if (rs.next()) {
+                Date latest = rs.getDate("latest_date");
+                if (latest != null) {
+                    LocalDate d = latest.toLocalDate();
+                    return YearMonth.of(d.getYear(), d.getMonthValue());
+                }
+            }
+        } finally {
+            close(conn, ps, rs);
+        }
+        return null;
+    }
+
     /** Monthly attendance aggregate for one employee (used to build a report). */
     public static final class MonthlySummary {
         public int employeeId;
@@ -202,6 +262,104 @@ public class AttendanceRecordDAO {
         public int paidLeaveDays;       // Leave
         public int unpaidLeaveDays;     // Unpaid Leave
         public java.math.BigDecimal overtimeHours = java.math.BigDecimal.ZERO;
+    }
+
+    /** Per-employee attendance summary for the card view. */
+    public static final class EmployeeAttSummary {
+        public int employeeId;
+        public String employeeCode;
+        public String fullName;
+        public String departmentName;
+        public int departmentId;
+        public int totalRecords;
+        public int pendingCount;
+        public int verifiedCount;
+        public int presentDays;
+        public int absentDays;
+        public int leaveDays;
+
+        public int getEmployeeId() { return employeeId; }
+        public String getEmployeeCode() { return employeeCode; }
+        public String getFullName() { return fullName; }
+        public String getDepartmentName() { return departmentName; }
+        public int getDepartmentId() { return departmentId; }
+        public int getTotalRecords() { return totalRecords; }
+        public int getPendingCount() { return pendingCount; }
+        public int getVerifiedCount() { return verifiedCount; }
+        public int getPresentDays() { return presentDays; }
+        public int getAbsentDays() { return absentDays; }
+        public int getLeaveDays() { return leaveDays; }
+    }
+
+    /**
+     * Employee attendance card data for a manager's team.
+     * Returns one summary row per active employee, even when the date range has no records yet.
+     */
+    public List<EmployeeAttSummary> summaryByManager(int managerUserId,
+                                                      LocalDate fromDate, LocalDate toDate) throws SQLException {
+        return summaryByScope(managerUserId, null, fromDate, toDate);
+    }
+
+    /**
+     * Employee attendance card data for all employees in a department.
+     */
+    public List<EmployeeAttSummary> summaryByDepartment(int departmentId,
+                                                         LocalDate fromDate, LocalDate toDate) throws SQLException {
+        return summaryByScope(null, departmentId, fromDate, toDate);
+    }
+
+    private List<EmployeeAttSummary> summaryByScope(Integer managerUserId, Integer departmentId,
+                                                    LocalDate fromDate, LocalDate toDate) throws SQLException {
+        StringBuilder sql = new StringBuilder(
+            "SELECT e.employee_id, e.employee_code, u.full_name, d.department_name, e.department_id, "
+          + " COALESCE(COUNT(a.attendance_id), 0) AS total_records, "
+          + " COALESCE(SUM(CASE WHEN a.verification_status='Pending' THEN 1 ELSE 0 END), 0) AS pending_cnt, "
+          + " COALESCE(SUM(CASE WHEN a.verification_status='Verified' THEN 1 ELSE 0 END), 0) AS verified_cnt, "
+          + " COALESCE(SUM(CASE WHEN a.attendance_status IN ('Present','Late') THEN 1 ELSE 0 END), 0) AS present_days, "
+          + " COALESCE(SUM(CASE WHEN a.attendance_status='Absent' THEN 1 ELSE 0 END), 0) AS absent_days, "
+          + " COALESCE(SUM(CASE WHEN a.attendance_status='Leave' THEN 1 ELSE 0 END), 0) AS leave_days "
+          + "FROM employees e "
+          + "JOIN users u       ON e.user_id       = u.user_id "
+          + "JOIN roles ro      ON u.role_id       = ro.role_id "
+          + "JOIN departments d ON e.department_id = d.department_id "
+          + "LEFT JOIN attendance_records a ON a.employee_id = e.employee_id ");
+        List<Object> params = new ArrayList<>();
+        if (fromDate != null) { sql.append("AND a.work_date >= ? "); params.add(Date.valueOf(fromDate)); }
+        if (toDate != null)   { sql.append("AND a.work_date <= ? "); params.add(Date.valueOf(toDate)); }
+        sql.append("WHERE u.is_active = 1 AND ro.role_name = 'EMPLOYEE' ");
+        if (managerUserId != null) { sql.append("AND u.manager_id = ? "); params.add(managerUserId); }
+        if (departmentId != null) { sql.append("AND e.department_id = ? "); params.add(departmentId); }
+        sql.append("GROUP BY e.employee_id, e.employee_code, u.full_name, d.department_name, e.department_id ");
+        sql.append("ORDER BY u.full_name");
+
+        List<EmployeeAttSummary> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            for (int i = 0; i < params.size(); i++) ps.setObject(i + 1, params.get(i));
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                EmployeeAttSummary s = new EmployeeAttSummary();
+                s.employeeId    = rs.getInt("employee_id");
+                s.employeeCode  = rs.getString("employee_code");
+                s.fullName      = rs.getString("full_name");
+                s.departmentName = rs.getString("department_name");
+                s.departmentId  = rs.getInt("department_id");
+                s.totalRecords  = rs.getInt("total_records");
+                s.pendingCount  = rs.getInt("pending_cnt");
+                s.verifiedCount = rs.getInt("verified_cnt");
+                s.presentDays   = rs.getInt("present_days");
+                s.absentDays    = rs.getInt("absent_days");
+                s.leaveDays     = rs.getInt("leave_days");
+                list.add(s);
+            }
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
     }
 
     /**

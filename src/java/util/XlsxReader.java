@@ -59,6 +59,17 @@ public final class XlsxReader {
 
     /** Parse the first worksheet of an .xlsx stream. */
     public static Sheet readFirstSheet(InputStream xlsx) throws IOException {
+        List<Sheet> all = readAllSheets(xlsx);
+        if (all.isEmpty()) throw new IOException("No worksheets found in the file.");
+        return all.get(0);
+    }
+
+    /**
+     * Parse ALL worksheets of an .xlsx stream.
+     * Returns one Sheet per tab in workbook order (sheet1, sheet2, …).
+     * Used by the ALL-department attendance import.
+     */
+    public static List<Sheet> readAllSheets(InputStream xlsx) throws IOException {
         Map<String, byte[]> entries = new HashMap<>();
         try (ZipInputStream zis = new ZipInputStream(xlsx)) {
             ZipEntry e;
@@ -74,28 +85,33 @@ public final class XlsxReader {
 
         List<String> shared = readSharedStrings(entries.get("xl/sharedStrings.xml"));
 
-        String sheetPath = resolveFirstSheetPath(entries);
-        byte[] sheetBytes = entries.get(sheetPath);
-        if (sheetBytes == null) {
-            throw new IOException("Worksheet not found in workbook: " + sheetPath);
-        }
-        return parseSheet(sheetBytes, shared);
-    }
-
-    /** Locate the first worksheet part; falls back to the conventional path. */
-    private static String resolveFirstSheetPath(Map<String, byte[]> entries) {
-        // Default layout produced by openpyxl / Excel.
-        if (entries.containsKey("xl/worksheets/sheet1.xml")) {
-            return "xl/worksheets/sheet1.xml";
-        }
-        // Otherwise pick the lowest-numbered worksheet present.
-        String best = null;
+        // Collect all sheet paths and sort so sheet1 < sheet2 < … < sheet10 etc.
+        List<String> sheetPaths = new ArrayList<>();
         for (String name : entries.keySet()) {
-            if (name.startsWith("xl/worksheets/") && name.endsWith(".xml")) {
-                if (best == null || name.compareTo(best) < 0) best = name;
+            if (name.startsWith("xl/worksheets/sheet") && name.endsWith(".xml")) {
+                sheetPaths.add(name);
             }
         }
-        return best != null ? best : "xl/worksheets/sheet1.xml";
+        sheetPaths.sort((a, b) -> {
+            int na = extractSheetNumber(a);
+            int nb = extractSheetNumber(b);
+            return Integer.compare(na, nb);
+        });
+
+        List<Sheet> sheets = new ArrayList<>();
+        for (String path : sheetPaths) {
+            byte[] xml = entries.get(path);
+            if (xml != null) sheets.add(parseSheet(xml, shared));
+        }
+        return sheets;
+    }
+
+    /** Extract the number from "xl/worksheets/sheet3.xml" → 3. */
+    private static int extractSheetNumber(String path) {
+        // strip prefix "xl/worksheets/sheet" and suffix ".xml"
+        String num = path.replace("xl/worksheets/sheet", "").replace(".xml", "");
+        try { return Integer.parseInt(num); }
+        catch (NumberFormatException ex) { return Integer.MAX_VALUE; }
     }
 
     private static List<String> readSharedStrings(byte[] xml) throws IOException {

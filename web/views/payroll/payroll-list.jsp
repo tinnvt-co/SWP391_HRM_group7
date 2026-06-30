@@ -167,7 +167,7 @@
                     <tbody>
                         <c:forEach var="p" items="${payrolls}" varStatus="s">
                             <tr>
-                                <td class="ps-4 text-muted">${s.index + 1}</td>
+                                <td class="ps-4 text-muted">${(currentPage - 1) * 10 + s.index + 1}</td>
                                 <td>
                                     <div class="fw-medium">${p.employeeFullName}</div>
                                     <div class="text-muted" style="font-size:0.78rem;">${p.employeeCode}</div>
@@ -198,6 +198,31 @@
                 </table>
             </div>
         </div>
+        <c:if test="${totalPages > 1}">
+            <div class="d-flex align-items-center justify-content-between px-3 py-3 border-top flex-wrap gap-2">
+                <small class="text-muted">
+                    Page ${currentPage} of ${totalPages} &middot; ${totalPayrolls} payroll record(s)
+                </small>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item ${currentPage == 1 ? 'disabled' : ''}">
+                            <a class="page-link"
+                               href="?month=${selectedMonth}&year=${selectedYear}&page=${currentPage - 1}">Previous</a>
+                        </li>
+                        <c:forEach var="pg" begin="1" end="${totalPages}">
+                            <li class="page-item ${pg == currentPage ? 'active' : ''}">
+                                <a class="page-link"
+                                   href="?month=${selectedMonth}&year=${selectedYear}&page=${pg}">${pg}</a>
+                            </li>
+                        </c:forEach>
+                        <li class="page-item ${currentPage == totalPages ? 'disabled' : ''}">
+                            <a class="page-link"
+                               href="?month=${selectedMonth}&year=${selectedYear}&page=${currentPage + 1}">Next</a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </c:if>
     </div>
 </div>
 

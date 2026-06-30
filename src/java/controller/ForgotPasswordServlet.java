@@ -5,6 +5,7 @@ import dao.UserDAO;
 import model.PasswordResetToken;
 import model.User;
 import service.MailService;
+import util.PasswordUtil;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -133,6 +134,13 @@ public class ForgotPasswordServlet extends HttpServlet {
             return;
         }
 
+        if (newPass.length() < 6) {
+            request.setAttribute("error", "New password must be at least 6 characters.");
+            request.setAttribute("token", token);
+            request.getRequestDispatcher("/views/auth/reset-password.jsp").forward(request, response);
+            return;
+        }
+
         try {
             PasswordResetToken prt = tokenDAO.findByToken(token);
             if (prt == null || prt.isUsed() || prt.isExpired()) {
@@ -141,7 +149,7 @@ public class ForgotPasswordServlet extends HttpServlet {
                 return;
             }
 
-            userDAO.updatePassword(prt.getUserId(), newPass);
+            userDAO.updatePassword(prt.getUserId(), PasswordUtil.hash(newPass));
             tokenDAO.markAsUsed(prt.getTokenId());
 
             response.sendRedirect(request.getContextPath() + "/login?reset=success");

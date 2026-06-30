@@ -66,6 +66,45 @@ public class PayrollDAO {
         return list;
     }
 
+    public int countByPeriod(int periodId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM payrolls WHERE payroll_period_id=?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, periodId);
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getInt(1) : 0;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public List<Payroll> findByPeriodPage(int periodId, int offset, int limit) throws SQLException {
+        String sql = baseSelect()
+                   + "WHERE p.payroll_period_id=? "
+                   + "ORDER BY d.department_name, eu.full_name "
+                   + "LIMIT ? OFFSET ?";
+        List<Payroll> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, periodId);
+            ps.setInt(2, limit);
+            ps.setInt(3, offset);
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
     public Payroll findById(int payrollId) throws SQLException {
         String sql = baseSelect() + "WHERE p.payroll_id=?";
         Connection conn = null;
