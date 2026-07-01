@@ -14,6 +14,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Imports a monthly attendance sheet (.xlsx) into attendance_records.
@@ -43,6 +45,10 @@ public class AttendanceImportService {
     private static final int CODE_COL = 1;      // "Ma NV"  ("B")
     private static final int HEADER_LABEL_ROW = 3; // 0-based row 4
     private static final int DATA_START_ROW = 5;   // 0-based row 6
+    private static final Pattern MONTH_YEAR_SLASH =
+            Pattern.compile("\\b(0?[1-9]|1[0-2])\\s*[/.-]\\s*((?:20)?\\d{2})\\b");
+    private static final Pattern YEAR_MONTH_DASH =
+            Pattern.compile("\\b((?:20)?\\d{2})\\s*[-/]\\s*(0?[1-9]|1[0-2])\\b");
 
     private final AttendanceRecordDAO attendanceDAO = new AttendanceRecordDAO();
 
@@ -76,6 +82,18 @@ public class AttendanceImportService {
             throws SQLException {
         Result merged = new Result();
         for (int i = 0; i < sheets.size(); i++) {
+            YearMonth sheetMonth = detectSheetMonth(sheets.get(i));
+            if (sheetMonth == null) {
+                merged.errors.add("Sheet " + (i + 1)
+                        + ": could not detect the attendance month/year in the file title.");
+            } else if (!sheetMonth.equals(month)) {
+                merged.errors.add("Sheet " + (i + 1) + ": file is for " + sheetMonth
+                        + ", but the selected import month is " + month + ".");
+            }
+        }
+        if (merged.hasErrors()) return merged;
+
+        for (int i = 0; i < sheets.size(); i++) {
             Result r = importSheet(sheets.get(i), allEmps, month, importerUid, overwrite);
             merged.merge(r);
         }
@@ -94,6 +112,16 @@ public class AttendanceImportService {
             throws SQLException {
 
         Result result = new Result();
+        YearMonth sheetMonth = detectSheetMonth(sheet);
+        if (sheetMonth == null) {
+            result.errors.add("Could not detect the attendance month/year in the file title.");
+            return result;
+        }
+        if (!sheetMonth.equals(month)) {
+            result.errors.add("File is for " + sheetMonth
+                    + ", but the selected import month is " + month + ".");
+            return result;
+        }
 
         // code -> employee, for fast lookup
         Map<String, Employee> byCode = new HashMap<>();
@@ -201,6 +229,46 @@ public class AttendanceImportService {
             map.put(FIRST_DAY_COL + d - 1, month.atDay(d));
         }
         return map;
+    }
+
+    private YearMonth detectSheetMonth(XlsxReader.Sheet sheet) {
+        int rows = Math.min(sheet.rowCount(), 8);
+        for (int r = 0; r < rows; r++) {
+            int cols = Math.max(sheet.colCount(r), 1);
+            for (int c = 0; c < cols; c++) {
+                YearMonth ym = parseMonthYear(sheet.get(r, c));
+                if (ym != null) return ym;
+            }
+        }
+        return null;
+    }
+
+    private YearMonth parseMonthYear(String text) {
+        if (text == null || text.isBlank()) return null;
+
+        Matcher slash = MONTH_YEAR_SLASH.matcher(text);
+        if (slash.find()) {
+            return buildYearMonth(slash.group(2), slash.group(1));
+        }
+
+        Matcher dash = YEAR_MONTH_DASH.matcher(text);
+        if (dash.find()) {
+            return buildYearMonth(dash.group(1), dash.group(2));
+        }
+
+        return null;
+    }
+
+    private YearMonth buildYearMonth(String yearText, String monthText) {
+        try {
+            int year = Integer.parseInt(yearText.trim());
+            int month = Integer.parseInt(monthText.trim());
+            if (year < 100) year += 2000;
+            if (year < 2000 || year > 2100 || month < 1 || month > 12) return null;
+            return YearMonth.of(year, month);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private static Integer asDay(String s) {

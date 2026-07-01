@@ -59,6 +59,16 @@
         <div class="card-body">
             <form method="get" class="row g-2 align-items-end">
                 <div class="col-md-3">
+                    <label class="form-label small text-muted mb-1">Department</label>
+                    <select name="deptId" class="form-select form-select-sm">
+                        <c:forEach var="dept" items="${departments}">
+                            <option value="${dept.departmentId}" ${dept.departmentId == selectedDeptId ? 'selected' : ''}>
+                                ${dept.departmentName}
+                            </option>
+                        </c:forEach>
+                    </select>
+                </div>
+                <div class="col-md-3">
                     <label class="form-label small text-muted mb-1">Month</label>
                     <select name="month" class="form-select form-select-sm">
                         <c:forEach var="m" begin="1" end="12">
@@ -86,6 +96,9 @@
         <div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div>
                 <span class="fw-medium">${monthLabel}</span>
+                <c:if test="${not empty selectedDeptName}">
+                    <span class="text-muted ms-2">${selectedDeptName}</span>
+                </c:if>
                 <c:choose>
                     <c:when test="${empty period}">
                         <span class="text-muted ms-2">No payroll generated yet.</span>
@@ -113,6 +126,7 @@
                     <form method="post" action="${pageContext.request.contextPath}/payroll?action=generate">
                         <input type="hidden" name="year" value="${selectedYear}">
                         <input type="hidden" name="month" value="${selectedMonth}">
+                        <input type="hidden" name="deptId" value="${selectedDeptId}">
                         <button type="submit" class="btn btn-sm btn-primary"
                                 style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;">
                             <i class="bi bi-calculator me-1"></i>Calculate Payroll
@@ -188,6 +202,9 @@
                                 <td colspan="11" class="text-center text-muted py-5">
                                     <i class="bi bi-cash-stack fs-2 d-block mb-2 opacity-25"></i>
                                     No payroll for ${monthLabel}.
+                                    <c:if test="${not empty selectedDeptName}">
+                                        <span>${selectedDeptName}.</span>
+                                    </c:if>
                                     <c:if test="${not hasReports}">
                                         <div class="small mt-1">No attendance reports have been submitted for this month yet.</div>
                                     </c:if>
@@ -207,17 +224,17 @@
                     <ul class="pagination pagination-sm mb-0">
                         <li class="page-item ${currentPage == 1 ? 'disabled' : ''}">
                             <a class="page-link"
-                               href="?month=${selectedMonth}&year=${selectedYear}&page=${currentPage - 1}">Previous</a>
+                               href="?month=${selectedMonth}&year=${selectedYear}&deptId=${selectedDeptId}&page=${currentPage - 1}">Previous</a>
                         </li>
                         <c:forEach var="pg" begin="1" end="${totalPages}">
                             <li class="page-item ${pg == currentPage ? 'active' : ''}">
                                 <a class="page-link"
-                                   href="?month=${selectedMonth}&year=${selectedYear}&page=${pg}">${pg}</a>
+                                   href="?month=${selectedMonth}&year=${selectedYear}&deptId=${selectedDeptId}&page=${pg}">${pg}</a>
                             </li>
                         </c:forEach>
                         <li class="page-item ${currentPage == totalPages ? 'disabled' : ''}">
                             <a class="page-link"
-                               href="?month=${selectedMonth}&year=${selectedYear}&page=${currentPage + 1}">Next</a>
+                               href="?month=${selectedMonth}&year=${selectedYear}&deptId=${selectedDeptId}&page=${currentPage + 1}">Next</a>
                         </li>
                     </ul>
                 </nav>

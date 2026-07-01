@@ -1,8 +1,10 @@
 package controller;
 
 import dao.AttendanceReportDAO;
+import dao.DepartmentDAO;
 import dao.PayrollDAO;
 import dao.PayrollPeriodDAO;
+import model.Department;
 import model.AttendanceReport;
 import model.Payroll;
 import model.PayrollPeriod;
@@ -26,7 +28,7 @@ import java.util.Locale;
 /**
  * Payroll workflow.
  *
- * Status flow on a payroll_period (whole company, one per month):
+ * Status flow on a payroll_period (one department per month):
  *   Generate (HR Staff)            -> Draft
  *   Submit for Approval (HR Staff) -> Pending Approval   (only from Draft/Rejected)
  *   Approve (HR Manager)           -> Approved           (only from Pending Approval)
@@ -46,6 +48,7 @@ public class PayrollServlet extends HttpServlet {
     private final PayrollPeriodDAO periodDAO = new PayrollPeriodDAO();
     private final PayrollDAO payrollDAO = new PayrollDAO();
     private final AttendanceReportDAO reportDAO = new AttendanceReportDAO();
+    private final DepartmentDAO departmentDAO = new DepartmentDAO();
     private final PayrollCalculationService calc = new PayrollCalculationService();
 
     @Override
@@ -111,8 +114,11 @@ public class PayrollServlet extends HttpServlet {
         int year  = parseIntOr(request.getParameter("year"),  now.getYear());
         int month = parseIntOr(request.getParameter("month"), now.getMonthValue());
         if (month < 1 || month > 12) month = now.getMonthValue();
+        List<Department> departments = departmentDAO.findAttendanceDepartments();
+        Integer deptId = selectedDepartmentId(request, departments);
 
-        PayrollPeriod period = periodDAO.findByMonth(year, month);
+        PayrollPeriod period = deptId == null ? null : periodDAO.findByMonthAndDepartment(year, month, deptId);
+        Department selectedDept = findDepartment(departments, deptId);
         int totalPayrolls = period != null ? payrollDAO.countByPeriod(period.getPayrollPeriodId()) : 0;
         int totalPages = Math.max(1, (int) Math.ceil(totalPayrolls / (double) PAGE_SIZE));
         int page = parsePageParam(request.getParameter("page"), totalPages);
@@ -122,10 +128,13 @@ public class PayrollServlet extends HttpServlet {
                 : List.of();
 
         // Can we generate? Only if no period yet AND there are submitted reports.
-        boolean hasReports = !reportDAO.findSubmittedByMonth(year, month, null).isEmpty();
+        boolean hasReports = deptId != null && !reportDAO.findSubmittedByMonth(year, month, deptId).isEmpty();
 
         request.setAttribute("period", period);
         request.setAttribute("payrolls", payrolls);
+        request.setAttribute("departments", departments);
+        request.setAttribute("selectedDeptId", deptId);
+        request.setAttribute("selectedDeptName", selectedDept == null ? "" : selectedDept.getDepartmentName());
         request.setAttribute("hasReports", hasReports);
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
@@ -147,35 +156,45 @@ public class PayrollServlet extends HttpServlet {
         YearMonth now = YearMonth.now();
         int year  = parseIntOr(request.getParameter("year"),  now.getYear());
         int month = parseIntOr(request.getParameter("month"), now.getMonthValue());
-
-        // Must have attendance reports submitted for that month.
-        List<AttendanceReport> reports = reportDAO.findSubmittedByMonth(year, month, null);
-        if (reports.isEmpty()) {
-            flashError(session, "No submitted attendance reports for " + monthLabel(year, month)
-                    + ". Ask managers to send attendance first.");
+        List<Department> departments = departmentDAO.findAttendanceDepartments();
+        Integer deptId = selectedDepartmentId(request, departments);
+        Department dept = findDepartment(departments, deptId);
+        if (dept == null) {
+            flashError(session, "Please select a department.");
             response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month);
             return;
         }
 
+        // Must have attendance reports submitted for that month.
+        List<AttendanceReport> reports = reportDAO.findSubmittedByMonth(year, month, deptId);
+        if (reports.isEmpty()) {
+            flashError(session, "No submitted attendance reports for " + monthLabel(year, month)
+                    + " in " + dept.getDepartmentName() + ". Ask managers to send attendance first.");
+            response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month + "&deptId=" + deptId);
+            return;
+        }
+
         // A period must not already exist (avoid regenerating an approved/paid batch).
-        PayrollPeriod existing = periodDAO.findByMonth(year, month);
+        PayrollPeriod existing = periodDAO.findByMonthAndDepartment(year, month, deptId);
         if (existing != null) {
             flashError(session, "A payroll for " + monthLabel(year, month)
+                    + " - " + dept.getDepartmentName()
                     + " already exists (status: " + existing.getStatus().getDbValue() + ").");
-            response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month);
+            response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month + "&deptId=" + deptId);
             return;
         }
 
         // Create the Draft period.
         PayrollPeriod p = new PayrollPeriod();
-        p.setPeriodName("Payroll " + monthLabel(year, month));
+        p.setPeriodName("Payroll " + monthLabel(year, month) + " - " + dept.getDepartmentName());
         p.setPayrollMonth(month);
         p.setPayrollYear(year);
+        p.setDepartmentId(deptId);
         p.setCreatedBy(user.getUserId());
         int periodId = periodDAO.createDraft(p);
         if (periodId < 0) {
             flashError(session, "Could not create payroll (it may already exist).");
-            response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month);
+            response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month + "&deptId=" + deptId);
             return;
         }
 
@@ -193,10 +212,10 @@ public class PayrollServlet extends HttpServlet {
         }
 
         String msg = "Generated payroll for " + monthLabel(year, month)
-                + ": " + created + " employee(s).";
+                + " - " + dept.getDepartmentName() + ": " + created + " employee(s).";
         if (skipped.length() > 0) msg += " Skipped: " + skipped;
         flashMessage(session, msg);
-        response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month);
+        response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month + "&deptId=" + deptId);
     }
 
     // ---------- HR Staff: submit / confirm payment ----------
@@ -249,8 +268,11 @@ public class PayrollServlet extends HttpServlet {
         int year  = parseIntOr(request.getParameter("year"),  now.getYear());
         int month = parseIntOr(request.getParameter("month"), now.getMonthValue());
         if (month < 1 || month > 12) month = now.getMonthValue();
+        List<Department> departments = departmentDAO.findAttendanceDepartments();
+        Integer deptId = selectedDepartmentId(request, departments);
 
-        PayrollPeriod period = periodDAO.findByMonth(year, month);
+        PayrollPeriod period = deptId == null ? null : periodDAO.findByMonthAndDepartment(year, month, deptId);
+        Department selectedDept = findDepartment(departments, deptId);
         int totalPayrolls = period != null ? payrollDAO.countByPeriod(period.getPayrollPeriodId()) : 0;
         int totalPages = Math.max(1, (int) Math.ceil(totalPayrolls / (double) PAGE_SIZE));
         int page = parsePageParam(request.getParameter("page"), totalPages);
@@ -261,6 +283,9 @@ public class PayrollServlet extends HttpServlet {
 
         request.setAttribute("period", period);
         request.setAttribute("payrolls", payrolls);
+        request.setAttribute("departments", departments);
+        request.setAttribute("selectedDeptId", deptId);
+        request.setAttribute("selectedDeptName", selectedDept == null ? "" : selectedDept.getDepartmentName());
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalPayrolls", totalPayrolls);
@@ -326,11 +351,26 @@ public class PayrollServlet extends HttpServlet {
     }
 
     private String redirectTo(String ctx, PayrollPeriod p) {
-        return ctx + "/payroll?year=" + p.getPayrollYear() + "&month=" + p.getPayrollMonth();
+        return ctx + "/payroll?year=" + p.getPayrollYear() + "&month=" + p.getPayrollMonth()
+                + "&deptId=" + p.getDepartmentId();
     }
     private String redirectApproval(String ctx, PayrollPeriod p) {
         return ctx + "/payroll?action=approval&year=" + p.getPayrollYear()
-                + "&month=" + p.getPayrollMonth();
+                + "&month=" + p.getPayrollMonth() + "&deptId=" + p.getDepartmentId();
+    }
+
+    private Integer selectedDepartmentId(HttpServletRequest request, List<Department> departments) {
+        Integer deptId = parseIntOrNull(request.getParameter("deptId"));
+        if (findDepartment(departments, deptId) != null) return deptId;
+        return departments == null || departments.isEmpty() ? null : departments.get(0).getDepartmentId();
+    }
+
+    private Department findDepartment(List<Department> departments, Integer deptId) {
+        if (departments == null || deptId == null) return null;
+        for (Department d : departments) {
+            if (d.getDepartmentId() == deptId) return d;
+        }
+        return null;
     }
 
     private String monthLabel(int year, int month) {
@@ -376,6 +416,11 @@ public class PayrollServlet extends HttpServlet {
         if (page < 1) page = 1;
         if (page > totalPages) page = totalPages;
         return page;
+    }
+
+    private Integer parseIntOrNull(String s) {
+        if (s == null || s.isBlank()) return null;
+        try { return Integer.parseInt(s.trim()); } catch (NumberFormatException ex) { return null; }
     }
 
     private String trim(String s) { return s == null ? "" : s.trim(); }

@@ -8,12 +8,11 @@ import java.sql.*;
 
 public class PayrollPeriodDAO {
 
-    /** Create a Draft period for (month, year). Returns new id, or -1 if it
-     *  already exists (unique key month+year). */
+    /** Create a Draft period for (month, year, department). Returns new id, or -1 if it already exists. */
     public int createDraft(PayrollPeriod p) throws SQLException {
         String sql = "INSERT INTO payroll_periods "
-                   + "(period_name, payroll_month, payroll_year, status, created_by) "
-                   + "VALUES (?, ?, ?, 'Draft', ?)";
+                   + "(period_name, payroll_month, payroll_year, department_id, status, created_by) "
+                   + "VALUES (?, ?, ?, ?, 'Draft', ?)";
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -22,14 +21,15 @@ public class PayrollPeriodDAO {
             ps.setString(1, p.getPeriodName());
             ps.setInt(2, p.getPayrollMonth());
             ps.setInt(3, p.getPayrollYear());
-            if (p.getCreatedBy() != null) ps.setInt(4, p.getCreatedBy());
-            else                          ps.setNull(4, Types.INTEGER);
+            ps.setInt(4, p.getDepartmentId());
+            if (p.getCreatedBy() != null) ps.setInt(5, p.getCreatedBy());
+            else                          ps.setNull(5, Types.INTEGER);
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) return keys.getInt(1);
             }
         } catch (SQLIntegrityConstraintViolationException dup) {
-            return -1; // period already exists for this month/year
+            return -1; // period already exists for this month/year/department
         } finally {
             close(conn, ps, null);
         }
@@ -38,6 +38,11 @@ public class PayrollPeriodDAO {
 
     public PayrollPeriod findByMonth(int year, int month) throws SQLException {
         return findOne("WHERE pp.payroll_year=? AND pp.payroll_month=?", year, month);
+    }
+
+    public PayrollPeriod findByMonthAndDepartment(int year, int month, int departmentId) throws SQLException {
+        return findOne("WHERE pp.payroll_year=? AND pp.payroll_month=? AND pp.department_id=?",
+                year, month, departmentId);
     }
 
     public PayrollPeriod findById(int id) throws SQLException {
@@ -63,8 +68,10 @@ public class PayrollPeriodDAO {
     private String baseSelect() {
         return "SELECT pp.*, "
              + "  cu.full_name AS created_by_name, au.full_name AS approved_by_name, "
+             + "  d.department_name, "
              + "  (SELECT COUNT(*) FROM payrolls p WHERE p.payroll_period_id = pp.payroll_period_id) AS payroll_count "
              + "FROM payroll_periods pp "
+             + "JOIN departments d ON pp.department_id = d.department_id "
              + "LEFT JOIN users cu ON pp.created_by  = cu.user_id "
              + "LEFT JOIN users au ON pp.approved_by = au.user_id ";
     }
@@ -118,6 +125,7 @@ public class PayrollPeriodDAO {
         p.setPeriodName(rs.getString("period_name"));
         p.setPayrollMonth(rs.getInt("payroll_month"));
         p.setPayrollYear(rs.getInt("payroll_year"));
+        p.setDepartmentId(rs.getInt("department_id"));
         Date pd = rs.getDate("payment_date");
         if (pd != null) p.setPaymentDate(pd.toLocalDate());
         p.setStatus(Status.fromDb(rs.getString("status")));
@@ -129,6 +137,7 @@ public class PayrollPeriodDAO {
         Timestamp u = rs.getTimestamp("updated_at"); if (u != null) p.setUpdatedAt(u.toLocalDateTime());
         p.setCreatedByName(rs.getString("created_by_name"));
         p.setApprovedByName(rs.getString("approved_by_name"));
+        p.setDepartmentName(rs.getString("department_name"));
         p.setPayrollCount(rs.getInt("payroll_count"));
         return p;
     }

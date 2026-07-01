@@ -61,7 +61,8 @@
                 <c:if test="${not empty selectedDeptId}">
                     <input type="hidden" name="deptId" value="${selectedDeptId}">
                 </c:if>
-                <select name="month" class="form-select form-select-sm" style="width:130px;" aria-label="Month">
+                <select name="month" class="form-select form-select-sm" style="width:130px;"
+                        aria-label="Month" onchange="this.form.submit()">
                     <c:forEach var="m" begin="1" end="12">
                         <c:choose>
                             <c:when test="${m == selectedMonth}">
@@ -73,7 +74,8 @@
                         </c:choose>
                     </c:forEach>
                 </select>
-                <select name="year" class="form-select form-select-sm" style="width:100px;" aria-label="Year">
+                <select name="year" class="form-select form-select-sm" style="width:100px;"
+                        aria-label="Year" onchange="this.form.submit()">
                     <c:forEach var="y" items="${yearOptions}">
                         <c:choose>
                             <c:when test="${y == selectedYear}">
@@ -85,9 +87,6 @@
                         </c:choose>
                     </c:forEach>
                 </select>
-                <button type="submit" class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-funnel me-1"></i>Apply
-                </button>
             </form>
             <%-- Import button: HR Staff only --%>
             <c:if test="${canImportAttendance}">

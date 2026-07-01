@@ -4,7 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * A monthly payroll batch for the whole company. One row per (month, year).
+ * A monthly payroll batch for one department. One row per (month, year, department).
  * Mirrors the payroll_periods table.
  */
 public class PayrollPeriod {
@@ -37,6 +37,7 @@ public class PayrollPeriod {
     private String periodName;
     private int payrollMonth;
     private int payrollYear;
+    private int departmentId;
     private LocalDate paymentDate;
     private Status status;
     private Integer createdBy;
@@ -49,6 +50,7 @@ public class PayrollPeriod {
     // join fields
     private String createdByName;
     private String approvedByName;
+    private String departmentName;
     private int payrollCount;
 
     public PayrollPeriod() {}
@@ -64,6 +66,9 @@ public class PayrollPeriod {
 
     public int getPayrollYear()                     { return payrollYear; }
     public void setPayrollYear(int v)               { this.payrollYear = v; }
+
+    public int getDepartmentId()                    { return departmentId; }
+    public void setDepartmentId(int v)              { this.departmentId = v; }
 
     public LocalDate getPaymentDate()               { return paymentDate; }
     public void setPaymentDate(LocalDate v)         { this.paymentDate = v; }
@@ -94,6 +99,9 @@ public class PayrollPeriod {
 
     public String getApprovedByName()               { return approvedByName; }
     public void setApprovedByName(String v)         { this.approvedByName = v; }
+
+    public String getDepartmentName()               { return departmentName; }
+    public void setDepartmentName(String v)         { this.departmentName = v; }
 
     public int getPayrollCount()                    { return payrollCount; }
     public void setPayrollCount(int v)              { this.payrollCount = v; }
