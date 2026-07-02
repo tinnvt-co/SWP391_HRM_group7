@@ -1,6 +1,7 @@
 <%@ page contentType="text/html;charset=UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<%@ include file="/views/common/tab-session.jsp" %>
 <nav class="navbar navbar-dark" style="background-color: #1a3c5e; height: 56px;">
     <div class="container-fluid px-4 d-flex align-items-center justify-content-between">
         <a class="navbar-brand fw-bold mb-0" href="${pageContext.request.contextPath}/home">

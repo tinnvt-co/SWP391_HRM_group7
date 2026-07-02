@@ -8,6 +8,7 @@ import model.Department;
 import model.AttendanceReport;
 import model.Payroll;
 import model.PayrollPeriod;
+import model.PayrollTaskSummary;
 import model.User;
 import service.PayrollCalculationService;
 
@@ -19,6 +20,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.YearMonth;
 import java.time.format.TextStyle;
@@ -126,6 +128,11 @@ public class PayrollServlet extends HttpServlet {
         List<Payroll> payrolls = period != null
                 ? payrollDAO.findByPeriodPage(period.getPayrollPeriodId(), offset, PAGE_SIZE)
                 : List.of();
+        BigDecimal monthlySalaryTotal = deptId == null
+                ? BigDecimal.ZERO
+                : payrollDAO.sumNetSalaryByDepartmentMonth(deptId, year, month);
+        BigDecimal yearlySalaryTotal = payrollDAO.sumNetSalaryByYear(year);
+        PayrollTaskSummary payrollTaskSummary = periodDAO.findHrStaffTaskSummary();
 
         // Can we generate? Only if no period yet AND there are submitted reports.
         boolean hasReports = deptId != null && !reportDAO.findSubmittedByMonth(year, month, deptId).isEmpty();
@@ -142,6 +149,9 @@ public class PayrollServlet extends HttpServlet {
         request.setAttribute("selectedYear", year);
         request.setAttribute("selectedMonth", month);
         request.setAttribute("monthLabel", monthLabel(year, month));
+        request.setAttribute("monthlySalaryTotal", monthlySalaryTotal);
+        request.setAttribute("yearlySalaryTotal", yearlySalaryTotal);
+        request.setAttribute("payrollTaskSummary", payrollTaskSummary);
         readFlash(request);
         request.getRequestDispatcher("/views/payroll/payroll-list.jsp")
                .forward(request, response);
@@ -280,6 +290,9 @@ public class PayrollServlet extends HttpServlet {
         List<Payroll> payrolls = period != null
                 ? payrollDAO.findByPeriodPage(period.getPayrollPeriodId(), offset, PAGE_SIZE)
                 : List.of();
+        BigDecimal monthlySalaryTotal = payrollDAO.sumNetSalaryByMonth(year, month);
+        BigDecimal yearlySalaryTotal = payrollDAO.sumNetSalaryByYear(year);
+        PayrollTaskSummary payrollTaskSummary = periodDAO.findHrManagerTaskSummary();
 
         request.setAttribute("period", period);
         request.setAttribute("payrolls", payrolls);
@@ -292,6 +305,9 @@ public class PayrollServlet extends HttpServlet {
         request.setAttribute("selectedYear", year);
         request.setAttribute("selectedMonth", month);
         request.setAttribute("monthLabel", monthLabel(year, month));
+        request.setAttribute("monthlySalaryTotal", monthlySalaryTotal);
+        request.setAttribute("yearlySalaryTotal", yearlySalaryTotal);
+        request.setAttribute("payrollTaskSummary", payrollTaskSummary);
         readFlash(request);
         request.getRequestDispatcher("/views/payroll/payroll-approval.jsp")
                .forward(request, response);

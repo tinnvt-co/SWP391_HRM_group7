@@ -26,6 +26,22 @@ public class RoleDAO {
         return list;
     }
 
+    public int countAll() throws SQLException {
+        String sql = "SELECT COUNT(*) FROM roles";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            rs = ps.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+        } finally {
+            close(conn, ps, rs);
+        }
+        return 0;
+    }
+
     public List<Role> findAllActive() throws SQLException {
         String sql = "SELECT * FROM roles WHERE is_active = 1 ORDER BY role_id";
         List<Role> list = new ArrayList<>();

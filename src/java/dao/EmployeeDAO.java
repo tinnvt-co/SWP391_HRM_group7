@@ -31,6 +31,51 @@ public class EmployeeDAO {
         return null;
     }
 
+    public int countByRoleName(String roleName) throws SQLException {
+        String sql = "SELECT COUNT(*) "
+                   + "FROM employees e "
+                   + "JOIN users u  ON e.user_id = u.user_id "
+                   + "JOIN roles ro ON u.role_id = ro.role_id "
+                   + "WHERE ro.role_name = ?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, roleName);
+            rs = ps.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+        } finally {
+            close(conn, ps, rs);
+        }
+        return 0;
+    }
+
+    public int countEmployeesInManagedDepartments(int managerUserId) throws SQLException {
+        String sql = "SELECT COUNT(*) "
+                   + "FROM employees e "
+                   + "JOIN users u       ON e.user_id       = u.user_id "
+                   + "JOIN roles ro      ON u.role_id       = ro.role_id "
+                   + "JOIN departments d ON e.department_id = d.department_id "
+                   + "WHERE d.manager_id = ? "
+                   + "AND u.is_active = 1 "
+                   + "AND ro.role_name = 'EMPLOYEE'";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, managerUserId);
+            rs = ps.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+        } finally {
+            close(conn, ps, rs);
+        }
+        return 0;
+    }
+
     public Employee findById(int employeeId) throws SQLException {
         String sql = "SELECT e.*, u.full_name, d.department_name "
                    + "FROM employees e "

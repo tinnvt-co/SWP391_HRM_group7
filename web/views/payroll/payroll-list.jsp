@@ -24,6 +24,13 @@
         .main-content { margin-left: 240px; padding: 2rem; }
         .table th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; font-weight: 600; }
         .table td { vertical-align: middle; font-size: 0.88rem; }
+        .salary-summary-card { border: none; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.07); transition: box-shadow 0.2s, transform 0.2s; }
+        .summary-card-link { color: inherit; text-decoration: none; display: block; }
+        .summary-card-link:hover .salary-summary-card { box-shadow: 0 4px 16px rgba(0,0,0,0.11); transform: translateY(-1px); }
+        .salary-summary-icon {
+            width: 48px; height: 48px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center; font-size: 1.25rem;
+        }
         .st-pill { padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
         .st-draft   { background:#e5e7eb; color:#374151; }
         .st-pending { background:#fff8e1; color:#a16207; }
@@ -41,6 +48,78 @@
         <div>
             <h5 class="fw-bold text-dark mb-0">Payroll</h5>
             <small class="text-muted">Calculate and process monthly salary</small>
+        </div>
+    </div>
+
+    <c:if test="${payrollTaskSummary.actionable}">
+        <c:url var="payrollTaskUrl" value="/payroll">
+            <c:param name="deptId" value="${payrollTaskSummary.departmentId}"/>
+            <c:param name="month" value="${payrollTaskSummary.month}"/>
+            <c:param name="year" value="${payrollTaskSummary.year}"/>
+        </c:url>
+    </c:if>
+    <div class="row g-3 mb-3">
+        <div class="col-lg-4 col-md-6">
+            <div class="salary-summary-card card p-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="salary-summary-icon" style="background:#e3f0fb;">
+                        <i class="bi bi-calendar2-month text-primary"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Total Monthly Salary</div>
+                        <div class="fw-bold fs-5">
+                            <fmt:formatNumber value="${monthlySalaryTotal}" type="number" maxFractionDigits="0"/>
+                        </div>
+                        <div class="text-muted" style="font-size:0.78rem;">
+                            ${selectedDeptName} &middot; Month ${selectedMonth}/${selectedYear}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-6">
+            <div class="salary-summary-card card p-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="salary-summary-icon" style="background:#e6f9f0;">
+                        <i class="bi bi-cash-stack text-success"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Total Yearly Salary</div>
+                        <div class="fw-bold fs-5">
+                            <fmt:formatNumber value="${yearlySalaryTotal}" type="number" maxFractionDigits="0"/>
+                        </div>
+                        <div class="text-muted" style="font-size:0.78rem;">
+                            All departments &middot; ${selectedYear}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-6">
+            <a class="summary-card-link ${payrollTaskSummary.actionable ? '' : 'pe-none'}"
+               href="${payrollTaskSummary.actionable ? payrollTaskUrl : '#'}"
+               aria-disabled="${payrollTaskSummary.actionable ? 'false' : 'true'}">
+                <div class="salary-summary-card card p-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="salary-summary-icon" style="background:#fff8e1;">
+                            <i class="bi bi-list-task text-warning"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Tasks to Process</div>
+                            <div class="fw-bold fs-5">${payrollTaskSummary.count}</div>
+                            <div class="text-muted" style="font-size:0.78rem;">
+                                <c:choose>
+                                    <c:when test="${payrollTaskSummary.actionable}">
+                                        ${payrollTaskSummary.taskLabel} &middot; ${payrollTaskSummary.departmentName}
+                                        &middot; Month ${payrollTaskSummary.month}/${payrollTaskSummary.year}
+                                    </c:when>
+                                    <c:otherwise>No pending payroll tasks</c:otherwise>
+                                </c:choose>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
         </div>
     </div>
 

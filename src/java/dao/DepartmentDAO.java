@@ -48,6 +48,39 @@ public class DepartmentDAO {
         return findList(BASE_SELECT + "ORDER BY d.department_id");
     }
 
+    public int countAll() throws SQLException {
+        String sql = "SELECT COUNT(*) FROM departments";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            rs = ps.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+        } finally {
+            close(conn, ps, rs);
+        }
+        return 0;
+    }
+
+    public int countActiveByManagerId(int managerUserId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM departments WHERE manager_id = ? AND is_active = 1";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, managerUserId);
+            rs = ps.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+        } finally {
+            close(conn, ps, rs);
+        }
+        return 0;
+    }
+
     public List<Department> findEmployeeAssignable() throws SQLException {
         return findList(BASE_SELECT
                 + "WHERE d.is_active = 1 AND d.department_code NOT IN ('ADMIN_DEPT', 'HR') "

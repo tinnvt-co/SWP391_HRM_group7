@@ -114,7 +114,9 @@
         </c:if>
         <c:if test="${permissions.contains('VIEW_PAYROLL')
                    or permissions.contains('APPROVE_REJECT_PAYROLL')
-                   or permissions.contains('VIEW_PAYSLIP')}">
+                   or permissions.contains('VIEW_PAYSLIP')
+                   or currentUser.role.roleName == 'HR_MANAGER'
+                   or currentUser.role.roleName == 'ADMIN'}">
             <div class="sidebar-label mt-2">Payroll</div>
             <c:if test="${permissions.contains('GENERATE_PAYROLL')}">
                 <li class="nav-item">
@@ -129,6 +131,14 @@
                     <a class="nav-link ${activePage == 'payrollApproval' ? 'active' : ''}"
                        href="${pageContext.request.contextPath}/payroll?action=approval">
                         <i class="bi bi-check2-square me-2"></i>Payroll Approval
+                       </a>
+                </li>
+            </c:if>
+            <c:if test="${currentUser.role.roleName == 'HR_MANAGER' or currentUser.role.roleName == 'ADMIN'}">
+                <li class="nav-item">
+                    <a class="nav-link ${activePage == 'allowances' ? 'active' : ''}"
+                       href="${pageContext.request.contextPath}/allowances">
+                        <i class="bi bi-wallet2 me-2"></i>Manage Allowance
                     </a>
                 </li>
             </c:if>

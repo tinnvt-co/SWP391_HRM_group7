@@ -82,6 +82,92 @@ public class PayrollDAO {
         }
     }
 
+    public BigDecimal sumNetSalaryByDepartmentMonth(int departmentId, int year, int month)
+            throws SQLException {
+        String sql = "SELECT COALESCE(SUM(p.net_salary), 0) "
+                   + "FROM payrolls p "
+                   + "JOIN payroll_periods pp ON p.payroll_period_id = pp.payroll_period_id "
+                   + "WHERE pp.department_id = ? "
+                   + "AND pp.payroll_year = ? "
+                   + "AND pp.payroll_month = ?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, departmentId);
+            ps.setInt(2, year);
+            ps.setInt(3, month);
+            rs = ps.executeQuery();
+            return rs.next() ? nz(rs.getBigDecimal(1)) : BigDecimal.ZERO;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public BigDecimal sumNetSalaryByDepartmentYear(int departmentId, int year)
+            throws SQLException {
+        String sql = "SELECT COALESCE(SUM(p.net_salary), 0) "
+                   + "FROM payrolls p "
+                   + "JOIN payroll_periods pp ON p.payroll_period_id = pp.payroll_period_id "
+                   + "WHERE pp.department_id = ? "
+                   + "AND pp.payroll_year = ?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, departmentId);
+            ps.setInt(2, year);
+            rs = ps.executeQuery();
+            return rs.next() ? nz(rs.getBigDecimal(1)) : BigDecimal.ZERO;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public BigDecimal sumNetSalaryByMonth(int year, int month) throws SQLException {
+        String sql = "SELECT COALESCE(SUM(p.net_salary), 0) "
+                   + "FROM payrolls p "
+                   + "JOIN payroll_periods pp ON p.payroll_period_id = pp.payroll_period_id "
+                   + "WHERE pp.payroll_year = ? "
+                   + "AND pp.payroll_month = ?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, year);
+            ps.setInt(2, month);
+            rs = ps.executeQuery();
+            return rs.next() ? nz(rs.getBigDecimal(1)) : BigDecimal.ZERO;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public BigDecimal sumNetSalaryByYear(int year) throws SQLException {
+        String sql = "SELECT COALESCE(SUM(p.net_salary), 0) "
+                   + "FROM payrolls p "
+                   + "JOIN payroll_periods pp ON p.payroll_period_id = pp.payroll_period_id "
+                   + "WHERE pp.payroll_year = ?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, year);
+            rs = ps.executeQuery();
+            return rs.next() ? nz(rs.getBigDecimal(1)) : BigDecimal.ZERO;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
     public List<Payroll> findByPeriodPage(int periodId, int offset, int limit) throws SQLException {
         String sql = baseSelect()
                    + "WHERE p.payroll_period_id=? "

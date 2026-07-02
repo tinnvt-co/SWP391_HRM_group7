@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import util.TabSession;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -26,7 +27,9 @@ public class LoginServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         HttpSession session = request.getSession(false);
-        if (session != null) session.invalidate();
+        if (session != null && TabSession.currentTabId(request) != null) {
+            session.invalidate();
+        }
         request.getRequestDispatcher("/views/auth/login.jsp").forward(request, response);
     }
 
@@ -61,7 +64,11 @@ public class LoginServlet extends HttpServlet {
             userDAO.updateLastLogin(user.getUserId());
 
             HttpSession oldSession = request.getSession(false);
-            if (oldSession != null) oldSession.invalidate();
+            if (oldSession != null) {
+                oldSession.removeAttribute("currentUser");
+                oldSession.removeAttribute("permissions");
+                request.changeSessionId();
+            }
 
             HttpSession session = request.getSession(true);
             session.setAttribute("currentUser", user);

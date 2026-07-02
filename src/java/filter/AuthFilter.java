@@ -11,6 +11,9 @@ import jakarta.servlet.annotation.WebFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import util.TabAwareHttpServletRequest;
+import util.TabAwareHttpServletResponse;
+import util.TabSession;
 
 import java.io.IOException;
 import java.util.List;
@@ -24,7 +27,8 @@ public class AuthFilter implements Filter {
             "/login",
             "/logout",
             "/forgot-password",
-            "/auth/google"
+            "/auth/google",
+            "/auth/google/callback"
     );
 
     private static final List<String> PUBLIC_PREFIXES = List.of(
@@ -43,23 +47,31 @@ public class AuthFilter implements Filter {
 
         String contextPath  = request.getContextPath();
         String relativePath = request.getRequestURI().substring(contextPath.length());
+        String tabId        = TabSession.resolveTabId(request);
+
+        HttpServletRequest effectiveRequest =
+                new TabAwareHttpServletRequest(request, tabId);
+        HttpServletResponse effectiveResponse =
+                new TabAwareHttpServletResponse(response, request, tabId);
 
         applyNoCacheHeaders(response);
 
         if (isPublicPath(relativePath)) {
-            chain.doFilter(req, res);
+            exposeSessionAttributes(effectiveRequest);
+            chain.doFilter(effectiveRequest, effectiveResponse);
             return;
         }
 
-        HttpSession session  = request.getSession(false);
+        HttpSession session  = effectiveRequest.getSession(false);
         User currentUser     = (session != null) ? (User) session.getAttribute("currentUser") : null;
 
         if (currentUser == null) {
-            response.sendRedirect(contextPath + "/login");
+            effectiveResponse.sendRedirect(contextPath + "/login");
             return;
         }
 
-        chain.doFilter(req, res);
+        exposeSessionAttributes(effectiveRequest);
+        chain.doFilter(effectiveRequest, effectiveResponse);
     }
 
     @Override
@@ -80,5 +92,21 @@ public class AuthFilter implements Filter {
         response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
         response.setHeader("Pragma", "no-cache");
         response.setDateHeader("Expires", 0);
+    }
+
+    private void exposeSessionAttributes(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            return;
+        }
+
+        Object currentUser = session.getAttribute("currentUser");
+        Object permissions = session.getAttribute("permissions");
+        if (currentUser != null) {
+            request.setAttribute("currentUser", currentUser);
+        }
+        if (permissions != null) {
+            request.setAttribute("permissions", permissions);
+        }
     }
 }

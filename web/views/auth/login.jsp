@@ -146,6 +146,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<%@ include file="/views/common/tab-session.jsp" %>
 <script>
     const toggleBtn = document.getElementById('togglePassword');
     const passwordInput = document.getElementById('password');

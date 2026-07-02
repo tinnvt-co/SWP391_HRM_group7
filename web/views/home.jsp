@@ -69,48 +69,55 @@
         </div>
     </div>
 
-    <div class="row g-3 mb-4">
-        <div class="col-sm-6 col-xl-3">
-            <div class="stat-card card p-3">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="stat-icon" style="background:#e3f0fb;">
-                        <i class="bi bi-people-fill text-primary"></i>
+    <c:if test="${not empty dashboardScope}">
+        <div class="row g-3 mb-4">
+            <c:if test="${not empty employeeCardLabel}">
+                <div class="col-sm-6 col-xl-4">
+                    <div class="stat-card card p-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="stat-icon" style="background:#e3f0fb;">
+                                <i class="bi bi-people-fill text-primary"></i>
+                            </div>
+                            <div>
+                                <div class="text-muted small">${employeeCardLabel}</div>
+                                <div class="fw-bold fs-5">${employeeCardValue}</div>
+                            </div>
+                        </div>
                     </div>
-                    <div><div class="text-muted small">Employees</div><div class="fw-bold fs-5">—</div></div>
                 </div>
-            </div>
-        </div>
-        <div class="col-sm-6 col-xl-3">
-            <div class="stat-card card p-3">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="stat-icon" style="background:#e6f9f0;">
-                        <i class="bi bi-shield-check text-success"></i>
+            </c:if>
+            <c:if test="${not empty departmentCardLabel}">
+                <div class="col-sm-6 col-xl-4">
+                    <div class="stat-card card p-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="stat-icon" style="background:#fff8e1;">
+                                <i class="bi bi-diagram-3 text-warning"></i>
+                            </div>
+                            <div>
+                                <div class="text-muted small">${departmentCardLabel}</div>
+                                <div class="fw-bold fs-5">${departmentCardValue}</div>
+                            </div>
+                        </div>
                     </div>
-                    <div><div class="text-muted small">Roles</div><div class="fw-bold fs-5">—</div></div>
                 </div>
-            </div>
-        </div>
-        <div class="col-sm-6 col-xl-3">
-            <div class="stat-card card p-3">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="stat-icon" style="background:#fff8e1;">
-                        <i class="bi bi-calendar-check text-warning"></i>
+            </c:if>
+            <c:if test="${not empty roleCardLabel}">
+                <div class="col-sm-6 col-xl-4">
+                    <div class="stat-card card p-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="stat-icon" style="background:#e6f9f0;">
+                                <i class="bi bi-shield-check text-success"></i>
+                            </div>
+                            <div>
+                                <div class="text-muted small">${roleCardLabel}</div>
+                                <div class="fw-bold fs-5">${roleCardValue}</div>
+                            </div>
+                        </div>
                     </div>
-                    <div><div class="text-muted small">Attendance</div><div class="fw-bold fs-5">—</div></div>
                 </div>
-            </div>
+            </c:if>
         </div>
-        <div class="col-sm-6 col-xl-3">
-            <div class="stat-card card p-3">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="stat-icon" style="background:#fce8e8;">
-                        <i class="bi bi-cash-coin text-danger"></i>
-                    </div>
-                    <div><div class="text-muted small">Payroll</div><div class="fw-bold fs-5">—</div></div>
-                </div>
-            </div>
-        </div>
-    </div>
+    </c:if>
 
     <div class="card border-0 shadow-sm rounded-3 p-4">
         <h6 class="fw-semibold mb-3 text-secondary">
@@ -120,12 +127,12 @@
             <div class="col-md-3 text-muted">Email</div>
             <div class="col-md-9">${currentUser.email}</div>
             <div class="col-md-3 text-muted">Phone</div>
-            <div class="col-md-9">${not empty currentUser.phone ? currentUser.phone : '—'}</div>
+            <div class="col-md-9">${not empty currentUser.phone ? currentUser.phone : '&mdash;'}</div>
             <div class="col-md-3 text-muted">Last Login</div>
             <div class="col-md-9">
                 <c:choose>
                     <c:when test="${not empty currentUser.lastLogin}">${currentUser.lastLogin}</c:when>
-                    <c:otherwise>—</c:otherwise>
+                    <c:otherwise>&mdash;</c:otherwise>
                 </c:choose>
             </div>
         </div>

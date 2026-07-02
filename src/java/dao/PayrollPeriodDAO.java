@@ -1,6 +1,7 @@
 package dao;
 
 import config.DBContext;
+import model.PayrollTaskSummary;
 import model.PayrollPeriod;
 import model.PayrollPeriod.Status;
 
@@ -117,6 +118,164 @@ public class PayrollPeriodDAO {
         } finally {
             close(conn, ps, null);
         }
+    }
+
+    public PayrollTaskSummary findHrStaffTaskSummary() throws SQLException {
+        Connection conn = null;
+        try {
+            conn = DBContext.getConnection();
+
+            PayrollTaskSummary summary = new PayrollTaskSummary();
+            int periodTaskCount = countHrStaffPeriodTasks(conn);
+            int missingPayrollCount = countHrStaffMissingPayrollTasks(conn);
+            summary.setCount(periodTaskCount + missingPayrollCount);
+
+            PayrollTaskSummary periodTask = findLatestHrStaffPeriodTask(conn);
+            PayrollTaskSummary missingPayrollTask = findLatestHrStaffMissingPayrollTask(conn);
+            copyTask(summary, latestTask(periodTask, missingPayrollTask));
+            return summary;
+        } finally {
+            close(conn, null, null);
+        }
+    }
+
+    public PayrollTaskSummary findHrManagerTaskSummary() throws SQLException {
+        Connection conn = null;
+        try {
+            conn = DBContext.getConnection();
+
+            PayrollTaskSummary summary = new PayrollTaskSummary();
+            summary.setCount(countHrManagerApprovalTasks(conn));
+            copyTask(summary, findLatestHrManagerApprovalTask(conn));
+            return summary;
+        } finally {
+            close(conn, null, null);
+        }
+    }
+
+    private int countHrStaffPeriodTasks(Connection conn) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM payroll_periods "
+                   + "WHERE status IN ('Draft', 'Rejected', 'Approved')";
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            return rs.next() ? rs.getInt(1) : 0;
+        }
+    }
+
+    private int countHrStaffMissingPayrollTasks(Connection conn) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM ("
+                   + "  SELECT ar.department_id, ar.report_year, ar.report_month "
+                   + "  FROM attendance_reports ar "
+                   + "  LEFT JOIN payroll_periods pp "
+                   + "    ON pp.department_id = ar.department_id "
+                   + "   AND pp.payroll_year = ar.report_year "
+                   + "   AND pp.payroll_month = ar.report_month "
+                   + "  WHERE ar.status <> 'Draft' "
+                   + "    AND pp.payroll_period_id IS NULL "
+                   + "  GROUP BY ar.department_id, ar.report_year, ar.report_month"
+                   + ") pending_reports";
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            return rs.next() ? rs.getInt(1) : 0;
+        }
+    }
+
+    private int countHrManagerApprovalTasks(Connection conn) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM payroll_periods WHERE status = 'Pending Approval'";
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            return rs.next() ? rs.getInt(1) : 0;
+        }
+    }
+
+    private PayrollTaskSummary findLatestHrStaffPeriodTask(Connection conn) throws SQLException {
+        String sql = "SELECT pp.department_id, d.department_name, "
+                   + "       pp.payroll_month AS task_month, pp.payroll_year AS task_year, "
+                   + "       CASE pp.status "
+                   + "         WHEN 'Draft' THEN 'Submit for Approval' "
+                   + "         WHEN 'Rejected' THEN 'Re-submit for Approval' "
+                   + "         WHEN 'Approved' THEN 'Confirm Payment' "
+                   + "         ELSE pp.status "
+                   + "       END AS task_label "
+                   + "FROM payroll_periods pp "
+                   + "JOIN departments d ON pp.department_id = d.department_id "
+                   + "WHERE pp.status IN ('Draft', 'Rejected', 'Approved') "
+                   + "ORDER BY pp.payroll_year DESC, pp.payroll_month DESC, "
+                   + "  CASE pp.status WHEN 'Approved' THEN 0 WHEN 'Rejected' THEN 1 ELSE 2 END, "
+                   + "  pp.updated_at DESC, pp.created_at DESC "
+                   + "LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            return rs.next() ? mapTaskSummary(rs) : null;
+        }
+    }
+
+    private PayrollTaskSummary findLatestHrStaffMissingPayrollTask(Connection conn) throws SQLException {
+        String sql = "SELECT ar.department_id, d.department_name, "
+                   + "       ar.report_month AS task_month, ar.report_year AS task_year, "
+                   + "       'Calculate Payroll' AS task_label "
+                   + "FROM attendance_reports ar "
+                   + "JOIN departments d ON ar.department_id = d.department_id "
+                   + "LEFT JOIN payroll_periods pp "
+                   + "  ON pp.department_id = ar.department_id "
+                   + " AND pp.payroll_year = ar.report_year "
+                   + " AND pp.payroll_month = ar.report_month "
+                   + "WHERE ar.status <> 'Draft' "
+                   + "  AND pp.payroll_period_id IS NULL "
+                   + "GROUP BY ar.department_id, d.department_name, ar.report_month, ar.report_year "
+                   + "ORDER BY ar.report_year DESC, ar.report_month DESC, d.department_name "
+                   + "LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            return rs.next() ? mapTaskSummary(rs) : null;
+        }
+    }
+
+    private PayrollTaskSummary findLatestHrManagerApprovalTask(Connection conn) throws SQLException {
+        String sql = "SELECT pp.department_id, d.department_name, "
+                   + "       pp.payroll_month AS task_month, pp.payroll_year AS task_year, "
+                   + "       'Approve Payroll' AS task_label "
+                   + "FROM payroll_periods pp "
+                   + "JOIN departments d ON pp.department_id = d.department_id "
+                   + "WHERE pp.status = 'Pending Approval' "
+                   + "ORDER BY pp.payroll_year DESC, pp.payroll_month DESC, "
+                   + "  pp.updated_at DESC, pp.created_at DESC "
+                   + "LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            return rs.next() ? mapTaskSummary(rs) : null;
+        }
+    }
+
+    private PayrollTaskSummary latestTask(PayrollTaskSummary first, PayrollTaskSummary second) {
+        if (first == null) return second;
+        if (second == null) return first;
+        if (first.getYear() != second.getYear()) {
+            return first.getYear() > second.getYear() ? first : second;
+        }
+        if (first.getMonth() != second.getMonth()) {
+            return first.getMonth() > second.getMonth() ? first : second;
+        }
+        return first;
+    }
+
+    private void copyTask(PayrollTaskSummary target, PayrollTaskSummary source) {
+        if (source == null) return;
+        target.setDepartmentId(source.getDepartmentId());
+        target.setDepartmentName(source.getDepartmentName());
+        target.setMonth(source.getMonth());
+        target.setYear(source.getYear());
+        target.setTaskLabel(source.getTaskLabel());
+    }
+
+    private PayrollTaskSummary mapTaskSummary(ResultSet rs) throws SQLException {
+        PayrollTaskSummary summary = new PayrollTaskSummary();
+        summary.setDepartmentId(rs.getInt("department_id"));
+        summary.setDepartmentName(rs.getString("department_name"));
+        summary.setMonth(rs.getInt("task_month"));
+        summary.setYear(rs.getInt("task_year"));
+        summary.setTaskLabel(rs.getString("task_label"));
+        return summary;
     }
 
     private PayrollPeriod mapRow(ResultSet rs) throws SQLException {

@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import util.TabSession;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -45,7 +46,10 @@ public class GoogleAuthServlet extends HttpServlet {
 
     private void handleAuthorize(HttpServletRequest request, HttpServletResponse response)
             throws IOException {
-        String state = UUID.randomUUID().toString();
+        String state = TabSession.oauthStateForTab(
+                TabSession.currentTabId(request),
+                UUID.randomUUID().toString()
+        );
         request.getSession().setAttribute("oauthState", state);
 
         String url = GoogleOAuthConfig.AUTH_URL
