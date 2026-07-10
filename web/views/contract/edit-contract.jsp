@@ -113,37 +113,31 @@
                         </div>
                     </div>
 
-                    <div class="section-title">Salary &amp; Allowances (VND)</div>
+                    <div class="section-title">Salary (VND)</div>
                     <div class="row g-3 mb-4">
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label for="basicSalary" class="form-label required">Basic Salary</label>
                             <input type="number" step="1000" min="0" id="basicSalary" name="basicSalary" class="form-control"
                                    value="${contract.basicSalary}" ${readonly ? 'disabled' : ''} required>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label for="standardWorkingDays" class="form-label required">Standard Working Days</label>
                             <input type="number" step="0.5" min="1" max="31" id="standardWorkingDays" name="standardWorkingDays" class="form-control"
                                    value="${contract.standardWorkingDays}" ${readonly ? 'disabled' : ''} required>
                         </div>
-                        <div class="col-md-4">
-                            <label for="lunchAllowance" class="form-label">Lunch Allowance</label>
-                            <input type="number" step="1000" min="0" id="lunchAllowance" name="lunchAllowance" class="form-control"
-                                   value="${contract.lunchAllowance}" ${readonly ? 'disabled' : ''}>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="transportationAllowance" class="form-label">Transportation Allowance</label>
-                            <input type="number" step="1000" min="0" id="transportationAllowance" name="transportationAllowance" class="form-control"
-                                   value="${contract.transportationAllowance}" ${readonly ? 'disabled' : ''}>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="phoneAllowance" class="form-label">Phone Allowance</label>
-                            <input type="number" step="1000" min="0" id="phoneAllowance" name="phoneAllowance" class="form-control"
-                                   value="${contract.phoneAllowance}" ${readonly ? 'disabled' : ''}>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="responsibilityAllowance" class="form-label">Responsibility Allowance</label>
-                            <input type="number" step="1000" min="0" id="responsibilityAllowance" name="responsibilityAllowance" class="form-control"
-                                   value="${contract.responsibilityAllowance}" ${readonly ? 'disabled' : ''}>
+                        <div class="col-12">
+                            <div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-0">
+                                <i class="bi bi-wallet2"></i>
+                                <span>
+                                    Allowances are managed globally in
+                                    <c:choose>
+                                        <c:when test="${permissions.contains('MANAGE_ALLOWANCE')}">
+                                            <a href="${pageContext.request.contextPath}/allowances" class="alert-link">Manage Allowance</a>.
+                                        </c:when>
+                                        <c:otherwise>Manage Allowance.</c:otherwise>
+                                    </c:choose>
+                                </span>
+                            </div>
                         </div>
                     </div>
 

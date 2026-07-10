@@ -207,13 +207,8 @@ public class ContractServlet extends HttpServlet {
         String salaryError = null;
         BigDecimal basicSalary  = parsePositiveMoney(request.getParameter("basicSalary"));
         BigDecimal workingDays  = parsePositiveMoney(request.getParameter("standardWorkingDays"));
-        BigDecimal lunch        = parsePositiveMoney(request.getParameter("lunchAllowance"));
-        BigDecimal transport    = parsePositiveMoney(request.getParameter("transportationAllowance"));
-        BigDecimal phone        = parsePositiveMoney(request.getParameter("phoneAllowance"));
-        BigDecimal responsibility = parsePositiveMoney(request.getParameter("responsibilityAllowance"));
-        if (basicSalary == null || workingDays == null || lunch == null
-                || transport == null || phone == null || responsibility == null) {
-            salaryError = "Salary, working days and allowances must be valid non-negative numbers.";
+        if (basicSalary == null || workingDays == null) {
+            salaryError = "Salary and working days must be valid non-negative numbers.";
         } else if (workingDays.signum() <= 0) {
             salaryError = "Standard working days must be greater than 0.";
         }
@@ -237,10 +232,10 @@ public class ContractServlet extends HttpServlet {
         c.setEndDate(endDate);
         c.setBasicSalary(basicSalary);
         c.setStandardWorkingDays(workingDays);
-        c.setLunchAllowance(lunch);
-        c.setTransportationAllowance(transport);
-        c.setPhoneAllowance(phone);
-        c.setResponsibilityAllowance(responsibility);
+        c.setLunchAllowance(BigDecimal.ZERO);
+        c.setTransportationAllowance(BigDecimal.ZERO);
+        c.setPhoneAllowance(BigDecimal.ZERO);
+        c.setResponsibilityAllowance(BigDecimal.ZERO);
         c.setStatus(Status.Active);
         c.setNote(note.isEmpty() ? null : note);
         c.setCreatedBy(currentUser.getUserId());
@@ -341,14 +336,9 @@ public class ContractServlet extends HttpServlet {
 
         BigDecimal basicSalary    = parsePositiveMoney(request.getParameter("basicSalary"));
         BigDecimal workingDays    = parsePositiveMoney(request.getParameter("standardWorkingDays"));
-        BigDecimal lunch          = parsePositiveMoney(request.getParameter("lunchAllowance"));
-        BigDecimal transport      = parsePositiveMoney(request.getParameter("transportationAllowance"));
-        BigDecimal phone          = parsePositiveMoney(request.getParameter("phoneAllowance"));
-        BigDecimal responsibility = parsePositiveMoney(request.getParameter("responsibilityAllowance"));
-        if (basicSalary == null || workingDays == null || lunch == null
-                || transport == null || phone == null || responsibility == null) {
+        if (basicSalary == null || workingDays == null) {
             forwardEditForm(request, response, contractId,
-                    "Salary, working days and allowances must be valid non-negative numbers.");
+                    "Salary and working days must be valid non-negative numbers.");
             return;
         }
         if (workingDays.signum() <= 0) {
@@ -369,10 +359,10 @@ public class ContractServlet extends HttpServlet {
         c.setEndDate(endDate);
         c.setBasicSalary(basicSalary);
         c.setStandardWorkingDays(workingDays);
-        c.setLunchAllowance(lunch);
-        c.setTransportationAllowance(transport);
-        c.setPhoneAllowance(phone);
-        c.setResponsibilityAllowance(responsibility);
+        c.setLunchAllowance(existing.getLunchAllowance());
+        c.setTransportationAllowance(existing.getTransportationAllowance());
+        c.setPhoneAllowance(existing.getPhoneAllowance());
+        c.setResponsibilityAllowance(existing.getResponsibilityAllowance());
         c.setNote(note.isEmpty() ? null : note);
         c.setUpdatedBy(currentUser.getUserId());
 

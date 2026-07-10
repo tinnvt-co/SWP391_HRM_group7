@@ -7,6 +7,7 @@ import model.AttendanceRecord.VerificationStatus;
 
 import java.sql.*;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
@@ -262,6 +263,93 @@ public class AttendanceRecordDAO {
         public int paidLeaveDays;       // Leave
         public int unpaidLeaveDays;     // Unpaid Leave
         public java.math.BigDecimal overtimeHours = java.math.BigDecimal.ZERO;
+    }
+
+    /** Pending attendance group that is old enough for automatic manager confirmation. */
+    public static final class AutoConfirmBatch {
+        public int managerUserId;
+        public int year;
+        public int month;
+        public int pendingCount;
+        public LocalDateTime latestCreatedAt;
+    }
+
+    public List<AutoConfirmBatch> findAutoConfirmBatches(LocalDateTime cutoff)
+            throws SQLException {
+        String sql =
+            "SELECT u.manager_id AS manager_user_id, "
+          + "       YEAR(ar.work_date) AS report_year, "
+          + "       MONTH(ar.work_date) AS report_month, "
+          + "       COUNT(*) AS pending_count, "
+          + "       MAX(ar.created_at) AS latest_created_at "
+          + "FROM attendance_records ar "
+          + "JOIN employees e ON ar.employee_id = e.employee_id "
+          + "JOIN users u ON e.user_id = u.user_id "
+          + "JOIN roles ro ON u.role_id = ro.role_id "
+          + "WHERE u.manager_id IS NOT NULL "
+          + "  AND ro.role_name = 'EMPLOYEE' "
+          + "  AND ar.verification_status = 'Pending' "
+          + "GROUP BY u.manager_id, YEAR(ar.work_date), MONTH(ar.work_date) "
+          + "HAVING MAX(ar.created_at) <= ? "
+          + "ORDER BY report_year, report_month, manager_user_id";
+
+        List<AutoConfirmBatch> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setTimestamp(1, Timestamp.valueOf(cutoff));
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                AutoConfirmBatch batch = new AutoConfirmBatch();
+                batch.managerUserId = rs.getInt("manager_user_id");
+                batch.year = rs.getInt("report_year");
+                batch.month = rs.getInt("report_month");
+                batch.pendingCount = rs.getInt("pending_count");
+                Timestamp latest = rs.getTimestamp("latest_created_at");
+                if (latest != null) batch.latestCreatedAt = latest.toLocalDateTime();
+                list.add(batch);
+            }
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
+    public int autoVerifyPendingByManagerMonth(int managerUserId, int year, int month)
+            throws SQLException {
+        String sql =
+            "UPDATE attendance_records ar "
+          + "JOIN employees e ON ar.employee_id = e.employee_id "
+          + "JOIN users u ON e.user_id = u.user_id "
+          + "JOIN roles ro ON u.role_id = ro.role_id "
+          + "SET ar.verification_status = 'Verified', "
+          + "    ar.verified_by = NULL, "
+          + "    ar.verified_at = NOW(), "
+          + "    ar.note = LEFT(CONCAT("
+          + "        CASE WHEN COALESCE(ar.note, '') = '' THEN '' ELSE CONCAT(ar.note, ' | ') END, "
+          + "        'Auto-confirmed after 2 days'), 255), "
+          + "    ar.updated_at = NOW() "
+          + "WHERE u.manager_id = ? "
+          + "  AND ro.role_name = 'EMPLOYEE' "
+          + "  AND ar.verification_status = 'Pending' "
+          + "  AND YEAR(ar.work_date) = ? "
+          + "  AND MONTH(ar.work_date) = ?";
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, managerUserId);
+            ps.setInt(2, year);
+            ps.setInt(3, month);
+            return ps.executeUpdate();
+        } finally {
+            close(conn, ps, null);
+        }
     }
 
     /** Per-employee attendance summary for the card view. */

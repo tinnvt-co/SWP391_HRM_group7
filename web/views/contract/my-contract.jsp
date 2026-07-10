@@ -116,32 +116,19 @@
                             </div>
 
                             <div class="col-lg-6">
-                                <h6 class="fw-semibold mb-3 text-secondary"><i class="bi bi-cash-stack me-2"></i>Salary &amp; Allowances</h6>
+                                <h6 class="fw-semibold mb-3 text-secondary"><i class="bi bi-cash-stack me-2"></i>Salary</h6>
                                 <div class="info-row row align-items-center">
                                     <div class="col-7 text-muted small">Basic Salary</div>
                                     <div class="col-5 money"><fmt:formatNumber value="${ct.basicSalary}" type="number" maxFractionDigits="0"/> &#8363;</div>
                                 </div>
-                                <div class="info-row row align-items-center">
-                                    <div class="col-7 text-muted small">Lunch Allowance</div>
-                                    <div class="col-5"><fmt:formatNumber value="${ct.lunchAllowance}" type="number" maxFractionDigits="0"/> &#8363;</div>
-                                </div>
-                                <div class="info-row row align-items-center">
-                                    <div class="col-7 text-muted small">Transportation Allowance</div>
-                                    <div class="col-5"><fmt:formatNumber value="${ct.transportationAllowance}" type="number" maxFractionDigits="0"/> &#8363;</div>
-                                </div>
-                                <div class="info-row row align-items-center">
-                                    <div class="col-7 text-muted small">Phone Allowance</div>
-                                    <div class="col-5"><fmt:formatNumber value="${ct.phoneAllowance}" type="number" maxFractionDigits="0"/> &#8363;</div>
-                                </div>
-                                <div class="info-row row align-items-center">
-                                    <div class="col-7 text-muted small">Responsibility Allowance</div>
-                                    <div class="col-5"><fmt:formatNumber value="${ct.responsibilityAllowance}" type="number" maxFractionDigits="0"/> &#8363;</div>
+                                <div class="alert alert-info d-flex align-items-center gap-2 py-2 mt-3 mb-0">
+                                    <i class="bi bi-wallet2"></i>
+                                    <span>Monthly allowances are managed globally and applied during payroll calculation.</span>
                                 </div>
                                 <div class="salary-total d-flex justify-content-between align-items-center mt-3">
-                                    <span class="fw-semibold text-primary">Gross (Salary + Allowances)</span>
+                                    <span class="fw-semibold text-primary">Contract Salary</span>
                                     <span class="fw-bold text-primary">
-                                        <fmt:formatNumber value="${ct.basicSalary + ct.lunchAllowance + ct.transportationAllowance + ct.phoneAllowance + ct.responsibilityAllowance}"
-                                                          type="number" maxFractionDigits="0"/> &#8363;
+                                        <fmt:formatNumber value="${ct.basicSalary}" type="number" maxFractionDigits="0"/> &#8363;
                                     </span>
                                 </div>
                             </div>

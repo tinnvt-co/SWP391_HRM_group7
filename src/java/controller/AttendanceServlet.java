@@ -11,6 +11,7 @@ import model.AttendanceReport;
 import model.Department;
 import model.Employee;
 import model.User;
+import service.AttendanceAutoConfirmService;
 import service.AttendanceImportService;
 import util.XlsxReader;
 
@@ -48,6 +49,7 @@ public class AttendanceServlet extends HttpServlet {
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
     private final AttendanceReportDAO reportDAO = new AttendanceReportDAO();
     private final DepartmentDAO departmentDAO = new DepartmentDAO();
+    private final AttendanceAutoConfirmService autoConfirmService = new AttendanceAutoConfirmService();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -139,6 +141,10 @@ public class AttendanceServlet extends HttpServlet {
         boolean hrScope      = "HR_STAFF".equalsIgnoreCase(roleName)
                             || "HR_MANAGER".equalsIgnoreCase(roleName)
                             || "ADMIN".equalsIgnoreCase(roleName);
+
+        if (managerScope || hrScope) {
+            autoConfirmService.runDueAutoConfirm();
+        }
 
         Integer deptId = parseIntOrNull(request.getParameter("deptId"));
         List<Department> attendanceDepartments = null;

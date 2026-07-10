@@ -82,7 +82,7 @@
                    class="btn btn-outline-primary btn-sm w-100 mb-2">
                     <i class="bi bi-key me-2"></i>Change Password
                 </a>
-                <c:if test="${not empty employee}">
+                <c:if test="${canManageBankAccount}">
                     <a href="${pageContext.request.contextPath}/bank-account"
                        class="btn btn-outline-secondary btn-sm w-100">
                         <i class="bi bi-bank me-2"></i>Manage Bank Account
@@ -162,7 +162,7 @@
                 </c:choose>
             </div>
 
-            <c:if test="${not empty employee}">
+            <c:if test="${canManageBankAccount}">
                 <div class="card border-0 shadow-sm rounded-3 p-4 mt-3">
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <h6 class="fw-semibold mb-0 text-secondary">

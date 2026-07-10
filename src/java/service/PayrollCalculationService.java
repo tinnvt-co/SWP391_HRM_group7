@@ -1,5 +1,6 @@
 package service;
 
+import dao.AllowanceTypeDAO;
 import dao.ContractDAO;
 import model.AttendanceReport;
 import model.Contract;
@@ -17,7 +18,7 @@ import java.sql.SQLException;
  *   daily        = basic_salary / standard_working_days
  *   work_salary  = daily * actual_working_days
  *   ot_salary    = (basic_salary / 26 / 8) * overtime_hours * 1.5
- *   allowance    = lunch + transport + phone + responsibility
+ *   allowance    = sum(active global allowance types)
  *   gross        = work_salary + allowance + kpi_bonus + ot_salary
  *   insurance    = gross * 10.5%
  *   deduction    = insurance + advance_payment
@@ -31,6 +32,7 @@ public class PayrollCalculationService {
     private static final int SCALE = 0; // VND — whole dong
 
     private final ContractDAO contractDAO = new ContractDAO();
+    private final AllowanceTypeDAO allowanceDAO = new AllowanceTypeDAO();
 
     /** Result of building a payroll line, with a reason when it can't be built. */
     public static final class BuildResult {
@@ -67,10 +69,7 @@ public class PayrollCalculationService {
                                      .divide(HOURS_PER_DAY, 4, RoundingMode.HALF_UP);
         BigDecimal otSalary   = otRate.multiply(otHours).multiply(OT_MULTIPLIER);
 
-        BigDecimal allowance  = nz(c.getLunchAllowance())
-                .add(nz(c.getTransportationAllowance()))
-                .add(nz(c.getPhoneAllowance()))
-                .add(nz(c.getResponsibilityAllowance()));
+        BigDecimal allowance  = nz(allowanceDAO.sumActiveAllowances());
 
         BigDecimal gross      = workSalary.add(allowance).add(kpi).add(otSalary);
         BigDecimal insurance  = gross.multiply(INSURANCE_RATE);

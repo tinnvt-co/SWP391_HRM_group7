@@ -10,6 +10,7 @@ import model.Payroll;
 import model.PayrollPeriod;
 import model.PayrollTaskSummary;
 import model.User;
+import service.AttendanceAutoConfirmService;
 import service.PayrollCalculationService;
 
 import jakarta.servlet.ServletException;
@@ -52,6 +53,7 @@ public class PayrollServlet extends HttpServlet {
     private final AttendanceReportDAO reportDAO = new AttendanceReportDAO();
     private final DepartmentDAO departmentDAO = new DepartmentDAO();
     private final PayrollCalculationService calc = new PayrollCalculationService();
+    private final AttendanceAutoConfirmService autoConfirmService = new AttendanceAutoConfirmService();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -112,6 +114,8 @@ public class PayrollServlet extends HttpServlet {
 
     private void handleList(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, ServletException, IOException {
+        autoConfirmService.runDueAutoConfirm();
+
         YearMonth now = YearMonth.now();
         int year  = parseIntOr(request.getParameter("year"),  now.getYear());
         int month = parseIntOr(request.getParameter("month"), now.getMonthValue());
@@ -159,6 +163,8 @@ public class PayrollServlet extends HttpServlet {
 
     private void handleGenerate(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, IOException {
+        autoConfirmService.runDueAutoConfirm();
+
         User user = currentUser(request);
         HttpSession session = request.getSession(true);
         String ctx = request.getContextPath();

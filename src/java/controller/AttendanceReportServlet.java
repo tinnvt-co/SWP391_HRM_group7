@@ -3,6 +3,7 @@ package controller;
 import dao.AttendanceReportDAO;
 import model.AttendanceReport;
 import model.User;
+import service.AttendanceAutoConfirmService;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -29,6 +30,7 @@ public class AttendanceReportServlet extends HttpServlet {
     private static final int PAGE_SIZE = 10;
 
     private final AttendanceReportDAO reportDAO = new AttendanceReportDAO();
+    private final AttendanceAutoConfirmService autoConfirmService = new AttendanceAutoConfirmService();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -45,6 +47,8 @@ public class AttendanceReportServlet extends HttpServlet {
         if (month < 1 || month > 12) month = now.getMonthValue();
 
         try {
+            autoConfirmService.runDueAutoConfirm();
+
             User currentUser = getCurrentUser(request);
             String roleName = currentUser != null && currentUser.getRole() != null
                     ? currentUser.getRole().getRoleName() : "";
