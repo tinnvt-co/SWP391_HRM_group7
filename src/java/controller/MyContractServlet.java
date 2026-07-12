@@ -1,5 +1,6 @@
 package controller;
 
+import dao.AllowanceTypeDAO;
 import dao.ContractDAO;
 import dao.EmployeeDAO;
 import model.Contract;
@@ -22,6 +23,7 @@ public class MyContractServlet extends HttpServlet {
 
     private final ContractDAO contractDAO = new ContractDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
+    private final AllowanceTypeDAO allowanceDAO = new AllowanceTypeDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -40,6 +42,8 @@ public class MyContractServlet extends HttpServlet {
                 request.setAttribute("error",
                         "Your account is not linked to an employee record. Please contact HR.");
                 request.setAttribute("contracts", java.util.Collections.emptyList());
+                request.setAttribute("activeAllowanceTypes", allowanceDAO.findActive());
+                request.setAttribute("totalActiveAllowance", allowanceDAO.sumActiveAllowances());
                 request.getRequestDispatcher("/views/contract/my-contract.jsp").forward(request, response);
                 return;
             }
@@ -47,6 +51,8 @@ public class MyContractServlet extends HttpServlet {
             List<Contract> contracts = contractDAO.findByEmployeeId(employee.getEmployeeId());
             request.setAttribute("employee", employee);
             request.setAttribute("contracts", contracts);
+            request.setAttribute("activeAllowanceTypes", allowanceDAO.findActive());
+            request.setAttribute("totalActiveAllowance", allowanceDAO.sumActiveAllowances());
             request.getRequestDispatcher("/views/contract/my-contract.jsp").forward(request, response);
         } catch (SQLException e) {
             throw new ServletException(e);

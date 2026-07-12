@@ -58,6 +58,51 @@
         </div>
     </c:if>
 
+    <div class="card border-0 shadow-sm rounded-3 mb-4">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                <h6 class="fw-semibold mb-0 text-secondary">
+                    <i class="bi bi-wallet2 me-2"></i>Current Monthly Allowances
+                </h6>
+                <span class="badge text-bg-primary">
+                    Total:
+                    <fmt:formatNumber value="${totalActiveAllowance}" type="number" maxFractionDigits="0"/>
+                    &#8363;
+                </span>
+            </div>
+            <c:choose>
+                <c:when test="${empty activeAllowanceTypes}">
+                    <div class="text-muted small">No active allowance policy is configured.</div>
+                </c:when>
+                <c:otherwise>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Allowance</th>
+                                <th class="text-end">Amount</th>
+                                <th>Description</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <c:forEach var="allowance" items="${activeAllowanceTypes}">
+                                <tr>
+                                    <td class="fw-medium">${allowance.allowanceName}</td>
+                                    <td class="text-end">
+                                        <fmt:formatNumber value="${allowance.amount}" type="number" maxFractionDigits="0"/>
+                                        &#8363;
+                                    </td>
+                                    <td class="text-muted small">${not empty allowance.description ? allowance.description : '-'}</td>
+                                </tr>
+                            </c:forEach>
+                            </tbody>
+                        </table>
+                    </div>
+                </c:otherwise>
+            </c:choose>
+        </div>
+    </div>
+
     <c:choose>
         <c:when test="${empty contracts}">
             <c:if test="${empty error}">
@@ -123,7 +168,7 @@
                                 </div>
                                 <div class="alert alert-info d-flex align-items-center gap-2 py-2 mt-3 mb-0">
                                     <i class="bi bi-wallet2"></i>
-                                    <span>Monthly allowances are managed globally and applied during payroll calculation.</span>
+                                    <span>Monthly allowances above are applied during payroll calculation.</span>
                                 </div>
                                 <div class="salary-total d-flex justify-content-between align-items-center mt-3">
                                     <span class="fw-semibold text-primary">Contract Salary</span>

@@ -1,6 +1,7 @@
 <%@ page contentType="text/html;charset=UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <c:set var="activePage" value="contracts" scope="request"/>
 <!DOCTYPE html>
 <html lang="en">
@@ -126,17 +127,47 @@
                                    value="${contract.standardWorkingDays}" ${readonly ? 'disabled' : ''} required>
                         </div>
                         <div class="col-12">
-                            <div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-0">
-                                <i class="bi bi-wallet2"></i>
-                                <span>
-                                    Allowances are managed globally in
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Active Allowance</th>
+                                        <th class="text-end">Amount</th>
+                                        <th>Description</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
                                     <c:choose>
-                                        <c:when test="${permissions.contains('MANAGE_ALLOWANCE')}">
-                                            <a href="${pageContext.request.contextPath}/allowances" class="alert-link">Manage Allowance</a>.
+                                        <c:when test="${empty activeAllowanceTypes}">
+                                            <tr>
+                                                <td colspan="3" class="text-muted text-center py-3">
+                                                    No active allowance policy is configured.
+                                                </td>
+                                            </tr>
                                         </c:when>
-                                        <c:otherwise>Manage Allowance.</c:otherwise>
+                                        <c:otherwise>
+                                            <c:forEach var="allowance" items="${activeAllowanceTypes}">
+                                                <tr>
+                                                    <td class="fw-medium">${allowance.allowanceName}</td>
+                                                    <td class="text-end">
+                                                        <fmt:formatNumber value="${allowance.amount}" type="number" maxFractionDigits="0"/>
+                                                        &#8363;
+                                                    </td>
+                                                    <td class="text-muted small">${not empty allowance.description ? allowance.description : '-'}</td>
+                                                </tr>
+                                            </c:forEach>
+                                            <tr class="table-light">
+                                                <td class="fw-semibold">Total Active Allowance</td>
+                                                <td class="text-end fw-semibold">
+                                                    <fmt:formatNumber value="${totalActiveAllowance}" type="number" maxFractionDigits="0"/>
+                                                    &#8363;
+                                                </td>
+                                                <td></td>
+                                            </tr>
+                                        </c:otherwise>
                                     </c:choose>
-                                </span>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>

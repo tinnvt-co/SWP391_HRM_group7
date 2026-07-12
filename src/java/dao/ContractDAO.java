@@ -1,12 +1,10 @@
 package dao;
 
 import config.DBContext;
-import model.AllowanceSettings;
 import model.Contract;
 import model.Contract.ContractType;
 import model.Contract.Status;
 
-import java.math.BigDecimal;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +12,10 @@ import java.util.List;
 public class ContractDAO {
 
     private static final String BASE_SELECT =
-            "SELECT c.*, u.full_name AS emp_full_name, e.employee_code, d.department_name "
+            "SELECT c.contract_id, c.employee_id, c.contract_code, c.contract_type, "
+          + "       c.start_date, c.end_date, c.basic_salary, c.standard_working_days, "
+          + "       c.status, c.note, c.created_by, c.updated_by, c.created_at, c.updated_at, "
+          + "       u.full_name AS emp_full_name, e.employee_code, d.department_name "
           + "FROM contracts c "
           + "JOIN employees e   ON c.employee_id   = e.employee_id "
           + "JOIN users u       ON e.user_id       = u.user_id "
@@ -169,68 +170,10 @@ public class ContractDAO {
         }
     }
 
-    public AllowanceSettings findGlobalAllowanceSettings() throws SQLException {
-        String sql = "SELECT c.lunch_allowance, c.transportation_allowance, "
-                   + "       c.phone_allowance, c.responsibility_allowance, "
-                   + "       (SELECT COUNT(*) FROM contracts WHERE status = 'Active') AS active_contract_count "
-                   + "FROM contracts c "
-                   + "WHERE c.status = 'Active' "
-                   + "ORDER BY c.updated_at DESC, c.contract_id DESC "
-                   + "LIMIT 1";
-        Connection conn = null;
-        PreparedStatement ps = null;
-        ResultSet rs = null;
-        try {
-            conn = DBContext.getConnection();
-            ps = conn.prepareStatement(sql);
-            rs = ps.executeQuery();
-            if (rs.next()) {
-                AllowanceSettings settings = new AllowanceSettings();
-                settings.setLunchAllowance(nz(rs.getBigDecimal("lunch_allowance")));
-                settings.setTransportationAllowance(nz(rs.getBigDecimal("transportation_allowance")));
-                settings.setPhoneAllowance(nz(rs.getBigDecimal("phone_allowance")));
-                settings.setResponsibilityAllowance(nz(rs.getBigDecimal("responsibility_allowance")));
-                settings.setActiveContractCount(rs.getInt("active_contract_count"));
-                settings.setTotalMonthlyAllowance(totalAllowance(settings));
-                return settings;
-            }
-            return new AllowanceSettings();
-        } finally {
-            close(conn, ps, rs);
-        }
-    }
-
-    public int updateGlobalAllowances(BigDecimal lunchAllowance,
-                                      BigDecimal transportationAllowance,
-                                      BigDecimal phoneAllowance,
-                                      BigDecimal responsibilityAllowance,
-                                      int actorUserId) throws SQLException {
-        String sql = "UPDATE contracts "
-                   + "SET lunch_allowance=?, transportation_allowance=?, "
-                   + "    phone_allowance=?, responsibility_allowance=?, "
-                   + "    updated_by=?, updated_at=NOW() "
-                   + "WHERE status='Active'";
-        Connection conn = null;
-        PreparedStatement ps = null;
-        try {
-            conn = DBContext.getConnection();
-            ps = conn.prepareStatement(sql);
-            ps.setBigDecimal(1, lunchAllowance);
-            ps.setBigDecimal(2, transportationAllowance);
-            ps.setBigDecimal(3, phoneAllowance);
-            ps.setBigDecimal(4, responsibilityAllowance);
-            ps.setInt(5, actorUserId);
-            return ps.executeUpdate();
-        } finally {
-            close(conn, ps, null);
-        }
-    }
-
     public int insert(Contract c) throws SQLException {
         String sql = "INSERT INTO contracts (employee_id, contract_code, contract_type, start_date, end_date, "
-                   + "basic_salary, standard_working_days, lunch_allowance, transportation_allowance, "
-                   + "phone_allowance, responsibility_allowance, status, note, created_by, updated_by) "
-                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                   + "basic_salary, standard_working_days, status, note, created_by, updated_by) "
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -243,14 +186,10 @@ public class ContractDAO {
             ps.setObject(5, c.getEndDate() != null ? Date.valueOf(c.getEndDate()) : null);
             ps.setBigDecimal(6, c.getBasicSalary());
             ps.setBigDecimal(7, c.getStandardWorkingDays());
-            ps.setBigDecimal(8, c.getLunchAllowance());
-            ps.setBigDecimal(9, c.getTransportationAllowance());
-            ps.setBigDecimal(10, c.getPhoneAllowance());
-            ps.setBigDecimal(11, c.getResponsibilityAllowance());
-            ps.setString(12, c.getStatus() == null ? Status.Active.name() : c.getStatus().name());
-            ps.setString(13, c.getNote());
-            if (c.getCreatedBy() != null) ps.setInt(14, c.getCreatedBy()); else ps.setNull(14, Types.INTEGER);
-            if (c.getUpdatedBy() != null) ps.setInt(15, c.getUpdatedBy()); else ps.setNull(15, Types.INTEGER);
+            ps.setString(8, c.getStatus() == null ? Status.Active.name() : c.getStatus().name());
+            ps.setString(9, c.getNote());
+            if (c.getCreatedBy() != null) ps.setInt(10, c.getCreatedBy()); else ps.setNull(10, Types.INTEGER);
+            if (c.getUpdatedBy() != null) ps.setInt(11, c.getUpdatedBy()); else ps.setNull(11, Types.INTEGER);
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) return keys.getInt(1);
@@ -263,8 +202,7 @@ public class ContractDAO {
 
     public boolean update(Contract c) throws SQLException {
         String sql = "UPDATE contracts SET contract_type=?, start_date=?, end_date=?, basic_salary=?, "
-                   + "standard_working_days=?, lunch_allowance=?, transportation_allowance=?, "
-                   + "phone_allowance=?, responsibility_allowance=?, note=?, updated_by=?, updated_at=NOW() "
+                   + "standard_working_days=?, note=?, updated_by=?, updated_at=NOW() "
                    + "WHERE contract_id=?";
         Connection conn = null;
         PreparedStatement ps = null;
@@ -276,13 +214,9 @@ public class ContractDAO {
             ps.setObject(3, c.getEndDate() != null ? Date.valueOf(c.getEndDate()) : null);
             ps.setBigDecimal(4, c.getBasicSalary());
             ps.setBigDecimal(5, c.getStandardWorkingDays());
-            ps.setBigDecimal(6, c.getLunchAllowance());
-            ps.setBigDecimal(7, c.getTransportationAllowance());
-            ps.setBigDecimal(8, c.getPhoneAllowance());
-            ps.setBigDecimal(9, c.getResponsibilityAllowance());
-            ps.setString(10, c.getNote());
-            if (c.getUpdatedBy() != null) ps.setInt(11, c.getUpdatedBy()); else ps.setNull(11, Types.INTEGER);
-            ps.setInt(12, c.getContractId());
+            ps.setString(6, c.getNote());
+            if (c.getUpdatedBy() != null) ps.setInt(7, c.getUpdatedBy()); else ps.setNull(7, Types.INTEGER);
+            ps.setInt(8, c.getContractId());
             return ps.executeUpdate() > 0;
         } finally {
             close(conn, ps, null);
@@ -317,10 +251,6 @@ public class ContractDAO {
         if (end != null) c.setEndDate(end.toLocalDate());
         c.setBasicSalary(rs.getBigDecimal("basic_salary"));
         c.setStandardWorkingDays(rs.getBigDecimal("standard_working_days"));
-        c.setLunchAllowance(rs.getBigDecimal("lunch_allowance"));
-        c.setTransportationAllowance(rs.getBigDecimal("transportation_allowance"));
-        c.setPhoneAllowance(rs.getBigDecimal("phone_allowance"));
-        c.setResponsibilityAllowance(rs.getBigDecimal("responsibility_allowance"));
         String status = rs.getString("status");
         if (status != null) {
             try { c.setStatus(Status.valueOf(status)); } catch (IllegalArgumentException ignored) {}
@@ -338,17 +268,6 @@ public class ContractDAO {
         try { c.setEmployeeCode(rs.getString("employee_code")); } catch (SQLException ignored) {}
         try { c.setDepartmentName(rs.getString("department_name")); } catch (SQLException ignored) {}
         return c;
-    }
-
-    private BigDecimal totalAllowance(AllowanceSettings settings) {
-        return nz(settings.getLunchAllowance())
-                .add(nz(settings.getTransportationAllowance()))
-                .add(nz(settings.getPhoneAllowance()))
-                .add(nz(settings.getResponsibilityAllowance()));
-    }
-
-    private BigDecimal nz(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
     }
 
     private void close(Connection conn, PreparedStatement ps, ResultSet rs) {

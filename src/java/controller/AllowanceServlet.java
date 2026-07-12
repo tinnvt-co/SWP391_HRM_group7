@@ -25,7 +25,7 @@ public class AllowanceServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        if (!hasPermission(request, "MANAGE_ALLOWANCE")) {
+        if (!canManageAllowance(request)) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
@@ -43,7 +43,7 @@ public class AllowanceServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        if (!hasPermission(request, "MANAGE_ALLOWANCE")) {
+        if (!canManageAllowance(request)) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
@@ -228,6 +228,13 @@ public class AllowanceServlet extends HttpServlet {
         if (session == null) return false;
         List<?> perms = (List<?>) session.getAttribute("permissions");
         return perms != null && perms.contains(permCode);
+    }
+
+    private boolean canManageAllowance(HttpServletRequest request) {
+        User user = currentUser(request);
+        if (user == null || user.getRole() == null) return false;
+        return "HR_MANAGER".equalsIgnoreCase(user.getRole().getRoleName())
+                && hasPermission(request, "MANAGE_ALLOWANCE");
     }
 
     private User currentUser(HttpServletRequest request) {

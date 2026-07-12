@@ -1,5 +1,6 @@
 package controller;
 
+import dao.AllowanceTypeDAO;
 import dao.ContractDAO;
 import dao.EmployeeDAO;
 import model.Contract;
@@ -27,6 +28,7 @@ public class ContractServlet extends HttpServlet {
 
     private final ContractDAO contractDAO = new ContractDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
+    private final AllowanceTypeDAO allowanceDAO = new AllowanceTypeDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -118,6 +120,8 @@ public class ContractServlet extends HttpServlet {
         }
         request.setAttribute("contract", c);
         request.setAttribute("readonly", true);
+        request.setAttribute("contractTypes", ContractType.values());
+        loadAllowanceAttributes(request);
         request.getRequestDispatcher("/views/contract/edit-contract.jsp").forward(request, response);
     }
 
@@ -130,6 +134,7 @@ public class ContractServlet extends HttpServlet {
         }
         request.setAttribute("employees", employeeDAO.findAllActive());
         request.setAttribute("contractTypes", ContractType.values());
+        loadAllowanceAttributes(request);
         request.getRequestDispatcher("/views/contract/add-contract.jsp").forward(request, response);
     }
 
@@ -232,10 +237,6 @@ public class ContractServlet extends HttpServlet {
         c.setEndDate(endDate);
         c.setBasicSalary(basicSalary);
         c.setStandardWorkingDays(workingDays);
-        c.setLunchAllowance(BigDecimal.ZERO);
-        c.setTransportationAllowance(BigDecimal.ZERO);
-        c.setPhoneAllowance(BigDecimal.ZERO);
-        c.setResponsibilityAllowance(BigDecimal.ZERO);
         c.setStatus(Status.Active);
         c.setNote(note.isEmpty() ? null : note);
         c.setCreatedBy(currentUser.getUserId());
@@ -267,6 +268,7 @@ public class ContractServlet extends HttpServlet {
 
         request.setAttribute("contract", c);
         request.setAttribute("contractTypes", ContractType.values());
+        loadAllowanceAttributes(request);
         request.getRequestDispatcher("/views/contract/edit-contract.jsp").forward(request, response);
     }
 
@@ -359,10 +361,6 @@ public class ContractServlet extends HttpServlet {
         c.setEndDate(endDate);
         c.setBasicSalary(basicSalary);
         c.setStandardWorkingDays(workingDays);
-        c.setLunchAllowance(existing.getLunchAllowance());
-        c.setTransportationAllowance(existing.getTransportationAllowance());
-        c.setPhoneAllowance(existing.getPhoneAllowance());
-        c.setResponsibilityAllowance(existing.getResponsibilityAllowance());
         c.setNote(note.isEmpty() ? null : note);
         c.setUpdatedBy(currentUser.getUserId());
 
@@ -394,6 +392,7 @@ public class ContractServlet extends HttpServlet {
         request.setAttribute("error", error);
         request.setAttribute("employees", employeeDAO.findAllActive());
         request.setAttribute("contractTypes", ContractType.values());
+        loadAllowanceAttributes(request);
         request.getRequestDispatcher("/views/contract/add-contract.jsp").forward(request, response);
     }
 
@@ -403,7 +402,13 @@ public class ContractServlet extends HttpServlet {
         request.setAttribute("error", error);
         request.setAttribute("contract", contractDAO.findById(contractId));
         request.setAttribute("contractTypes", ContractType.values());
+        loadAllowanceAttributes(request);
         request.getRequestDispatcher("/views/contract/edit-contract.jsp").forward(request, response);
+    }
+
+    private void loadAllowanceAttributes(HttpServletRequest request) throws SQLException {
+        request.setAttribute("activeAllowanceTypes", allowanceDAO.findActive());
+        request.setAttribute("totalActiveAllowance", allowanceDAO.sumActiveAllowances());
     }
 
     private BigDecimal parsePositiveMoney(String value) {

@@ -28,6 +28,25 @@ public class AllowanceTypeDAO {
         return list;
     }
 
+    public List<AllowanceType> findActive() throws SQLException {
+        String sql = "SELECT * FROM allowance_types "
+                   + "WHERE is_active = 1 "
+                   + "ORDER BY allowance_name ASC";
+        List<AllowanceType> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
     public AllowanceType findById(int allowanceTypeId) throws SQLException {
         String sql = "SELECT * FROM allowance_types WHERE allowance_type_id = ?";
         Connection conn = null;

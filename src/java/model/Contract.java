@@ -34,10 +34,6 @@ public class Contract {
     private LocalDate endDate;
     private BigDecimal basicSalary;
     private BigDecimal standardWorkingDays;
-    private BigDecimal lunchAllowance;
-    private BigDecimal transportationAllowance;
-    private BigDecimal phoneAllowance;
-    private BigDecimal responsibilityAllowance;
     private Status status;
     private String note;
     private Integer createdBy;
@@ -74,18 +70,6 @@ public class Contract {
 
     public BigDecimal getStandardWorkingDays()              { return standardWorkingDays; }
     public void setStandardWorkingDays(BigDecimal d)        { this.standardWorkingDays = d; }
-
-    public BigDecimal getLunchAllowance()                   { return lunchAllowance; }
-    public void setLunchAllowance(BigDecimal v)             { this.lunchAllowance = v; }
-
-    public BigDecimal getTransportationAllowance()          { return transportationAllowance; }
-    public void setTransportationAllowance(BigDecimal v)    { this.transportationAllowance = v; }
-
-    public BigDecimal getPhoneAllowance()                   { return phoneAllowance; }
-    public void setPhoneAllowance(BigDecimal v)             { this.phoneAllowance = v; }
-
-    public BigDecimal getResponsibilityAllowance()          { return responsibilityAllowance; }
-    public void setResponsibilityAllowance(BigDecimal v)    { this.responsibilityAllowance = v; }
 
     public Status getStatus()                               { return status; }
     public void setStatus(Status status)                    { this.status = status; }

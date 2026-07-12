@@ -23,8 +23,11 @@ public final class TabSession {
 
     public static String resolveTabId(HttpServletRequest request) {
         Object cached = request.getAttribute(REQUEST_ATTRIBUTE);
-        if (cached instanceof String cachedTabId && isValidTabId(cachedTabId)) {
-            return cachedTabId;
+        if (cached instanceof String) {
+            String cachedTabId = (String) cached;
+            if (isValidTabId(cachedTabId)) {
+                return cachedTabId;
+            }
         }
 
         String tabId = firstValid(
@@ -41,7 +44,11 @@ public final class TabSession {
 
     public static String currentTabId(HttpServletRequest request) {
         Object tabId = request.getAttribute(REQUEST_ATTRIBUTE);
-        return tabId instanceof String value && isValidTabId(value) ? value : null;
+        if (tabId instanceof String) {
+            String value = (String) tabId;
+            return isValidTabId(value) ? value : null;
+        }
+        return null;
     }
 
     public static String scopedAttributeName(String tabId, String name) {
