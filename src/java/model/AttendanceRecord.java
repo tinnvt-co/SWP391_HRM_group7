@@ -7,15 +7,18 @@ import java.time.LocalDateTime;
 public class AttendanceRecord {
 
     public enum AttendanceStatus {
-        Present, Absent, Late, Leave, Holiday, UnpaidLeave;
+        Present, Absent, Late, Leave, Holiday, UnpaidLeave, MaternityLeave;
 
         public String getDbValue() {
-            return this == UnpaidLeave ? "Unpaid Leave" : name();
+            if (this == UnpaidLeave) return "Unpaid Leave";
+            if (this == MaternityLeave) return "Maternity Leave";
+            return name();
         }
 
         public static AttendanceStatus fromDb(String value) {
             if (value == null) return null;
             if ("Unpaid Leave".equals(value)) return UnpaidLeave;
+            if ("Maternity Leave".equals(value)) return MaternityLeave;
             try { return valueOf(value); } catch (IllegalArgumentException ex) { return null; }
         }
     }

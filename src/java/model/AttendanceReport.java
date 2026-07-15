@@ -51,6 +51,7 @@ public class AttendanceReport {
     private BigDecimal actualWorkingDays;
     private BigDecimal paidLeaveDays;
     private BigDecimal unpaidLeaveDays;
+    private BigDecimal maternityLeaveDays;
     private BigDecimal overtimeHours;
     private BigDecimal kpiBonus;
     private BigDecimal advancePayment;
@@ -99,6 +100,9 @@ public class AttendanceReport {
 
     public BigDecimal getUnpaidLeaveDays()                   { return unpaidLeaveDays; }
     public void setUnpaidLeaveDays(BigDecimal v)             { this.unpaidLeaveDays = v; }
+
+    public BigDecimal getMaternityLeaveDays()                { return maternityLeaveDays; }
+    public void setMaternityLeaveDays(BigDecimal v)          { this.maternityLeaveDays = v; }
 
     public BigDecimal getOvertimeHours()                     { return overtimeHours; }
     public void setOvertimeHours(BigDecimal v)               { this.overtimeHours = v; }

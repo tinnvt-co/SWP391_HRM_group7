@@ -8,6 +8,7 @@ import model.Employee;
 import util.XlsxReader;
 
 import java.sql.SQLException;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -28,7 +29,8 @@ import java.util.regex.Pattern;
  *   row 6+: one employee per row; the first day cell is column index 4 (0-based, "E")
  *
  * Day-cell legend -> attendance_status:
- *   P -> Present, A -> Absent, L -> Leave, T -> Late, H -> Holiday
+ *   P -> Present, A -> Absent, L -> Leave, T -> Late, H -> Holiday,
+ *   M/ML -> Maternity Leave
  *   a NUMBER (e.g. 2) -> Present that day + that many overtime hours
  *
  * Only the status and overtime hours are stored. Cells left blank are skipped.
@@ -294,7 +296,7 @@ public class AttendanceImportService {
 
     /**
      * Parse a day cell. Two forms are accepted:
-     *   - a LETTER  (P/A/L/T/O/H) -> the matching status, 0 OT hours
+     *   - a LETTER  (P/A/L/T/O/H/M/ML) -> the matching status, 0 OT hours
      *   - a NUMBER  (e.g. "2")    -> Present that day + that many OT hours
      * Returns null for anything unrecognized.
      */
@@ -321,13 +323,25 @@ public class AttendanceImportService {
 
     /** Map a legend letter to an attendance status. Returns null if unknown. */
     static AttendanceStatus mapStatus(String raw) {
-        switch (raw.toUpperCase()) {
+        String normalized = Normalizer.normalize(raw.trim(), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replace('Đ', 'D')
+                .replace('đ', 'd')
+                .toUpperCase();
+        switch (normalized) {
             case "P": return AttendanceStatus.Present;
             case "A": return AttendanceStatus.Absent;
             case "L": return AttendanceStatus.Leave;
             case "T": return AttendanceStatus.Late;
             case "O": return AttendanceStatus.Present; // OT day still counts as present
             case "H": return AttendanceStatus.Holiday;
+            case "M":
+            case "ML":
+            case "MATERNITY":
+            case "MATERNITY LEAVE":
+            case "NGHI THAI SAN":
+            case "THAI SAN":
+                return AttendanceStatus.MaternityLeave;
             default:  return null;
         }
     }

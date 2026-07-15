@@ -21,14 +21,15 @@ public class AttendanceReportDAO {
             "INSERT INTO attendance_reports "
           + "(employee_id, manager_id, department_id, report_month, report_year, "
           + " standard_working_days, actual_working_days, paid_leave_days, "
-          + " unpaid_leave_days, overtime_hours, status, submitted_at) "
-          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Submitted To HR Staff', NOW()) "
+          + " unpaid_leave_days, maternity_leave_days, overtime_hours, status, submitted_at) "
+          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Submitted To HR Staff', NOW()) "
           + "ON DUPLICATE KEY UPDATE "
           + " manager_id=VALUES(manager_id), department_id=VALUES(department_id), "
           + " standard_working_days=VALUES(standard_working_days), "
           + " actual_working_days=VALUES(actual_working_days), "
           + " paid_leave_days=VALUES(paid_leave_days), "
           + " unpaid_leave_days=VALUES(unpaid_leave_days), "
+          + " maternity_leave_days=VALUES(maternity_leave_days), "
           + " overtime_hours=VALUES(overtime_hours), "
           + " status='Submitted To HR Staff', submitted_at=NOW(), updated_at=NOW()";
         Connection conn = null;
@@ -45,7 +46,8 @@ public class AttendanceReportDAO {
             ps.setBigDecimal(7, nz(r.getActualWorkingDays(), BigDecimal.ZERO));
             ps.setBigDecimal(8, nz(r.getPaidLeaveDays(), BigDecimal.ZERO));
             ps.setBigDecimal(9, nz(r.getUnpaidLeaveDays(), BigDecimal.ZERO));
-            ps.setBigDecimal(10, nz(r.getOvertimeHours(), BigDecimal.ZERO));
+            ps.setBigDecimal(10, nz(r.getMaternityLeaveDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(11, nz(r.getOvertimeHours(), BigDecimal.ZERO));
             return ps.executeUpdate() > 0;
         } finally {
             close(conn, ps, null);
@@ -148,6 +150,7 @@ public class AttendanceReportDAO {
         r.setActualWorkingDays(rs.getBigDecimal("actual_working_days"));
         r.setPaidLeaveDays(rs.getBigDecimal("paid_leave_days"));
         r.setUnpaidLeaveDays(rs.getBigDecimal("unpaid_leave_days"));
+        r.setMaternityLeaveDays(rs.getBigDecimal("maternity_leave_days"));
         r.setOvertimeHours(rs.getBigDecimal("overtime_hours"));
         r.setKpiBonus(rs.getBigDecimal("kpi_bonus"));
         r.setAdvancePayment(rs.getBigDecimal("advance_payment"));

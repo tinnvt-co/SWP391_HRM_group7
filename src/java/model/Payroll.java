@@ -41,13 +41,28 @@ public class Payroll {
 
     private BigDecimal basicSalary;
     private BigDecimal actualWorkingDays;
+    private BigDecimal workSalary;
     private BigDecimal totalAllowance;
     private BigDecimal kpiBonus;
+    private BigDecimal normalOvertimeHours;
+    private BigDecimal weekendOvertimeHours;
+    private BigDecimal holidayOvertimeHours;
+    private BigDecimal normalOvertimeSalary;
+    private BigDecimal weekendOvertimeSalary;
+    private BigDecimal holidayOvertimeSalary;
     private BigDecimal overtimeSalary;
 
     private BigDecimal grossSalary;
+    private BigDecimal insuranceBase;
+    private BigDecimal socialInsurance;
+    private BigDecimal healthInsurance;
+    private BigDecimal unemploymentInsurance;
+    private BigDecimal personalIncomeTax;
+    private BigDecimal advancePayment;
     private BigDecimal totalDeduction;
     private BigDecimal netSalary;
+    private BigDecimal maternityLeaveDays;
+    private BigDecimal socialInsuranceBenefit;
 
     private Status status;
     private String note;
@@ -58,8 +73,7 @@ public class Payroll {
     private String employeeFullName;
     private String employeeCode;
     private String departmentName;
-    // carried for recalculation / display (not a DB column on payrolls)
-    private BigDecimal advancePayment;
+    // carried for display; total of the split OT-hour columns.
     private BigDecimal overtimeHours;
 
     public Payroll() {}
@@ -85,11 +99,32 @@ public class Payroll {
     public BigDecimal getActualWorkingDays()        { return actualWorkingDays; }
     public void setActualWorkingDays(BigDecimal v)  { this.actualWorkingDays = v; }
 
+    public BigDecimal getWorkSalary()               { return workSalary; }
+    public void setWorkSalary(BigDecimal v)         { this.workSalary = v; }
+
     public BigDecimal getTotalAllowance()           { return totalAllowance; }
     public void setTotalAllowance(BigDecimal v)     { this.totalAllowance = v; }
 
     public BigDecimal getKpiBonus()                 { return kpiBonus; }
     public void setKpiBonus(BigDecimal v)           { this.kpiBonus = v; }
+
+    public BigDecimal getNormalOvertimeHours()      { return normalOvertimeHours; }
+    public void setNormalOvertimeHours(BigDecimal v){ this.normalOvertimeHours = v; }
+
+    public BigDecimal getWeekendOvertimeHours()     { return weekendOvertimeHours; }
+    public void setWeekendOvertimeHours(BigDecimal v){ this.weekendOvertimeHours = v; }
+
+    public BigDecimal getHolidayOvertimeHours()     { return holidayOvertimeHours; }
+    public void setHolidayOvertimeHours(BigDecimal v){ this.holidayOvertimeHours = v; }
+
+    public BigDecimal getNormalOvertimeSalary()     { return normalOvertimeSalary; }
+    public void setNormalOvertimeSalary(BigDecimal v){ this.normalOvertimeSalary = v; }
+
+    public BigDecimal getWeekendOvertimeSalary()    { return weekendOvertimeSalary; }
+    public void setWeekendOvertimeSalary(BigDecimal v){ this.weekendOvertimeSalary = v; }
+
+    public BigDecimal getHolidayOvertimeSalary()    { return holidayOvertimeSalary; }
+    public void setHolidayOvertimeSalary(BigDecimal v){ this.holidayOvertimeSalary = v; }
 
     public BigDecimal getOvertimeSalary()           { return overtimeSalary; }
     public void setOvertimeSalary(BigDecimal v)     { this.overtimeSalary = v; }
@@ -97,11 +132,35 @@ public class Payroll {
     public BigDecimal getGrossSalary()              { return grossSalary; }
     public void setGrossSalary(BigDecimal v)        { this.grossSalary = v; }
 
+    public BigDecimal getInsuranceBase()            { return insuranceBase; }
+    public void setInsuranceBase(BigDecimal v)      { this.insuranceBase = v; }
+
+    public BigDecimal getSocialInsurance()          { return socialInsurance; }
+    public void setSocialInsurance(BigDecimal v)    { this.socialInsurance = v; }
+
+    public BigDecimal getHealthInsurance()          { return healthInsurance; }
+    public void setHealthInsurance(BigDecimal v)    { this.healthInsurance = v; }
+
+    public BigDecimal getUnemploymentInsurance()    { return unemploymentInsurance; }
+    public void setUnemploymentInsurance(BigDecimal v) { this.unemploymentInsurance = v; }
+
+    public BigDecimal getPersonalIncomeTax()        { return personalIncomeTax; }
+    public void setPersonalIncomeTax(BigDecimal v)  { this.personalIncomeTax = v; }
+
+    public BigDecimal getAdvancePayment()           { return advancePayment; }
+    public void setAdvancePayment(BigDecimal v)     { this.advancePayment = v; }
+
     public BigDecimal getTotalDeduction()           { return totalDeduction; }
     public void setTotalDeduction(BigDecimal v)     { this.totalDeduction = v; }
 
     public BigDecimal getNetSalary()                { return netSalary; }
     public void setNetSalary(BigDecimal v)          { this.netSalary = v; }
+
+    public BigDecimal getMaternityLeaveDays()       { return maternityLeaveDays; }
+    public void setMaternityLeaveDays(BigDecimal v) { this.maternityLeaveDays = v; }
+
+    public BigDecimal getSocialInsuranceBenefit()   { return socialInsuranceBenefit; }
+    public void setSocialInsuranceBenefit(BigDecimal v) { this.socialInsuranceBenefit = v; }
 
     public Status getStatus()                       { return status; }
     public void setStatus(Status v)                 { this.status = v; }
@@ -123,9 +182,6 @@ public class Payroll {
 
     public String getDepartmentName()               { return departmentName; }
     public void setDepartmentName(String v)         { this.departmentName = v; }
-
-    public BigDecimal getAdvancePayment()           { return advancePayment; }
-    public void setAdvancePayment(BigDecimal v)     { this.advancePayment = v; }
 
     public BigDecimal getOvertimeHours()            { return overtimeHours; }
     public void setOvertimeHours(BigDecimal v)      { this.overtimeHours = v; }

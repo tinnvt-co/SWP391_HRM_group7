@@ -21,14 +21,25 @@
         .sidebar-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;
             color: rgba(255,255,255,0.4); padding: 0.75rem 1.25rem 0.25rem; }
         .main-content { margin-left: 240px; padding: 2rem; }
-        .slip { max-width: 640px; }
-        .slip .row-line { display:flex; justify-content:space-between; padding:0.55rem 0;
-            border-bottom:1px solid #f0f1f3; font-size:0.92rem; }
-        .slip .row-line .lbl { color:#6b7280; }
-        .slip .grp-title { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.5px;
-            color:#9ca3af; font-weight:600; margin:1rem 0 0.25rem; }
-        .net-box { background:linear-gradient(135deg,#1a3c5e,#2d6a9f); color:#fff;
-            border-radius:10px; padding:1rem 1.25rem; }
+        .payslip-wrap { max-width: 980px; }
+        .summary-box { border: 1px solid #dfe5ee; border-radius: 8px; background:#fff; }
+        .section-panel { border: 1px solid #e3e8f0; border-radius: 8px; height: 100%; }
+        .section-panel.earnings { background:#fbfffd; }
+        .section-panel.deductions { background:#fffafa; }
+        .section-title { font-size:0.86rem; font-weight:700; padding-bottom:0.7rem; border-bottom:1px solid #e5e7eb; }
+        .section-title.earnings { color:#166534; }
+        .section-title.deductions { color:#b42318; }
+        .row-line { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem;
+            padding:0.48rem 0; font-size:0.92rem; }
+        .row-line .lbl { color:#6b7280; }
+        .row-line.sub { padding:0.22rem 0 0.22rem 1.25rem; font-size:0.84rem; }
+        .net-box { border:1px solid #b9d6f2; background:#eef7ff; border-radius:8px; padding:1rem 1.25rem; }
+        .net-value { color:#157347; font-size:2rem; font-weight:800; letter-spacing:0; }
+        @media (max-width: 768px) {
+            .sidebar { position: static; width: 100%; min-height: auto; }
+            .main-content { margin-left: 0; padding: 1rem; }
+            .net-value { font-size:1.55rem; }
+        }
     </style>
 </head>
 <body>
@@ -43,7 +54,7 @@
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm rounded-3 mb-3">
+    <div class="card border-0 shadow-sm rounded-3 mb-3 payslip-wrap">
         <div class="card-body">
             <form method="get" class="row g-2 align-items-end">
                 <div class="col-md-3">
@@ -61,7 +72,7 @@
                 </div>
                 <div class="col-md-2">
                     <button type="submit" class="btn btn-sm btn-primary w-100"
-                            style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;">
+                            style="background:#1a3c5e;border:none;">
                         <i class="bi bi-search me-1"></i>View
                     </button>
                 </div>
@@ -71,49 +82,95 @@
 
     <c:choose>
         <c:when test="${empty payslip}">
-            <div class="card border-0 shadow-sm rounded-3">
+            <div class="card border-0 shadow-sm rounded-3 payslip-wrap">
                 <div class="card-body text-center text-muted py-5">
                     <i class="bi bi-receipt fs-2 d-block mb-2 opacity-25"></i>
                     No payslip available for ${monthLabel}.
-                    <div class="small mt-1">Your payslip appears here once payroll for the month has been paid.</div>
+                    <div class="small mt-1">Your payslip appears here once payroll for the month is approved or paid.</div>
                 </div>
             </div>
         </c:when>
         <c:otherwise>
-            <div class="card border-0 shadow-sm rounded-3 slip">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="card border-0 shadow-sm rounded-3 payslip-wrap">
+                <div class="card-body p-4">
+                    <div class="summary-box p-3 mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
                         <div>
-                            <div class="fw-bold">${employee.fullName}</div>
+                            <div class="text-muted small text-uppercase fw-semibold">Employee</div>
+                            <div class="fs-5 fw-bold">${employee.fullName}</div>
                             <div class="text-muted small">${payslip.employeeCode} &middot; ${payslip.departmentName}</div>
                         </div>
-                        <div class="text-end">
-                            <div class="fw-medium">${monthLabel}</div>
-                            <span class="badge bg-success">Paid</span>
+                        <div class="text-md-end">
+                            <div class="text-muted small text-uppercase fw-semibold">Employee ID / Period</div>
+                            <div class="fw-bold">#${payslip.employeeId} | ${monthLabel}</div>
+                            <span class="badge bg-secondary mt-1">${payslip.status.dbValue}</span>
                         </div>
                     </div>
 
-                    <div class="grp-title">Earnings</div>
-                    <div class="row-line"><span class="lbl">Basic salary</span>
-                        <span><fmt:formatNumber value="${payslip.basicSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
-                    <div class="row-line"><span class="lbl">Actual working days</span>
-                        <span>${payslip.actualWorkingDays}</span></div>
-                    <div class="row-line"><span class="lbl">Allowance</span>
-                        <span><fmt:formatNumber value="${payslip.totalAllowance}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
-                    <div class="row-line"><span class="lbl">KPI bonus</span>
-                        <span><fmt:formatNumber value="${payslip.kpiBonus}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
-                    <div class="row-line"><span class="lbl">Overtime salary</span>
-                        <span><fmt:formatNumber value="${payslip.overtimeSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
-                    <div class="row-line fw-medium"><span>Gross salary</span>
-                        <span><fmt:formatNumber value="${payslip.grossSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                    <div class="row g-4">
+                        <div class="col-lg-6">
+                            <div class="section-panel earnings p-3">
+                                <div class="section-title earnings">
+                                    <i class="bi bi-plus-circle-fill me-1"></i>Earnings
+                                </div>
+                                <div class="row-line"><span class="lbl">Basic salary</span>
+                                    <span><fmt:formatNumber value="${payslip.basicSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                <div class="row-line"><span class="lbl">Paid working days</span>
+                                    <span>${payslip.actualWorkingDays}</span></div>
+                                <div class="row-line"><span class="lbl">Work salary</span>
+                                    <span><fmt:formatNumber value="${payslip.workSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                <div class="row-line"><span class="lbl">Overtime salary</span>
+                                    <span>+ <fmt:formatNumber value="${payslip.overtimeSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                <div class="row-line sub"><span class="lbl">Normal OT (${payslip.normalOvertimeHours}h x 150%)</span>
+                                    <span>+ <fmt:formatNumber value="${payslip.normalOvertimeSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                <div class="row-line sub"><span class="lbl">Weekend OT (${payslip.weekendOvertimeHours}h x 200%)</span>
+                                    <span>+ <fmt:formatNumber value="${payslip.weekendOvertimeSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                <div class="row-line sub"><span class="lbl">Holiday OT (${payslip.holidayOvertimeHours}h x 300%)</span>
+                                    <span>+ <fmt:formatNumber value="${payslip.holidayOvertimeSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                <div class="row-line"><span class="lbl">Allowances</span>
+                                    <span>+ <fmt:formatNumber value="${payslip.totalAllowance}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                <div class="row-line"><span class="lbl">KPI bonus</span>
+                                    <span>+ <fmt:formatNumber value="${payslip.kpiBonus}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                <div class="row-line fw-bold border-top mt-2 pt-3"><span>Gross salary</span>
+                                    <span><fmt:formatNumber value="${payslip.grossSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                            </div>
+                        </div>
 
-                    <div class="grp-title">Deductions</div>
-                    <div class="row-line"><span class="lbl">Total deduction (insurance + advance)</span>
-                        <span class="text-danger">&minus; <fmt:formatNumber value="${payslip.totalDeduction}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                        <div class="col-lg-6">
+                            <div class="section-panel deductions p-3">
+                                <div class="section-title deductions">
+                                    <i class="bi bi-dash-circle-fill me-1"></i>Deductions
+                                </div>
+                                <div class="row-line"><span class="lbl">Insurance base</span>
+                                    <span><fmt:formatNumber value="${payslip.insuranceBase}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                <div class="row-line"><span class="lbl">Social insurance (8.00%)</span>
+                                    <span class="text-danger">- <fmt:formatNumber value="${payslip.socialInsurance}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                <div class="row-line"><span class="lbl">Health insurance (1.50%)</span>
+                                    <span class="text-danger">- <fmt:formatNumber value="${payslip.healthInsurance}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                <div class="row-line"><span class="lbl">Unemployment insurance (1.00%)</span>
+                                    <span class="text-danger">- <fmt:formatNumber value="${payslip.unemploymentInsurance}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                <div class="row-line"><span class="lbl">Personal income tax</span>
+                                    <span class="text-danger">- <fmt:formatNumber value="${payslip.personalIncomeTax}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                <div class="row-line"><span class="lbl">Advance payment / other deduction</span>
+                                    <span class="text-danger">- <fmt:formatNumber value="${payslip.advancePayment}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                <div class="row-line fw-bold border-top mt-2 pt-3"><span>Total deduction</span>
+                                    <span class="text-danger">- <fmt:formatNumber value="${payslip.totalDeduction}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
 
-                    <div class="net-box d-flex justify-content-between align-items-center mt-3">
-                        <span class="fw-medium">Net salary</span>
-                        <span class="fs-5 fw-bold"><fmt:formatNumber value="${payslip.netSalary}" type="number" maxFractionDigits="0"/> &#8363;</span>
+                                <div class="mt-4 pt-2 border-top">
+                                    <div class="text-muted small text-uppercase fw-semibold mb-1">Social insurance benefit</div>
+                                    <div class="row-line py-1"><span class="lbl">Maternity leave days</span>
+                                        <span>${payslip.maternityLeaveDays}</span></div>
+                                    <div class="row-line py-1"><span class="lbl">Maternity benefit</span>
+                                        <span><fmt:formatNumber value="${payslip.socialInsuranceBenefit}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                    <div class="text-muted small">This benefit is paid by social insurance and is not included in company net salary.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="net-box mt-4 text-center">
+                        <div class="text-muted small text-uppercase fw-semibold">Net Salary</div>
+                        <div class="net-value"><fmt:formatNumber value="${payslip.netSalary}" type="number" maxFractionDigits="0"/> &#8363;</div>
+                        <div class="small text-muted">Company-paid salary for ${monthLabel}</div>
                     </div>
 
                     <c:if test="${not empty payslip.note}">

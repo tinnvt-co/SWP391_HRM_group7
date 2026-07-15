@@ -255,6 +255,7 @@
                             <th class="text-end">Gross</th>
                             <th class="text-end">Deduction</th>
                             <th class="text-end">Net</th>
+                            <th class="text-center">Details</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -274,11 +275,17 @@
                                 <td class="text-end"><fmt:formatNumber value="${p.grossSalary}" type="number" maxFractionDigits="0"/></td>
                                 <td class="text-end text-danger"><fmt:formatNumber value="${p.totalDeduction}" type="number" maxFractionDigits="0"/></td>
                                 <td class="text-end fw-bold"><fmt:formatNumber value="${p.netSalary}" type="number" maxFractionDigits="0"/></td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-primary"
+                                            data-bs-toggle="modal" data-bs-target="#payrollDetail${p.payrollId}">
+                                        <i class="bi bi-receipt"></i>
+                                    </button>
+                                </td>
                             </tr>
                         </c:forEach>
                         <c:if test="${empty payrolls}">
                             <tr>
-                                <td colspan="11" class="text-center text-muted py-5">
+                                <td colspan="12" class="text-center text-muted py-5">
                                     <i class="bi bi-cash-stack fs-2 d-block mb-2 opacity-25"></i>
                                     No payroll for ${monthLabel}.
                                     <c:if test="${not empty selectedDeptName}">
@@ -321,6 +328,69 @@
         </c:if>
     </div>
 </div>
+
+<c:forEach var="p" items="${payrolls}">
+<div class="modal fade" id="payrollDetail${p.payrollId}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header" style="background:#1a3c5e;">
+        <h6 class="modal-title text-white mb-0"><i class="bi bi-receipt me-2"></i>Payroll Detail</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 border rounded p-3 mb-3">
+            <div>
+                <div class="text-muted small text-uppercase fw-semibold">Employee</div>
+                <div class="fw-bold">${p.employeeFullName}</div>
+                <div class="text-muted small">${p.employeeCode} &middot; ${p.departmentName}</div>
+            </div>
+            <div class="text-end">
+                <div class="text-muted small text-uppercase fw-semibold">Period</div>
+                <div class="fw-bold">${monthLabel}</div>
+                <span class="badge bg-secondary">${p.status.dbValue}</span>
+            </div>
+        </div>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <h6 class="text-success fw-bold border-bottom pb-2">Earnings</h6>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Basic salary</span><span><fmt:formatNumber value="${p.basicSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Paid working days</span><span>${p.actualWorkingDays}</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Work salary</span><span><fmt:formatNumber value="${p.workSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Normal OT (${p.normalOvertimeHours}h x 150%)</span><span>+ <fmt:formatNumber value="${p.normalOvertimeSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Weekend OT (${p.weekendOvertimeHours}h x 200%)</span><span>+ <fmt:formatNumber value="${p.weekendOvertimeSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Holiday OT (${p.holidayOvertimeHours}h x 300%)</span><span>+ <fmt:formatNumber value="${p.holidayOvertimeSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Allowances</span><span>+ <fmt:formatNumber value="${p.totalAllowance}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">KPI bonus</span><span>+ <fmt:formatNumber value="${p.kpiBonus}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                <div class="d-flex justify-content-between fw-bold border-top mt-2 pt-2"><span>Gross salary</span><span><fmt:formatNumber value="${p.grossSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+            </div>
+            <div class="col-md-6">
+                <h6 class="text-danger fw-bold border-bottom pb-2">Deductions</h6>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Insurance base</span><span><fmt:formatNumber value="${p.insuranceBase}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Social insurance (8.00%)</span><span class="text-danger">- <fmt:formatNumber value="${p.socialInsurance}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Health insurance (1.50%)</span><span class="text-danger">- <fmt:formatNumber value="${p.healthInsurance}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Unemployment insurance (1.00%)</span><span class="text-danger">- <fmt:formatNumber value="${p.unemploymentInsurance}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Personal income tax</span><span class="text-danger">- <fmt:formatNumber value="${p.personalIncomeTax}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Advance payment / other deduction</span><span class="text-danger">- <fmt:formatNumber value="${p.advancePayment}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                <div class="d-flex justify-content-between fw-bold border-top mt-2 pt-2"><span>Total deduction</span><span class="text-danger">- <fmt:formatNumber value="${p.totalDeduction}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                <div class="border-top mt-3 pt-2">
+                    <div class="d-flex justify-content-between py-1"><span class="text-muted">Maternity leave days</span><span>${p.maternityLeaveDays}</span></div>
+                    <div class="d-flex justify-content-between py-1"><span class="text-muted">Maternity benefit</span><span><fmt:formatNumber value="${p.socialInsuranceBenefit}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                    <div class="text-muted small">Paid by social insurance, not included in company net salary.</div>
+                </div>
+            </div>
+        </div>
+        <div class="text-center border rounded mt-3 p-3" style="background:#eef7ff;">
+            <div class="text-muted small text-uppercase fw-semibold">Net Salary</div>
+            <div class="fs-3 fw-bold text-success"><fmt:formatNumber value="${p.netSalary}" type="number" maxFractionDigits="0"/> &#8363;</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+</c:forEach>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

@@ -259,9 +259,10 @@ public class AttendanceRecordDAO {
     public static final class MonthlySummary {
         public int employeeId;
         public int departmentId;
-        public int actualWorkingDays;   // Present + Late + days that have OT
+        public int actualWorkingDays;   // Present + Late + paid Leave
         public int paidLeaveDays;       // Leave
         public int unpaidLeaveDays;     // Unpaid Leave
+        public int maternityLeaveDays;  // Maternity Leave
         public java.math.BigDecimal overtimeHours = java.math.BigDecimal.ZERO;
     }
 
@@ -459,9 +460,10 @@ public class AttendanceRecordDAO {
                                                         int year, int month) throws SQLException {
         String sql =
             "SELECT ar.employee_id, e.department_id, "
-          + "  SUM(CASE WHEN ar.attendance_status IN ('Present','Late') THEN 1 ELSE 0 END) AS work_days, "
+          + "  SUM(CASE WHEN ar.attendance_status IN ('Present','Late','Leave') THEN 1 ELSE 0 END) AS work_days, "
           + "  SUM(CASE WHEN ar.attendance_status='Leave' THEN 1 ELSE 0 END) AS paid_leave, "
           + "  SUM(CASE WHEN ar.attendance_status='Unpaid Leave' THEN 1 ELSE 0 END) AS unpaid_leave, "
+          + "  SUM(CASE WHEN ar.attendance_status='Maternity Leave' THEN 1 ELSE 0 END) AS maternity_leave, "
           + "  COALESCE(SUM(ar.overtime_hours),0) AS ot_hours "
           + "FROM attendance_records ar "
           + "JOIN employees e ON ar.employee_id = e.employee_id "
@@ -487,6 +489,7 @@ public class AttendanceRecordDAO {
                 s.actualWorkingDays = rs.getInt("work_days");
                 s.paidLeaveDays   = rs.getInt("paid_leave");
                 s.unpaidLeaveDays = rs.getInt("unpaid_leave");
+                s.maternityLeaveDays = rs.getInt("maternity_leave");
                 s.overtimeHours   = rs.getBigDecimal("ot_hours");
                 list.add(s);
             }
@@ -507,6 +510,41 @@ public class AttendanceRecordDAO {
                                                    LocalDate fromDate,
                                                    LocalDate toDate) throws SQLException {
         return findByScope(null, employeeId, null, fromDate, toDate, -1, -1);
+    }
+
+    public List<AttendanceRecord> findVerifiedByEmployeeMonth(int employeeId,
+                                                              int year,
+                                                              int month) throws SQLException {
+        LocalDate fromDate = LocalDate.of(year, month, 1);
+        LocalDate toDate = fromDate.withDayOfMonth(fromDate.lengthOfMonth());
+        String sql =
+            "SELECT a.*, u.full_name AS emp_full_name, e.employee_code, "
+          + "       vu.full_name AS verified_by_name "
+          + "FROM attendance_records a "
+          + "JOIN employees e   ON a.employee_id = e.employee_id "
+          + "JOIN users u       ON e.user_id     = u.user_id "
+          + "LEFT JOIN users vu ON a.verified_by = vu.user_id "
+          + "WHERE a.employee_id = ? "
+          + "  AND a.verification_status = 'Verified' "
+          + "  AND a.work_date >= ? AND a.work_date <= ? "
+          + "ORDER BY a.work_date";
+
+        List<AttendanceRecord> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, employeeId);
+            ps.setDate(2, Date.valueOf(fromDate));
+            ps.setDate(3, Date.valueOf(toDate));
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
     }
 
     public List<AttendanceRecord> findAll(Integer employeeIdFilter,

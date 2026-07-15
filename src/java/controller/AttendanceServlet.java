@@ -530,6 +530,7 @@ public class AttendanceServlet extends HttpServlet {
             rpt.setActualWorkingDays(java.math.BigDecimal.valueOf(s.actualWorkingDays));
             rpt.setPaidLeaveDays(java.math.BigDecimal.valueOf(s.paidLeaveDays));
             rpt.setUnpaidLeaveDays(java.math.BigDecimal.valueOf(s.unpaidLeaveDays));
+            rpt.setMaternityLeaveDays(java.math.BigDecimal.valueOf(s.maternityLeaveDays));
             rpt.setOvertimeHours(s.overtimeHours);
             if (reportDAO.upsertSubmitted(rpt)) reports++;
         }

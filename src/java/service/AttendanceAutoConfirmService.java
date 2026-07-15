@@ -39,6 +39,7 @@ public class AttendanceAutoConfirmService {
                 report.setActualWorkingDays(BigDecimal.valueOf(s.actualWorkingDays));
                 report.setPaidLeaveDays(BigDecimal.valueOf(s.paidLeaveDays));
                 report.setUnpaidLeaveDays(BigDecimal.valueOf(s.unpaidLeaveDays));
+                report.setMaternityLeaveDays(BigDecimal.valueOf(s.maternityLeaveDays));
                 report.setOvertimeHours(s.overtimeHours);
                 reportDAO.upsertSubmitted(report);
             }
