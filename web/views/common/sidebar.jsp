@@ -91,6 +91,14 @@
                     </a>
                 </li>
             </c:if>
+            <c:if test="${currentUser.role.roleName == 'HR_STAFF' and permissions.contains('VIEW_ATTENDANCE')}">
+                <li class="nav-item">
+                    <a class="nav-link ${activePage == 'attendanceLeaveCalendar' ? 'active' : ''}"
+                       href="${pageContext.request.contextPath}/leave-requests?action=attendance">
+                        <i class="bi bi-calendar-check me-2"></i>Leave Calendar
+                    </a>
+                </li>
+            </c:if>
         </c:if>
         <c:if test="${permissions.contains('VIEW_CONTRACT_LIST')
                    or permissions.contains('VIEW_MY_CONTRACT')}">

@@ -320,6 +320,33 @@ public class EmployeeDAO {
         return list;
     }
 
+    public List<Employee> findAttendanceActiveByDepartment(Integer departmentId) throws SQLException {
+        StringBuilder sql = new StringBuilder(
+                "SELECT e.*, u.full_name, d.department_name "
+              + "FROM employees e "
+              + "JOIN users u       ON e.user_id       = u.user_id "
+              + "JOIN departments d ON e.department_id = d.department_id "
+              + "WHERE u.is_active = 1 "
+              + "AND d.department_code NOT IN ('ADMIN_DEPT', 'HR', 'IT') ");
+        if (departmentId != null) sql.append("AND e.department_id = ? ");
+        sql.append("ORDER BY u.full_name");
+
+        List<Employee> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            if (departmentId != null) ps.setInt(1, departmentId);
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
     private Employee mapRow(ResultSet rs) throws SQLException {
         Employee e = new Employee();
         e.setEmployeeId(rs.getInt("employee_id"));

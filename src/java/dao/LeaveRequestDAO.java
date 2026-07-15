@@ -162,6 +162,57 @@ public class LeaveRequestDAO {
         return list;
     }
 
+    public List<LeaveRequest> findApprovedOverlappingForAttendance(LocalDate fromDate,
+                                                                   LocalDate toDate,
+                                                                   Integer departmentId,
+                                                                   Integer employeeId)
+            throws SQLException {
+        StringBuilder sql = new StringBuilder()
+            .append("SELECT lr.*, ")
+            .append("       u.full_name AS emp_full_name, u.email AS emp_email, ")
+            .append("       u.phone AS emp_phone, u.user_id AS emp_user_id, ")
+            .append("       u.manager_id AS emp_manager_user_id, ")
+            .append("       e.employee_code, ")
+            .append("       d.department_name, ")
+            .append("       au.full_name AS approver_full_name ")
+            .append("FROM leave_requests lr ")
+            .append("JOIN employees e   ON lr.employee_id  = e.employee_id ")
+            .append("JOIN users u       ON e.user_id       = u.user_id ")
+            .append("JOIN departments d ON e.department_id = d.department_id ")
+            .append("LEFT JOIN users au ON lr.approved_by  = au.user_id ")
+            .append("WHERE lr.status = 'Approved' ")
+            .append("  AND lr.start_date <= ? ")
+            .append("  AND lr.end_date >= ? ")
+            .append("  AND d.department_code NOT IN ('ADMIN_DEPT', 'HR', 'IT') ");
+        List<Object> params = new ArrayList<>();
+        params.add(Date.valueOf(toDate));
+        params.add(Date.valueOf(fromDate));
+        if (departmentId != null) {
+            sql.append("AND e.department_id = ? ");
+            params.add(departmentId);
+        }
+        if (employeeId != null) {
+            sql.append("AND lr.employee_id = ? ");
+            params.add(employeeId);
+        }
+        sql.append("ORDER BY d.department_name, u.full_name, lr.start_date, lr.end_date");
+
+        List<LeaveRequest> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            for (int i = 0; i < params.size(); i++) ps.setObject(i + 1, params.get(i));
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapDetailRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
     public boolean approve(int leaveRequestId, int approverUserId, String managerNote) throws SQLException {
         String sql = "UPDATE leave_requests SET status='Approved', approved_by=?, "
                    + "approved_at=NOW(), manager_note=?, updated_at=NOW() "

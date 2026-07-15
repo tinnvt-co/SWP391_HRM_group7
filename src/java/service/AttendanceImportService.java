@@ -29,8 +29,8 @@ import java.util.regex.Pattern;
  *   row 6+: one employee per row; the first day cell is column index 4 (0-based, "E")
  *
  * Day-cell legend -> attendance_status:
- *   P -> Present, A -> Absent, L -> Leave, T -> Late, H -> Holiday,
- *   M/ML -> Maternity Leave
+ *   P -> Present, A -> Absent, L -> Leave, U/UL -> Unpaid Leave,
+ *   T -> Late, H -> Holiday, M/ML -> Maternity Leave
  *   a NUMBER (e.g. 2) -> Present that day + that many overtime hours
  *
  * Only the status and overtime hours are stored. Cells left blank are skipped.
@@ -296,7 +296,7 @@ public class AttendanceImportService {
 
     /**
      * Parse a day cell. Two forms are accepted:
-     *   - a LETTER  (P/A/L/T/O/H/M/ML) -> the matching status, 0 OT hours
+     *   - a LETTER  (P/A/L/U/UL/T/O/H/M/ML) -> the matching status, 0 OT hours
      *   - a NUMBER  (e.g. "2")    -> Present that day + that many OT hours
      * Returns null for anything unrecognized.
      */
@@ -332,6 +332,12 @@ public class AttendanceImportService {
             case "P": return AttendanceStatus.Present;
             case "A": return AttendanceStatus.Absent;
             case "L": return AttendanceStatus.Leave;
+            case "U":
+            case "UL":
+            case "UNPAID":
+            case "UNPAID LEAVE":
+            case "NGHI KHONG LUONG":
+                return AttendanceStatus.UnpaidLeave;
             case "T": return AttendanceStatus.Late;
             case "O": return AttendanceStatus.Present; // OT day still counts as present
             case "H": return AttendanceStatus.Holiday;

@@ -1,7 +1,10 @@
 package controller;
 
+import dao.DepartmentDAO;
 import dao.EmployeeDAO;
 import dao.LeaveRequestDAO;
+import model.AttendanceLeaveDay;
+import model.Department;
 import model.Employee;
 import model.LeaveRequest;
 import model.LeaveRequest.LeaveType;
@@ -19,15 +22,22 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
+import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 @WebServlet(name = "LeaveRequestServlet", urlPatterns = {"/leave-requests"})
 public class LeaveRequestServlet extends HttpServlet {
 
     private final LeaveRequestDAO leaveDAO   = new LeaveRequestDAO();
     private final EmployeeDAO     employeeDAO = new EmployeeDAO();
+    private final DepartmentDAO   departmentDAO = new DepartmentDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -58,6 +68,13 @@ public class LeaveRequestServlet extends HttpServlet {
                         return;
                     }
                     handleList(request, response);
+                }
+                case "attendance" -> {
+                    if (!canViewAttendanceLeaveCalendar(request)) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleAttendanceLeaveCalendar(request, response);
                 }
                 case "detail" -> {
                     if (!hasPermission(request, "VIEW_LEAVE_REQUEST_DETAIL")) {
@@ -230,6 +247,124 @@ public class LeaveRequestServlet extends HttpServlet {
         request.setAttribute("countTotal", allForCount.size());
         request.getRequestDispatcher("/views/leave/leave-request-list.jsp")
                .forward(request, response);
+    }
+
+    private void handleAttendanceLeaveCalendar(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, ServletException, IOException {
+
+        YearMonth now = YearMonth.now();
+        int year = parseIntOr(request.getParameter("year"), now.getYear());
+        int month = parseIntOr(request.getParameter("month"), now.getMonthValue());
+        if (month < 1 || month > 12) month = now.getMonthValue();
+
+        YearMonth selectedMonth = YearMonth.of(year, month);
+        LocalDate monthStart = selectedMonth.atDay(1);
+        LocalDate monthEnd = selectedMonth.atEndOfMonth();
+
+        List<Department> departments = departmentDAO.findAttendanceDepartments();
+        Integer departmentId = parseIntOrNull(request.getParameter("deptId"));
+        if (departmentId != null && !containsDepartment(departments, departmentId)) {
+            departmentId = null;
+        }
+
+        List<Employee> employees = employeeDAO.findAttendanceActiveByDepartment(departmentId);
+        Integer employeeId = parseIntOrNull(request.getParameter("employeeId"));
+        if (employeeId != null && !containsEmployee(employees, employeeId)) {
+            employeeId = null;
+        }
+
+        List<LeaveRequest> requests = leaveDAO.findApprovedOverlappingForAttendance(
+                monthStart, monthEnd, departmentId, employeeId);
+        List<AttendanceLeaveDay> leaveDays = expandLeaveDays(requests, monthStart, monthEnd);
+
+        int paidLeaveDays = 0;
+        int unpaidLeaveDays = 0;
+        Set<Integer> employeeIds = new HashSet<>();
+        for (AttendanceLeaveDay day : leaveDays) {
+            employeeIds.add(day.getEmployeeId());
+            if ("Unpaid Leave".equals(day.getAttendanceStatus())) {
+                unpaidLeaveDays++;
+            } else {
+                paidLeaveDays++;
+            }
+        }
+
+        request.setAttribute("departments", departments);
+        request.setAttribute("employees", employees);
+        request.setAttribute("leaveRequests", requests);
+        request.setAttribute("leaveDays", leaveDays);
+        request.setAttribute("selectedYear", year);
+        request.setAttribute("selectedMonth", month);
+        request.setAttribute("selectedDeptId", departmentId);
+        request.setAttribute("selectedEmployeeId", employeeId);
+        request.setAttribute("monthLabel", selectedMonth.getMonth()
+                .getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + year);
+        request.setAttribute("totalLeaveDays", leaveDays.size());
+        request.setAttribute("totalEmployeesOnLeave", employeeIds.size());
+        request.setAttribute("paidLeaveDays", paidLeaveDays);
+        request.setAttribute("unpaidLeaveDays", unpaidLeaveDays);
+        request.getRequestDispatcher("/views/leave/attendance-leave-calendar.jsp")
+               .forward(request, response);
+    }
+
+    private List<AttendanceLeaveDay> expandLeaveDays(List<LeaveRequest> requests,
+                                                     LocalDate monthStart,
+                                                     LocalDate monthEnd) {
+        List<AttendanceLeaveDay> days = new ArrayList<>();
+        for (LeaveRequest lr : requests) {
+            if (lr.getStartDate() == null || lr.getEndDate() == null) continue;
+            LocalDate from = lr.getStartDate().isBefore(monthStart) ? monthStart : lr.getStartDate();
+            LocalDate to = lr.getEndDate().isAfter(monthEnd) ? monthEnd : lr.getEndDate();
+            for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
+                AttendanceLeaveDay day = new AttendanceLeaveDay();
+                day.setLeaveRequestId(lr.getLeaveRequestId());
+                day.setEmployeeId(lr.getEmployeeId());
+                day.setEmployeeCode(lr.getEmployeeCode());
+                day.setEmployeeFullName(lr.getEmployeeFullName());
+                day.setDepartmentName(lr.getEmployeeDepartment());
+                day.setLeaveDate(d);
+                day.setLeaveTypeLabel(leaveTypeLabel(lr.getLeaveType()));
+                day.setAttendanceStatus(attendanceStatusFor(lr.getLeaveType()));
+                day.setAttendanceCode(attendanceCodeFor(lr.getLeaveType()));
+                day.setReason(lr.getReason());
+                day.setManagerNote(lr.getManagerNote());
+                days.add(day);
+            }
+        }
+        return days;
+    }
+
+    private String leaveTypeLabel(LeaveType type) {
+        if (type == null) return "";
+        switch (type) {
+            case AnnualLeave: return "Annual Leave";
+            case SickLeave: return "Sick Leave";
+            case PersonalLeave: return "Personal Leave";
+            case UnpaidLeave: return "Unpaid Leave";
+            default: return type.name();
+        }
+    }
+
+    private String attendanceStatusFor(LeaveType type) {
+        return type == LeaveType.UnpaidLeave ? "Unpaid Leave" : "Leave";
+    }
+
+    private String attendanceCodeFor(LeaveType type) {
+        return type == LeaveType.UnpaidLeave ? "UL" : "L";
+    }
+
+    private boolean containsDepartment(List<Department> departments, int departmentId) {
+        for (Department department : departments) {
+            if (department.getDepartmentId() == departmentId) return true;
+        }
+        return false;
+    }
+
+    private boolean containsEmployee(List<Employee> employees, int employeeId) {
+        for (Employee employee : employees) {
+            if (employee.getEmployeeId() == employeeId) return true;
+        }
+        return false;
     }
 
     private void handleDetail(HttpServletRequest request, HttpServletResponse response)
@@ -445,6 +580,24 @@ public class LeaveRequestServlet extends HttpServlet {
         if (session == null) return false;
         List<?> perms = (List<?>) session.getAttribute("permissions");
         return perms != null && perms.contains(permCode);
+    }
+
+    private boolean canViewAttendanceLeaveCalendar(HttpServletRequest request) {
+        User currentUser = getCurrentUser(request);
+        String roleName = currentUser != null && currentUser.getRole() != null
+                ? currentUser.getRole().getRoleName() : "";
+        return "HR_STAFF".equalsIgnoreCase(roleName)
+                && hasPermission(request, "VIEW_ATTENDANCE");
+    }
+
+    private Integer parseIntOrNull(String value) {
+        if (value == null || value.isBlank()) return null;
+        try { return Integer.parseInt(value.trim()); } catch (NumberFormatException ex) { return null; }
+    }
+
+    private int parseIntOr(String value, int fallback) {
+        if (value == null || value.isBlank()) return fallback;
+        try { return Integer.parseInt(value.trim()); } catch (NumberFormatException ex) { return fallback; }
     }
 
     private String trim(String value) {
