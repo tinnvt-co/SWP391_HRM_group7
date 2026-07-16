@@ -460,7 +460,9 @@ public class AttendanceRecordDAO {
                                                         int year, int month) throws SQLException {
         String sql =
             "SELECT ar.employee_id, e.department_id, "
-          + "  SUM(CASE WHEN ar.attendance_status IN ('Present','Late','Leave') THEN 1 ELSE 0 END) AS work_days, "
+          + "  SUM(CASE WHEN ar.attendance_status IN ('Present','Late','Leave') "
+          + "           OR (ar.attendance_status='Holiday' AND hd.holiday_date IS NOT NULL) "
+          + "      THEN 1 ELSE 0 END) AS work_days, "
           + "  SUM(CASE WHEN ar.attendance_status='Leave' THEN 1 ELSE 0 END) AS paid_leave, "
           + "  SUM(CASE WHEN ar.attendance_status='Unpaid Leave' THEN 1 ELSE 0 END) AS unpaid_leave, "
           + "  SUM(CASE WHEN ar.attendance_status='Maternity Leave' THEN 1 ELSE 0 END) AS maternity_leave, "
@@ -468,6 +470,7 @@ public class AttendanceRecordDAO {
           + "FROM attendance_records ar "
           + "JOIN employees e ON ar.employee_id = e.employee_id "
           + "JOIN users u     ON e.user_id      = u.user_id "
+          + "LEFT JOIN holiday_dates hd ON hd.holiday_date = ar.work_date AND hd.is_active = 1 "
           + "WHERE u.manager_id=? AND ar.verification_status='Verified' "
           + "  AND YEAR(ar.work_date)=? AND MONTH(ar.work_date)=? "
           + "GROUP BY ar.employee_id, e.department_id";
