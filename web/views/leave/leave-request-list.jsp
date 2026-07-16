@@ -198,6 +198,9 @@
                                         <c:when test="${lr.leaveType == 'PersonalLeave'}">
                                             <i class="bi bi-person text-primary me-1"></i>Personal Leave
                                         </c:when>
+                                        <c:when test="${lr.leaveType == 'MaternityLeave'}">
+                                            <i class="bi bi-heart-pulse text-danger me-1"></i>Maternity Leave
+                                        </c:when>
                                         <c:when test="${lr.leaveType == 'UnpaidLeave'}">
                                             <i class="bi bi-cash-stack text-secondary me-1"></i>Unpaid Leave
                                         </c:when>

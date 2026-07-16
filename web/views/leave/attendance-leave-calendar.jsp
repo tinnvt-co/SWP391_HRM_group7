@@ -29,6 +29,7 @@
             border-radius:999px; font-weight:700; font-size:0.78rem; }
         .code-paid { background:#e6f9f0; color:#166534; }
         .code-unpaid { background:#fff8e1; color:#a16207; }
+        .code-maternity { background:#fee2e2; color:#b91c1c; }
         .reason-cell { max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         @media (max-width:768px) {
             .sidebar { position:static; width:100%; min-height:auto; }
@@ -150,6 +151,19 @@
                 </div>
             </div>
         </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="stat-card card p-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="stat-icon" style="background:#fee2e2;color:#b91c1c;">
+                        <i class="bi bi-heart-pulse"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Maternity Leave</div>
+                        <div class="fw-bold fs-5">${maternityLeaveDays}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="card border-0 shadow-sm rounded-3">
@@ -193,7 +207,7 @@
                                 <td>${day.departmentName}</td>
                                 <td>${day.leaveTypeLabel}</td>
                                 <td class="text-center">
-                                    <span class="code-pill ${day.attendanceCode == 'UL' ? 'code-unpaid' : 'code-paid'}">
+                                    <span class="code-pill ${day.attendanceCode == 'UL' ? 'code-unpaid' : day.attendanceCode == 'M' ? 'code-maternity' : 'code-paid'}">
                                         ${day.attendanceCode}
                                     </span>
                                 </td>

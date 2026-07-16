@@ -279,10 +279,13 @@ public class LeaveRequestServlet extends HttpServlet {
 
         int paidLeaveDays = 0;
         int unpaidLeaveDays = 0;
+        int maternityLeaveDays = 0;
         Set<Integer> employeeIds = new HashSet<>();
         for (AttendanceLeaveDay day : leaveDays) {
             employeeIds.add(day.getEmployeeId());
-            if ("Unpaid Leave".equals(day.getAttendanceStatus())) {
+            if ("Maternity Leave".equals(day.getAttendanceStatus())) {
+                maternityLeaveDays++;
+            } else if ("Unpaid Leave".equals(day.getAttendanceStatus())) {
                 unpaidLeaveDays++;
             } else {
                 paidLeaveDays++;
@@ -303,6 +306,7 @@ public class LeaveRequestServlet extends HttpServlet {
         request.setAttribute("totalEmployeesOnLeave", employeeIds.size());
         request.setAttribute("paidLeaveDays", paidLeaveDays);
         request.setAttribute("unpaidLeaveDays", unpaidLeaveDays);
+        request.setAttribute("maternityLeaveDays", maternityLeaveDays);
         request.getRequestDispatcher("/views/leave/attendance-leave-calendar.jsp")
                .forward(request, response);
     }
@@ -341,15 +345,18 @@ public class LeaveRequestServlet extends HttpServlet {
             case SickLeave: return "Sick Leave";
             case PersonalLeave: return "Personal Leave";
             case UnpaidLeave: return "Unpaid Leave";
+            case MaternityLeave: return "Maternity Leave";
             default: return type.name();
         }
     }
 
     private String attendanceStatusFor(LeaveType type) {
+        if (type == LeaveType.MaternityLeave) return "Maternity Leave";
         return type == LeaveType.UnpaidLeave ? "Unpaid Leave" : "Leave";
     }
 
     private String attendanceCodeFor(LeaveType type) {
+        if (type == LeaveType.MaternityLeave) return "M";
         return type == LeaveType.UnpaidLeave ? "UL" : "L";
     }
 

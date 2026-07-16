@@ -54,7 +54,7 @@
 <div class="main-content">
     <div class="mb-4">
         <h5 class="fw-bold text-dark mb-0">Submit Leave Request</h5>
-        <small class="text-muted">Request time off for annual, sick, personal or unpaid leave</small>
+        <small class="text-muted">Request time off for annual, sick, personal, maternity or unpaid leave</small>
     </div>
 
     <c:if test="${param.submitted == 'success'}">
@@ -98,6 +98,7 @@
                         <li><strong>Annual Leave</strong> &mdash; paid yearly leave</li>
                         <li><strong>Sick Leave</strong> &mdash; medical-related absence</li>
                         <li><strong>Personal Leave</strong> &mdash; private matters</li>
+                        <li><strong>Maternity Leave</strong> &mdash; social-insurance paid maternity absence</li>
                         <li><strong>Unpaid Leave</strong> &mdash; without salary</li>
                     </ul>
                 </div>

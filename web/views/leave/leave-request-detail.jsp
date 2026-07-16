@@ -188,6 +188,9 @@
                             <c:when test="${lr.leaveType == 'PersonalLeave'}">
                                 <span class="type-badge"><i class="bi bi-person"></i>Personal Leave</span>
                             </c:when>
+                            <c:when test="${lr.leaveType == 'MaternityLeave'}">
+                                <span class="type-badge"><i class="bi bi-heart-pulse"></i>Maternity Leave</span>
+                            </c:when>
                             <c:when test="${lr.leaveType == 'UnpaidLeave'}">
                                 <span class="type-badge"><i class="bi bi-cash-stack"></i>Unpaid Leave</span>
                             </c:when>

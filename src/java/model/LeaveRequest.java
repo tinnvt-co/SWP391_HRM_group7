@@ -10,7 +10,8 @@ public class LeaveRequest {
         AnnualLeave("Annual Leave"),
         SickLeave("Sick Leave"),
         UnpaidLeave("Unpaid Leave"),
-        PersonalLeave("Personal Leave");
+        PersonalLeave("Personal Leave"),
+        MaternityLeave("Maternity Leave");
 
         private final String dbValue;
         LeaveType(String dbValue) { this.dbValue = dbValue; }
