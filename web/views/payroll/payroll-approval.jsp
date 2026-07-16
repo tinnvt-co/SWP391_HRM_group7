@@ -369,6 +369,7 @@
                 <div class="d-flex justify-content-between py-1"><span class="text-muted">Unemployment insurance (1.00%)</span><span class="text-danger">- <fmt:formatNumber value="${p.unemploymentInsurance}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
                 <div class="d-flex justify-content-between py-1"><span class="text-muted">Personal income tax</span><span class="text-danger">- <fmt:formatNumber value="${p.personalIncomeTax}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
                 <div class="d-flex justify-content-between py-1"><span class="text-muted">Advance payment / other deduction</span><span class="text-danger">- <fmt:formatNumber value="${p.advancePayment}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Late penalty</span><span class="text-danger">- <fmt:formatNumber value="${p.latePenaltyAmount}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
                 <div class="d-flex justify-content-between fw-bold border-top mt-2 pt-2"><span>Total deduction</span><span class="text-danger">- <fmt:formatNumber value="${p.totalDeduction}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
                 <div class="border-top mt-3 pt-2">
                     <div class="d-flex justify-content-between py-1"><span class="text-muted">Maternity leave days</span><span>${p.maternityLeaveDays}</span></div>

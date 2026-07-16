@@ -16,9 +16,10 @@ public class AttendanceRecordDAO {
 
     public int insert(AttendanceRecord r) throws SQLException {
         String sql = "INSERT INTO attendance_records (employee_id, work_date, "
+                   + "check_in_time, check_out_time, late_minutes, late_penalty_amount, "
                    + "overtime_hours, attendance_status, verification_status, "
                    + "verified_by, verified_at, note) "
-                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -26,15 +27,21 @@ public class AttendanceRecordDAO {
             ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
             ps.setInt(1, r.getEmployeeId());
             ps.setDate(2, Date.valueOf(r.getWorkDate()));
-            ps.setBigDecimal(3, r.getOvertimeHours() != null ? r.getOvertimeHours() : java.math.BigDecimal.ZERO);
-            ps.setString(4, r.getAttendanceStatus().getDbValue());
-            ps.setString(5, r.getVerificationStatus() == null
+            if (r.getCheckInTime() != null) ps.setTime(3, Time.valueOf(r.getCheckInTime()));
+            else                            ps.setNull(3, Types.TIME);
+            if (r.getCheckOutTime() != null) ps.setTime(4, Time.valueOf(r.getCheckOutTime()));
+            else                             ps.setNull(4, Types.TIME);
+            ps.setInt(5, r.getLateMinutes());
+            ps.setBigDecimal(6, r.getLatePenaltyAmount() != null ? r.getLatePenaltyAmount() : java.math.BigDecimal.ZERO);
+            ps.setBigDecimal(7, r.getOvertimeHours() != null ? r.getOvertimeHours() : java.math.BigDecimal.ZERO);
+            ps.setString(8, r.getAttendanceStatus().getDbValue());
+            ps.setString(9, r.getVerificationStatus() == null
                     ? VerificationStatus.Pending.name() : r.getVerificationStatus().name());
-            if (r.getVerifiedBy() != null) ps.setInt(6, r.getVerifiedBy());
-            else                           ps.setNull(6, Types.INTEGER);
-            if (r.getVerifiedAt() != null) ps.setTimestamp(7, Timestamp.valueOf(r.getVerifiedAt()));
-            else                           ps.setNull(7, Types.TIMESTAMP);
-            ps.setString(8, r.getNote());
+            if (r.getVerifiedBy() != null) ps.setInt(10, r.getVerifiedBy());
+            else                           ps.setNull(10, Types.INTEGER);
+            if (r.getVerifiedAt() != null) ps.setTimestamp(11, Timestamp.valueOf(r.getVerifiedAt()));
+            else                           ps.setNull(11, Types.TIMESTAMP);
+            ps.setString(12, r.getNote());
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) return keys.getInt(1);
@@ -93,6 +100,7 @@ public class AttendanceRecordDAO {
 
     public boolean update(AttendanceRecord r) throws SQLException {
         String sql = "UPDATE attendance_records SET work_date=?, "
+                   + "check_in_time=?, check_out_time=?, late_minutes=?, late_penalty_amount=?, "
                    + "overtime_hours=?, attendance_status=?, note=?, "
                    + "updated_at=NOW() "
                    + "WHERE attendance_id=?";
@@ -102,10 +110,16 @@ public class AttendanceRecordDAO {
             conn = DBContext.getConnection();
             ps = conn.prepareStatement(sql);
             ps.setDate(1, Date.valueOf(r.getWorkDate()));
-            ps.setBigDecimal(2, r.getOvertimeHours() != null ? r.getOvertimeHours() : java.math.BigDecimal.ZERO);
-            ps.setString(3, r.getAttendanceStatus().getDbValue());
-            ps.setString(4, r.getNote());
-            ps.setInt(5, r.getAttendanceId());
+            if (r.getCheckInTime() != null) ps.setTime(2, Time.valueOf(r.getCheckInTime()));
+            else                            ps.setNull(2, Types.TIME);
+            if (r.getCheckOutTime() != null) ps.setTime(3, Time.valueOf(r.getCheckOutTime()));
+            else                             ps.setNull(3, Types.TIME);
+            ps.setInt(4, r.getLateMinutes());
+            ps.setBigDecimal(5, r.getLatePenaltyAmount() != null ? r.getLatePenaltyAmount() : java.math.BigDecimal.ZERO);
+            ps.setBigDecimal(6, r.getOvertimeHours() != null ? r.getOvertimeHours() : java.math.BigDecimal.ZERO);
+            ps.setString(7, r.getAttendanceStatus().getDbValue());
+            ps.setString(8, r.getNote());
+            ps.setInt(9, r.getAttendanceId());
             return ps.executeUpdate() > 0;
         } finally {
             close(conn, ps, null);
@@ -264,6 +278,7 @@ public class AttendanceRecordDAO {
         public int unpaidLeaveDays;     // Unpaid Leave
         public int maternityLeaveDays;  // Maternity Leave
         public java.math.BigDecimal overtimeHours = java.math.BigDecimal.ZERO;
+        public java.math.BigDecimal latePenaltyAmount = java.math.BigDecimal.ZERO;
     }
 
     /** Pending attendance group that is old enough for automatic manager confirmation. */
@@ -466,7 +481,8 @@ public class AttendanceRecordDAO {
           + "  SUM(CASE WHEN ar.attendance_status='Leave' THEN 1 ELSE 0 END) AS paid_leave, "
           + "  SUM(CASE WHEN ar.attendance_status='Unpaid Leave' THEN 1 ELSE 0 END) AS unpaid_leave, "
           + "  SUM(CASE WHEN ar.attendance_status='Maternity Leave' THEN 1 ELSE 0 END) AS maternity_leave, "
-          + "  COALESCE(SUM(ar.overtime_hours),0) AS ot_hours "
+          + "  COALESCE(SUM(ar.overtime_hours),0) AS ot_hours, "
+          + "  COALESCE(SUM(ar.late_penalty_amount),0) AS late_penalty_amount "
           + "FROM attendance_records ar "
           + "JOIN employees e ON ar.employee_id = e.employee_id "
           + "JOIN users u     ON e.user_id      = u.user_id "
@@ -494,6 +510,7 @@ public class AttendanceRecordDAO {
                 s.unpaidLeaveDays = rs.getInt("unpaid_leave");
                 s.maternityLeaveDays = rs.getInt("maternity_leave");
                 s.overtimeHours   = rs.getBigDecimal("ot_hours");
+                s.latePenaltyAmount = rs.getBigDecimal("late_penalty_amount");
                 list.add(s);
             }
         } finally {
@@ -671,6 +688,13 @@ public class AttendanceRecordDAO {
         r.setEmployeeId(rs.getInt("employee_id"));
         Date wd = rs.getDate("work_date");
         if (wd != null) r.setWorkDate(wd.toLocalDate());
+        Time checkIn = rs.getTime("check_in_time");
+        if (checkIn != null) r.setCheckInTime(checkIn.toLocalTime());
+        Time checkOut = rs.getTime("check_out_time");
+        if (checkOut != null) r.setCheckOutTime(checkOut.toLocalTime());
+        int lateMinutes = rs.getInt("late_minutes");
+        if (!rs.wasNull()) r.setLateMinutes(lateMinutes);
+        r.setLatePenaltyAmount(rs.getBigDecimal("late_penalty_amount"));
         r.setOvertimeHours(rs.getBigDecimal("overtime_hours"));
         r.setAttendanceStatus(AttendanceStatus.fromDb(rs.getString("attendance_status")));
         String vs = rs.getString("verification_status");

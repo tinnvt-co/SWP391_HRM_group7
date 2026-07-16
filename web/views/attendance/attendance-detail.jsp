@@ -1,6 +1,7 @@
 <%@ page contentType="text/html;charset=UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <c:set var="activePage" value="attendanceList" scope="request"/>
 <!DOCTYPE html>
 <html lang="en">
@@ -118,7 +119,11 @@
                                 <tr>
                                     <th class="ps-3" style="width:40px;">#</th>
                                     <th>Date</th>
+                                    <th>Check In</th>
+                                    <th>Check Out</th>
                                     <th>Status</th>
+                                    <th>Late</th>
+                                    <th>Late Penalty</th>
                                     <th>Overtime (hrs)</th>
                                     <th>Verification</th>
                                     <th>Verified By</th>
@@ -133,6 +138,18 @@
                                     <tr>
                                         <td class="ps-3 text-muted">${(currentPage - 1) * 10 + loop.index + 1}</td>
                                         <td class="fw-medium">${r.workDate}</td>
+                                        <td>
+                                            <c:choose>
+                                                <c:when test="${not empty r.checkInTime}">${r.checkInTime}</c:when>
+                                                <c:otherwise><span class="text-muted">&mdash;</span></c:otherwise>
+                                            </c:choose>
+                                        </td>
+                                        <td>
+                                            <c:choose>
+                                                <c:when test="${not empty r.checkOutTime}">${r.checkOutTime}</c:when>
+                                                <c:otherwise><span class="text-muted">&mdash;</span></c:otherwise>
+                                            </c:choose>
+                                        </td>
                                         <td>
                                             <c:choose>
                                                 <c:when test="${r.attendanceStatus == 'Present'}">
@@ -162,6 +179,28 @@
                                                 </c:when>
                                                 <c:otherwise>
                                                     <span class="badge bg-secondary">${r.attendanceStatus}</span>
+                                                </c:otherwise>
+                                            </c:choose>
+                                        </td>
+                                        <td>
+                                            <c:choose>
+                                                <c:when test="${r.lateMinutes > 0}">
+                                                    <span class="text-warning fw-medium">${r.lateMinutes} min</span>
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <span class="text-muted">0</span>
+                                                </c:otherwise>
+                                            </c:choose>
+                                        </td>
+                                        <td>
+                                            <c:choose>
+                                                <c:when test="${r.latePenaltyAmount != null and r.latePenaltyAmount > 0}">
+                                                    <span class="text-danger fw-medium">
+                                                        <fmt:formatNumber value="${r.latePenaltyAmount}" type="number" maxFractionDigits="0"/>
+                                                    </span>
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <span class="text-muted">0</span>
                                                 </c:otherwise>
                                             </c:choose>
                                         </td>

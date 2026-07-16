@@ -20,9 +20,9 @@ public class PayrollDAO {
                    + " normal_overtime_salary, weekend_overtime_salary, holiday_overtime_salary, "
                    + " overtime_salary, gross_salary, insurance_base, social_insurance, "
                    + " health_insurance, unemployment_insurance, personal_income_tax, "
-                   + " advance_payment, total_deduction, net_salary, maternity_leave_days, "
+                   + " advance_payment, late_penalty_amount, total_deduction, net_salary, maternity_leave_days, "
                    + " social_insurance_benefit, status, note) "
-                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Draft', ?)";
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Draft', ?)";
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -53,11 +53,12 @@ public class PayrollDAO {
             ps.setBigDecimal(21, nz(p.getUnemploymentInsurance()));
             ps.setBigDecimal(22, nz(p.getPersonalIncomeTax()));
             ps.setBigDecimal(23, nz(p.getAdvancePayment()));
-            ps.setBigDecimal(24, nz(p.getTotalDeduction()));
-            ps.setBigDecimal(25, nz(p.getNetSalary()));
-            ps.setBigDecimal(26, nz(p.getMaternityLeaveDays()));
-            ps.setBigDecimal(27, nz(p.getSocialInsuranceBenefit()));
-            ps.setString(28, p.getNote());
+            ps.setBigDecimal(24, nz(p.getLatePenaltyAmount()));
+            ps.setBigDecimal(25, nz(p.getTotalDeduction()));
+            ps.setBigDecimal(26, nz(p.getNetSalary()));
+            ps.setBigDecimal(27, nz(p.getMaternityLeaveDays()));
+            ps.setBigDecimal(28, nz(p.getSocialInsuranceBenefit()));
+            ps.setString(29, p.getNote());
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) return keys.getInt(1);
@@ -315,6 +316,7 @@ public class PayrollDAO {
         p.setUnemploymentInsurance(rs.getBigDecimal("unemployment_insurance"));
         p.setPersonalIncomeTax(rs.getBigDecimal("personal_income_tax"));
         p.setAdvancePayment(rs.getBigDecimal("advance_payment"));
+        p.setLatePenaltyAmount(rs.getBigDecimal("late_penalty_amount"));
         p.setTotalDeduction(rs.getBigDecimal("total_deduction"));
         p.setNetSalary(rs.getBigDecimal("net_salary"));
         p.setMaternityLeaveDays(rs.getBigDecimal("maternity_leave_days"));

@@ -28,7 +28,7 @@ import java.util.Set;
  *   holiday OT = hourly salary * holiday OT hours * 3.0
  *   gross = work salary + active allowances + KPI bonus + OT salary
  *   insurance base = work salary + KPI bonus + OT salary
- *   deductions = employee insurance + PIT + advance payment
+ *   deductions = employee insurance + PIT + advance payment + late penalty
  *   net = gross - deductions
  *
  * Maternity benefit is shown separately as a social-insurance benefit and is
@@ -77,6 +77,7 @@ public class PayrollCalculationService {
         BigDecimal actualDays = nz(report.getActualWorkingDays());
         BigDecimal kpi = nz(report.getKpiBonus());
         BigDecimal advance = nz(report.getAdvancePayment());
+        BigDecimal latePenalty = nz(report.getLatePenaltyAmount());
         BigDecimal maternityLeaveDays = nz(report.getMaternityLeaveDays());
 
         BigDecimal daily = basic.divide(stdDays, 4, RoundingMode.HALF_UP);
@@ -101,7 +102,8 @@ public class PayrollCalculationService {
                 .add(healthInsurance)
                 .add(unemploymentInsurance)
                 .add(personalIncomeTax)
-                .add(advance);
+                .add(advance)
+                .add(latePenalty);
         BigDecimal net = gross.subtract(deduction);
         BigDecimal socialInsuranceBenefit = daily.multiply(maternityLeaveDays);
 
@@ -129,6 +131,7 @@ public class PayrollCalculationService {
         p.setUnemploymentInsurance(round(unemploymentInsurance));
         p.setPersonalIncomeTax(round(personalIncomeTax));
         p.setAdvancePayment(round(advance));
+        p.setLatePenaltyAmount(round(latePenalty));
         p.setTotalDeduction(round(deduction));
         p.setNetSalary(round(net));
         p.setMaternityLeaveDays(maternityLeaveDays);

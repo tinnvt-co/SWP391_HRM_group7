@@ -152,6 +152,8 @@
                                     <span class="text-danger">- <fmt:formatNumber value="${payslip.personalIncomeTax}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
                                 <div class="row-line"><span class="lbl">Advance payment / other deduction</span>
                                     <span class="text-danger">- <fmt:formatNumber value="${payslip.advancePayment}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                <div class="row-line"><span class="lbl">Late penalty</span>
+                                    <span class="text-danger">- <fmt:formatNumber value="${payslip.latePenaltyAmount}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
                                 <div class="row-line fw-bold border-top mt-2 pt-3"><span>Total deduction</span>
                                     <span class="text-danger">- <fmt:formatNumber value="${payslip.totalDeduction}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
 

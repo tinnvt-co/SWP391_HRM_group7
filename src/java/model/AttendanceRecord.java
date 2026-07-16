@@ -3,6 +3,7 @@ package model;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 public class AttendanceRecord {
 
@@ -28,6 +29,10 @@ public class AttendanceRecord {
     private int attendanceId;
     private int employeeId;
     private LocalDate workDate;
+    private LocalTime checkInTime;
+    private LocalTime checkOutTime;
+    private int lateMinutes;
+    private BigDecimal latePenaltyAmount;
     private BigDecimal overtimeHours;
     private AttendanceStatus attendanceStatus;
     private VerificationStatus verificationStatus;
@@ -52,6 +57,18 @@ public class AttendanceRecord {
 
     public LocalDate getWorkDate()                            { return workDate; }
     public void setWorkDate(LocalDate workDate)               { this.workDate = workDate; }
+
+    public LocalTime getCheckInTime()                         { return checkInTime; }
+    public void setCheckInTime(LocalTime checkInTime)         { this.checkInTime = checkInTime; }
+
+    public LocalTime getCheckOutTime()                        { return checkOutTime; }
+    public void setCheckOutTime(LocalTime checkOutTime)       { this.checkOutTime = checkOutTime; }
+
+    public int getLateMinutes()                               { return lateMinutes; }
+    public void setLateMinutes(int lateMinutes)               { this.lateMinutes = lateMinutes; }
+
+    public BigDecimal getLatePenaltyAmount()                  { return latePenaltyAmount; }
+    public void setLatePenaltyAmount(BigDecimal v)            { this.latePenaltyAmount = v; }
 
     public BigDecimal getOvertimeHours()                      { return overtimeHours; }
     public void setOvertimeHours(BigDecimal overtimeHours)    { this.overtimeHours = overtimeHours; }

@@ -53,6 +53,7 @@ public class AttendanceReport {
     private BigDecimal unpaidLeaveDays;
     private BigDecimal maternityLeaveDays;
     private BigDecimal overtimeHours;
+    private BigDecimal latePenaltyAmount;
     private BigDecimal kpiBonus;
     private BigDecimal advancePayment;
     private Status status;
@@ -106,6 +107,9 @@ public class AttendanceReport {
 
     public BigDecimal getOvertimeHours()                     { return overtimeHours; }
     public void setOvertimeHours(BigDecimal v)               { this.overtimeHours = v; }
+
+    public BigDecimal getLatePenaltyAmount()                 { return latePenaltyAmount; }
+    public void setLatePenaltyAmount(BigDecimal v)           { this.latePenaltyAmount = v; }
 
     public BigDecimal getKpiBonus()                          { return kpiBonus; }
     public void setKpiBonus(BigDecimal v)                    { this.kpiBonus = v; }

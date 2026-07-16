@@ -278,11 +278,12 @@
           </div>
 
           <div class="border rounded p-2 bg-light small text-muted">
-            <strong>Legend:</strong>
-            P = Present &middot; A = Absent &middot; L = Leave &middot;
-            T = Late &middot; H = Holiday.
-            <br>A number (e.g. 2) = worked that day + overtime hours.
-            <br>Blank cells are skipped. Existing records will not be overwritten.
+            <strong>Accepted formats:</strong>
+            old monthly template, or the machine-detail workbook containing
+            <strong>Ma Cham Cong / Ma Nhan Vien / Gio</strong>.
+            <br>Detail import uses 07:30 as check-in, 17:30 as check-out,
+            calculates late penalties, links approved leave requests, and skips Sundays without punches.
+            <br>Existing records will not be overwritten.
           </div>
         </div>
         <div class="modal-footer">

@@ -59,6 +59,7 @@ public class Payroll {
     private BigDecimal unemploymentInsurance;
     private BigDecimal personalIncomeTax;
     private BigDecimal advancePayment;
+    private BigDecimal latePenaltyAmount;
     private BigDecimal totalDeduction;
     private BigDecimal netSalary;
     private BigDecimal maternityLeaveDays;
@@ -149,6 +150,9 @@ public class Payroll {
 
     public BigDecimal getAdvancePayment()           { return advancePayment; }
     public void setAdvancePayment(BigDecimal v)     { this.advancePayment = v; }
+
+    public BigDecimal getLatePenaltyAmount()        { return latePenaltyAmount; }
+    public void setLatePenaltyAmount(BigDecimal v)  { this.latePenaltyAmount = v; }
 
     public BigDecimal getTotalDeduction()           { return totalDeduction; }
     public void setTotalDeduction(BigDecimal v)     { this.totalDeduction = v; }

@@ -1,6 +1,7 @@
 <%@ page contentType="text/html;charset=UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <c:set var="activePage" value="attendanceReport" scope="request"/>
 <!DOCTYPE html>
 <html lang="en">
@@ -112,6 +113,7 @@
                             <th class="text-center">Paid Leave</th>
                             <th class="text-center">Unpaid Leave</th>
                             <th class="text-center">OT Hours</th>
+                            <th class="text-end">Late Penalty</th>
                             <th>Status</th>
                             <th>Submitted</th>
                         </tr>
@@ -135,6 +137,9 @@
                                 <td class="text-center">${r.paidLeaveDays}</td>
                                 <td class="text-center">${r.unpaidLeaveDays}</td>
                                 <td class="text-center">${r.overtimeHours}</td>
+                                <td class="text-end text-danger">
+                                    <fmt:formatNumber value="${r.latePenaltyAmount}" type="number" maxFractionDigits="0"/>
+                                </td>
                                 <td>
                                     <c:choose>
                                         <c:when test="${r.status == 'SubmittedToHrStaff'}">
@@ -157,7 +162,7 @@
                         </c:forEach>
                         <c:if test="${empty reports}">
                             <tr>
-                                <td colspan="10" class="text-center text-muted py-5">
+                                <td colspan="11" class="text-center text-muted py-5">
                                     <i class="bi bi-inbox fs-2 d-block mb-2 opacity-25"></i>
                                     No attendance reports submitted for ${monthLabel}.
                                 </td>

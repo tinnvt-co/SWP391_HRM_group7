@@ -41,6 +41,7 @@ public class AttendanceAutoConfirmService {
                 report.setUnpaidLeaveDays(BigDecimal.valueOf(s.unpaidLeaveDays));
                 report.setMaternityLeaveDays(BigDecimal.valueOf(s.maternityLeaveDays));
                 report.setOvertimeHours(s.overtimeHours);
+                report.setLatePenaltyAmount(s.latePenaltyAmount);
                 reportDAO.upsertSubmitted(report);
             }
         }

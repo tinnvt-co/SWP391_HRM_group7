@@ -338,8 +338,13 @@ public class AttendanceServlet extends HttpServlet {
         if (result.skippedExisting > 0)
             msg.append(", skipped ").append(result.skippedExisting).append(" existing record(s)");
         msg.append(".");
-        if (!result.warnings.isEmpty())
-            msg.append(" Warnings: ").append(result.warnings.size()).append(" cell(s).");
+        if (!result.warnings.isEmpty()) {
+            msg.append(" Warnings: ");
+            int showWarnings = Math.min(3, result.warnings.size());
+            for (int i = 0; i < showWarnings; i++) msg.append(result.warnings.get(i)).append(" ");
+            if (result.warnings.size() > showWarnings)
+                msg.append("(+").append(result.warnings.size() - showWarnings).append(" more)");
+        }
 
         if (result.hasErrors()) {
             StringBuilder err = new StringBuilder(msg).append(" Errors: ");
@@ -445,6 +450,10 @@ public class AttendanceServlet extends HttpServlet {
         existing.setWorkDate(workDate);
         existing.setOvertimeHours(overtimeHours);
         existing.setAttendanceStatus(status);
+        if (status != AttendanceStatus.Late) {
+            existing.setLateMinutes(0);
+            existing.setLatePenaltyAmount(BigDecimal.ZERO);
+        }
         existing.setNote(note);
 
         attendanceDAO.update(existing);
@@ -532,6 +541,7 @@ public class AttendanceServlet extends HttpServlet {
             rpt.setUnpaidLeaveDays(java.math.BigDecimal.valueOf(s.unpaidLeaveDays));
             rpt.setMaternityLeaveDays(java.math.BigDecimal.valueOf(s.maternityLeaveDays));
             rpt.setOvertimeHours(s.overtimeHours);
+            rpt.setLatePenaltyAmount(s.latePenaltyAmount);
             if (reportDAO.upsertSubmitted(rpt)) reports++;
         }
 
