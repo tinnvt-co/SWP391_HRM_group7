@@ -310,6 +310,16 @@ public class AttendanceServlet extends HttpServlet {
             return;
         }
 
+        if (reportDAO.isMonthLockedForImport(target.getYear(), target.getMonthValue())) {
+            session.setAttribute("importError",
+                    "Attendance for " + monthLabel(target)
+                            + " has already been submitted for approval and is locked. "
+                            + "You cannot import this period again.");
+            response.sendRedirect(ctx + "/attendance?year=" + target.getYear()
+                    + "&month=" + target.getMonthValue());
+            return;
+        }
+
         // HR Staff can import for active attendance departments only (Admin/HR/IT excluded).
         List<Employee> allEmps = employeeDAO.findAttendanceActive();
         if (allEmps.isEmpty()) {
@@ -491,8 +501,8 @@ public class AttendanceServlet extends HttpServlet {
 
     /**
      * "Confirm Attendance": a manager bulk-verifies every Pending record of
-     * their team for the selected month, then builds one monthly
-     * attendance_report per employee and submits it to HR Staff. Managers only.
+     * their team for the selected month, then builds one monthly report per
+     * employee for HR Staff review. HR Staff submits those reports to HR Manager.
      */
     private void handleConfirmToHr(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, IOException {
@@ -513,7 +523,25 @@ public class AttendanceServlet extends HttpServlet {
         LocalDate monthStart = month.atDay(1);
         LocalDate monthEnd = month.atEndOfMonth();
 
+        if (reportDAO.hasHrManagerApprovedMonth(month.getYear(), month.getMonthValue())) {
+            session.setAttribute("importError",
+                    "Attendance for " + monthLabel(month)
+                            + " has already been approved by HR Manager and is closed.");
+            response.sendRedirect(ctx + "/attendance?year=" + month.getYear()
+                    + "&month=" + month.getMonthValue());
+            return;
+        }
+
         int mgrId = currentUser.getUserId();
+        int pending = attendanceDAO.countPendingByManager(mgrId, monthStart, monthEnd);
+        if (pending <= 0) {
+            session.setAttribute("importError",
+                    "There are no pending attendance records for " + monthLabel(month) + " to confirm.");
+            response.sendRedirect(ctx + "/attendance?year=" + month.getYear()
+                    + "&month=" + month.getMonthValue());
+            return;
+        }
+
         // 1) Verify any still-pending records for the selected month.
         attendanceDAO.verifyAllPendingByManager(mgrId, mgrId, monthStart, monthEnd);
 
@@ -547,8 +575,7 @@ public class AttendanceServlet extends HttpServlet {
 
         session.setAttribute("importMessage",
                 "Sent to HR Staff: " + reports + " attendance report(s) submitted for "
-                        + month.getMonth().getDisplayName(java.time.format.TextStyle.FULL,
-                                java.util.Locale.ENGLISH) + " " + month.getYear() + ".");
+                        + monthLabel(month) + ".");
         response.sendRedirect(ctx + "/attendance");
     }
 

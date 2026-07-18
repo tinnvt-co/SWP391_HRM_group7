@@ -43,6 +43,7 @@ public class Payroll {
     private BigDecimal actualWorkingDays;
     private BigDecimal workSalary;
     private BigDecimal totalAllowance;
+    private BigDecimal attendanceBonusAmount;
     private BigDecimal kpiBonus;
     private BigDecimal normalOvertimeHours;
     private BigDecimal weekendOvertimeHours;
@@ -105,6 +106,9 @@ public class Payroll {
 
     public BigDecimal getTotalAllowance()           { return totalAllowance; }
     public void setTotalAllowance(BigDecimal v)     { this.totalAllowance = v; }
+
+    public BigDecimal getAttendanceBonusAmount()    { return attendanceBonusAmount; }
+    public void setAttendanceBonusAmount(BigDecimal v) { this.attendanceBonusAmount = v; }
 
     public BigDecimal getKpiBonus()                 { return kpiBonus; }
     public void setKpiBonus(BigDecimal v)           { this.kpiBonus = v; }

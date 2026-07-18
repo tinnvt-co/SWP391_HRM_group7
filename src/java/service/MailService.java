@@ -70,6 +70,34 @@ public class MailService {
         sendHtml(toEmail, subject, html);
     }
 
+    public void sendAccountCreatedEmail(String toEmail, String fullName, String username,
+                                        String temporaryPassword, String loginLink)
+            throws MessagingException, UnsupportedEncodingException {
+        String subject = "HRM System - Your Account Has Been Created";
+        String html = "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;background:#f4f6f8;padding:24px;\">"
+                + "<div style=\"max-width:560px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);\">"
+                + "<div style=\"background:linear-gradient(135deg,#1a3c5e,#2d6a9f);padding:24px;text-align:center;color:#fff;\">"
+                + "<h2 style=\"margin:0;\">HRM System</h2>"
+                + "<p style=\"margin:4px 0 0;opacity:0.85;\">New Employee Account</p>"
+                + "</div>"
+                + "<div style=\"padding:32px 28px;color:#333;line-height:1.6;\">"
+                + "<p>Hello <strong>" + escape(fullName) + "</strong>,</p>"
+                + "<p>Your HRM System employee account has been created.</p>"
+                + "<div style=\"background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin:20px 0;\">"
+                + "<p style=\"margin:0 0 8px;\"><strong>Username:</strong> " + escape(username) + "</p>"
+                + "<p style=\"margin:0;\"><strong>Temporary password:</strong> " + escape(temporaryPassword) + "</p>"
+                + "</div>"
+                + "<div style=\"text-align:center;margin:28px 0;\">"
+                + "<a href=\"" + loginLink + "\" "
+                + "style=\"display:inline-block;background:linear-gradient(135deg,#1a3c5e,#2d6a9f);color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;\">"
+                + "Sign In</a>"
+                + "</div>"
+                + "<p style=\"font-size:13px;color:#666;\">Please sign in and change your password after first login.</p>"
+                + "<p style=\"font-size:13px;word-break:break-all;color:#2d6a9f;\">" + loginLink + "</p>"
+                + "</div></div></body></html>";
+        sendHtml(toEmail, subject, html);
+    }
+
     private String escape(String value) {
         if (value == null) return "";
         return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");

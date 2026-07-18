@@ -170,7 +170,7 @@ public class PayrollPeriodDAO {
                    + "    ON pp.department_id = ar.department_id "
                    + "   AND pp.payroll_year = ar.report_year "
                    + "   AND pp.payroll_month = ar.report_month "
-                   + "  WHERE ar.status <> 'Draft' "
+                   + "  WHERE ar.status = 'Approved By HR Manager' "
                    + "    AND pp.payroll_period_id IS NULL "
                    + "  GROUP BY ar.department_id, ar.report_year, ar.report_month"
                    + ") pending_reports";
@@ -220,7 +220,7 @@ public class PayrollPeriodDAO {
                    + "  ON pp.department_id = ar.department_id "
                    + " AND pp.payroll_year = ar.report_year "
                    + " AND pp.payroll_month = ar.report_month "
-                   + "WHERE ar.status <> 'Draft' "
+                   + "WHERE ar.status = 'Approved By HR Manager' "
                    + "  AND pp.payroll_period_id IS NULL "
                    + "GROUP BY ar.department_id, d.department_name, ar.report_month, ar.report_year "
                    + "ORDER BY ar.report_year DESC, ar.report_month DESC, d.department_name "

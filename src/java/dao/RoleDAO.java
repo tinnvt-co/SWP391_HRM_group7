@@ -76,6 +76,23 @@ public class RoleDAO {
         return null;
     }
 
+    public Role findByName(String roleName) throws SQLException {
+        String sql = "SELECT * FROM roles WHERE role_name = ?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, roleName);
+            rs = ps.executeQuery();
+            if (rs.next()) return mapRow(rs);
+        } finally {
+            close(conn, ps, rs);
+        }
+        return null;
+    }
+
     public boolean setActiveStatus(int roleId, boolean isActive) throws SQLException {
         String sql = "UPDATE roles SET is_active = ?, updated_at = NOW() WHERE role_id = ?";
         Connection conn = null;

@@ -41,6 +41,8 @@
         .st-reviewed  { background:#e6f9f0; color:#166534; }
         .st-rejected  { background:#fee2e2; color:#b91c1c; }
         .st-final     { background:#fef3c7; color:#854d0e; }
+        .st-pending-hr { background:#fff7ed; color:#9a3412; }
+        .st-approved-hr { background:#dcfce7; color:#166534; }
     </style>
 </head>
 <body>
@@ -58,6 +60,23 @@
                 </c:choose>
             </small>
         </div>
+        <c:if test="${canSubmitToHrManager}">
+            <form method="post"
+                  action="${pageContext.request.contextPath}/attendance-report?action=submitToHrManager"
+                  onsubmit="return confirm('Submit ready attendance reports to HR Manager?');">
+                <input type="hidden" name="month" value="${selectedMonth}">
+                <input type="hidden" name="year" value="${selectedYear}">
+                <button type="submit" class="btn btn-primary btn-sm px-3 fw-medium"
+                        style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;"
+                        ${readyToSubmitCount > 0 ? '' : 'disabled'}
+                        title="${readyToSubmitCount > 0 ? 'Submit reports returned by managers to HR Manager' : 'No reports are ready to submit'}">
+                    <i class="bi bi-send me-2"></i>Submit to HR Manager
+                    <c:if test="${readyToSubmitCount > 0}">
+                        <span class="badge bg-light text-primary ms-1">${readyToSubmitCount}</span>
+                    </c:if>
+                </button>
+            </form>
+        </c:if>
     </div>
 
     <div class="card border-0 shadow-sm rounded-3 mb-3">
@@ -93,6 +112,17 @@
         </div>
     </div>
 
+    <c:if test="${not empty attendanceReportMessage}">
+        <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-check-circle-fill"></i><span>${attendanceReportMessage}</span>
+        </div>
+    </c:if>
+    <c:if test="${not empty attendanceReportError}">
+        <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-exclamation-circle-fill"></i><span>${attendanceReportError}</span>
+        </div>
+    </c:if>
+
     <div class="card border-0 shadow-sm rounded-3">
         <div class="card-body p-0">
             <div class="p-3 border-bottom d-flex align-items-center gap-2">
@@ -116,6 +146,9 @@
                             <th class="text-end">Late Penalty</th>
                             <th>Status</th>
                             <th>Submitted</th>
+                            <c:if test="${canApproveAttendanceReport}">
+                                <th class="text-center">Actions</th>
+                            </c:if>
                         </tr>
                     </thead>
                     <tbody>
@@ -143,7 +176,7 @@
                                 <td>
                                     <c:choose>
                                         <c:when test="${r.status == 'SubmittedToHrStaff'}">
-                                            <span class="status-pill st-submitted">Submitted</span>
+                                            <span class="status-pill st-submitted">With HR Staff</span>
                                         </c:when>
                                         <c:when test="${r.status == 'ReviewedByHrStaff'}">
                                             <span class="status-pill st-reviewed">Reviewed</span>
@@ -154,15 +187,56 @@
                                         <c:when test="${r.status == 'FinalSubmitted'}">
                                             <span class="status-pill st-final">Final</span>
                                         </c:when>
+                                        <c:when test="${r.status == 'PendingHrManagerApproval'}">
+                                            <span class="status-pill st-pending-hr">Pending HR Manager</span>
+                                        </c:when>
+                                        <c:when test="${r.status == 'ApprovedByHrManager'}">
+                                            <span class="status-pill st-approved-hr">Approved</span>
+                                        </c:when>
+                                        <c:when test="${r.status == 'RejectedByHrManager'}">
+                                            <span class="status-pill st-rejected">Rejected by HR Manager</span>
+                                        </c:when>
                                         <c:otherwise>${r.status}</c:otherwise>
                                     </c:choose>
                                 </td>
                                 <td class="text-muted" style="font-size:0.82rem;">${r.submittedAt}</td>
+                                <c:if test="${canApproveAttendanceReport}">
+                                    <td class="text-center">
+                                        <c:choose>
+                                            <c:when test="${r.status == 'PendingHrManagerApproval'}">
+                                                <div class="d-inline-flex gap-1">
+                                                    <form method="post" action="${pageContext.request.contextPath}/attendance-report?action=approve"
+                                                          onsubmit="return confirm('Approve this attendance report?');">
+                                                        <input type="hidden" name="reportId" value="${r.attendanceReportId}">
+                                                        <input type="hidden" name="month" value="${selectedMonth}">
+                                                        <input type="hidden" name="year" value="${selectedYear}">
+                                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Approve">
+                                                            <i class="bi bi-check2"></i>
+                                                        </button>
+                                                    </form>
+                                                    <form method="post" action="${pageContext.request.contextPath}/attendance-report?action=reject"
+                                                          onsubmit="const reason = prompt('Reason for rejection:'); if (!reason) return false; this.note.value = reason; return true;">
+                                                        <input type="hidden" name="reportId" value="${r.attendanceReportId}">
+                                                        <input type="hidden" name="month" value="${selectedMonth}">
+                                                        <input type="hidden" name="year" value="${selectedYear}">
+                                                        <input type="hidden" name="note" value="">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Reject">
+                                                            <i class="bi bi-x-lg"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </c:when>
+                                            <c:otherwise>
+                                                <span class="text-muted">&mdash;</span>
+                                            </c:otherwise>
+                                        </c:choose>
+                                    </td>
+                                </c:if>
                             </tr>
                         </c:forEach>
                         <c:if test="${empty reports}">
                             <tr>
-                                <td colspan="11" class="text-center text-muted py-5">
+                                <td colspan="${canApproveAttendanceReport ? 12 : 11}" class="text-center text-muted py-5">
                                     <i class="bi bi-inbox fs-2 d-block mb-2 opacity-25"></i>
                                     No attendance reports submitted for ${monthLabel}.
                                 </td>

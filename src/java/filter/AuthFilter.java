@@ -26,9 +26,7 @@ public class AuthFilter implements Filter {
             "/index.jsp",
             "/login",
             "/logout",
-            "/forgot-password",
-            "/auth/google",
-            "/auth/google/callback"
+            "/forgot-password"
     );
 
     private static final List<String> PUBLIC_PREFIXES = List.of(

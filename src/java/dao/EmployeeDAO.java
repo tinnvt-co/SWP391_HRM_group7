@@ -193,6 +193,22 @@ public class EmployeeDAO {
         }
     }
 
+    public boolean existsByEmployeeCode(String employeeCode) throws SQLException {
+        String sql = "SELECT 1 FROM employees WHERE employee_code = ?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, employeeCode);
+            rs = ps.executeQuery();
+            return rs.next();
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
     public List<Employee> findByRoleName(String roleName) throws SQLException {
         String sql = "SELECT e.*, u.full_name, u.username, u.email, u.phone, u.is_active, "
                    + "       d.department_name "

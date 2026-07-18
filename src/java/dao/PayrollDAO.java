@@ -15,14 +15,15 @@ public class PayrollDAO {
     public int insert(Payroll p) throws SQLException {
         String sql = "INSERT INTO payrolls "
                    + "(payroll_period_id, employee_id, contract_id, attendance_report_id, "
-                   + " basic_salary, actual_working_days, work_salary, total_allowance, kpi_bonus, "
+                   + " basic_salary, actual_working_days, work_salary, total_allowance, "
+                   + " attendance_bonus_amount, kpi_bonus, "
                    + " normal_overtime_hours, weekend_overtime_hours, holiday_overtime_hours, "
                    + " normal_overtime_salary, weekend_overtime_salary, holiday_overtime_salary, "
                    + " overtime_salary, gross_salary, insurance_base, social_insurance, "
                    + " health_insurance, unemployment_insurance, personal_income_tax, "
                    + " advance_payment, late_penalty_amount, total_deduction, net_salary, maternity_leave_days, "
                    + " social_insurance_benefit, status, note) "
-                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Draft', ?)";
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Draft', ?)";
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -38,27 +39,28 @@ public class PayrollDAO {
             ps.setBigDecimal(6, nz(p.getActualWorkingDays()));
             ps.setBigDecimal(7, nz(p.getWorkSalary()));
             ps.setBigDecimal(8, nz(p.getTotalAllowance()));
-            ps.setBigDecimal(9, nz(p.getKpiBonus()));
-            ps.setBigDecimal(10, nz(p.getNormalOvertimeHours()));
-            ps.setBigDecimal(11, nz(p.getWeekendOvertimeHours()));
-            ps.setBigDecimal(12, nz(p.getHolidayOvertimeHours()));
-            ps.setBigDecimal(13, nz(p.getNormalOvertimeSalary()));
-            ps.setBigDecimal(14, nz(p.getWeekendOvertimeSalary()));
-            ps.setBigDecimal(15, nz(p.getHolidayOvertimeSalary()));
-            ps.setBigDecimal(16, nz(p.getOvertimeSalary()));
-            ps.setBigDecimal(17, nz(p.getGrossSalary()));
-            ps.setBigDecimal(18, nz(p.getInsuranceBase()));
-            ps.setBigDecimal(19, nz(p.getSocialInsurance()));
-            ps.setBigDecimal(20, nz(p.getHealthInsurance()));
-            ps.setBigDecimal(21, nz(p.getUnemploymentInsurance()));
-            ps.setBigDecimal(22, nz(p.getPersonalIncomeTax()));
-            ps.setBigDecimal(23, nz(p.getAdvancePayment()));
-            ps.setBigDecimal(24, nz(p.getLatePenaltyAmount()));
-            ps.setBigDecimal(25, nz(p.getTotalDeduction()));
-            ps.setBigDecimal(26, nz(p.getNetSalary()));
-            ps.setBigDecimal(27, nz(p.getMaternityLeaveDays()));
-            ps.setBigDecimal(28, nz(p.getSocialInsuranceBenefit()));
-            ps.setString(29, p.getNote());
+            ps.setBigDecimal(9, nz(p.getAttendanceBonusAmount()));
+            ps.setBigDecimal(10, nz(p.getKpiBonus()));
+            ps.setBigDecimal(11, nz(p.getNormalOvertimeHours()));
+            ps.setBigDecimal(12, nz(p.getWeekendOvertimeHours()));
+            ps.setBigDecimal(13, nz(p.getHolidayOvertimeHours()));
+            ps.setBigDecimal(14, nz(p.getNormalOvertimeSalary()));
+            ps.setBigDecimal(15, nz(p.getWeekendOvertimeSalary()));
+            ps.setBigDecimal(16, nz(p.getHolidayOvertimeSalary()));
+            ps.setBigDecimal(17, nz(p.getOvertimeSalary()));
+            ps.setBigDecimal(18, nz(p.getGrossSalary()));
+            ps.setBigDecimal(19, nz(p.getInsuranceBase()));
+            ps.setBigDecimal(20, nz(p.getSocialInsurance()));
+            ps.setBigDecimal(21, nz(p.getHealthInsurance()));
+            ps.setBigDecimal(22, nz(p.getUnemploymentInsurance()));
+            ps.setBigDecimal(23, nz(p.getPersonalIncomeTax()));
+            ps.setBigDecimal(24, nz(p.getAdvancePayment()));
+            ps.setBigDecimal(25, nz(p.getLatePenaltyAmount()));
+            ps.setBigDecimal(26, nz(p.getTotalDeduction()));
+            ps.setBigDecimal(27, nz(p.getNetSalary()));
+            ps.setBigDecimal(28, nz(p.getMaternityLeaveDays()));
+            ps.setBigDecimal(29, nz(p.getSocialInsuranceBenefit()));
+            ps.setString(30, p.getNote());
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) return keys.getInt(1);
@@ -301,6 +303,7 @@ public class PayrollDAO {
         p.setActualWorkingDays(rs.getBigDecimal("actual_working_days"));
         p.setWorkSalary(rs.getBigDecimal("work_salary"));
         p.setTotalAllowance(rs.getBigDecimal("total_allowance"));
+        p.setAttendanceBonusAmount(rs.getBigDecimal("attendance_bonus_amount"));
         p.setKpiBonus(rs.getBigDecimal("kpi_bonus"));
         p.setNormalOvertimeHours(rs.getBigDecimal("normal_overtime_hours"));
         p.setWeekendOvertimeHours(rs.getBigDecimal("weekend_overtime_hours"));

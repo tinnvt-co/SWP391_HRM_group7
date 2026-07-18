@@ -56,7 +56,6 @@
         const path = window.location.pathname.toLowerCase();
         return path.endsWith('/login')
             || path.endsWith('/forgot-password')
-            || path.endsWith('/auth/google/callback')
             || path === '/'
             || path.endsWith('/index.jsp');
     }

@@ -15,7 +15,10 @@ public class AttendanceReport {
         SubmittedToHrStaff,
         ReviewedByHrStaff,
         RejectedByHrStaff,
-        FinalSubmitted;
+        FinalSubmitted,
+        PendingHrManagerApproval,
+        ApprovedByHrManager,
+        RejectedByHrManager;
 
         /** Value as stored in the DB ENUM (spaces, title case). */
         public String getDbValue() {
@@ -24,6 +27,9 @@ public class AttendanceReport {
                 case ReviewedByHrStaff:  return "Reviewed By HR Staff";
                 case RejectedByHrStaff:  return "Rejected By HR Staff";
                 case FinalSubmitted:     return "Final Submitted";
+                case PendingHrManagerApproval: return "Pending HR Manager Approval";
+                case ApprovedByHrManager:      return "Approved By HR Manager";
+                case RejectedByHrManager:      return "Rejected By HR Manager";
                 default:                 return "Draft";
             }
         }
@@ -35,6 +41,9 @@ public class AttendanceReport {
                 case "Reviewed By HR Staff":  return ReviewedByHrStaff;
                 case "Rejected By HR Staff":  return RejectedByHrStaff;
                 case "Final Submitted":       return FinalSubmitted;
+                case "Pending HR Manager Approval": return PendingHrManagerApproval;
+                case "Approved By HR Manager":      return ApprovedByHrManager;
+                case "Rejected By HR Manager":      return RejectedByHrManager;
                 case "Draft":                 return Draft;
                 default:                      return null;
             }

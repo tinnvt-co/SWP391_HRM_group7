@@ -13,8 +13,8 @@ public class AttendanceReportDAO {
 
     /**
      * Insert a report, or update the summary if one already exists for the same
-     * (employee, month, year). Sets status to "Submitted To HR Staff" and stamps
-     * submitted_at. Returns true on success.
+     * (employee, month, year). Manager confirmation sends reports back to HR
+     * Staff first; HR Staff submits them to HR Manager in a separate step.
      */
     public boolean upsertSubmitted(AttendanceReport r) throws SQLException {
         String sql =
@@ -33,7 +33,8 @@ public class AttendanceReportDAO {
           + " maternity_leave_days=VALUES(maternity_leave_days), "
           + " overtime_hours=VALUES(overtime_hours), "
           + " late_penalty_amount=VALUES(late_penalty_amount), "
-          + " status='Submitted To HR Staff', submitted_at=NOW(), updated_at=NOW()";
+          + " status='Submitted To HR Staff', submitted_at=NOW(), "
+          + " reviewed_by=NULL, reviewed_at=NULL, hr_note=NULL, updated_at=NOW()";
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -98,6 +99,191 @@ public class AttendanceReportDAO {
                                                        Integer departmentId, Integer managerUserId)
             throws SQLException {
         return findSubmittedByMonthPage(year, month, departmentId, managerUserId, 0, Integer.MAX_VALUE);
+    }
+
+    public List<AttendanceReport> findApprovedForPayrollByMonth(int year, int month,
+                                                                 Integer departmentId) throws SQLException {
+        StringBuilder sql = new StringBuilder(
+            "SELECT ar.*, "
+          + "  eu.full_name AS emp_full_name, e.employee_code, "
+          + "  d.department_name, mu.full_name AS manager_full_name "
+          + "FROM attendance_reports ar "
+          + "JOIN employees e   ON ar.employee_id  = e.employee_id "
+          + "JOIN users eu      ON e.user_id       = eu.user_id "
+          + "JOIN departments d ON ar.department_id = d.department_id "
+          + "JOIN users mu      ON ar.manager_id    = mu.user_id "
+          + "WHERE ar.report_year=? AND ar.report_month=? "
+          + "  AND ar.status = 'Approved By HR Manager' ");
+        if (departmentId != null) sql.append("AND ar.department_id=? ");
+        sql.append("ORDER BY d.department_name, eu.full_name");
+
+        List<AttendanceReport> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int idx = 1;
+            ps.setInt(idx++, year);
+            ps.setInt(idx++, month);
+            if (departmentId != null) ps.setInt(idx, departmentId);
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
+    public int countReadyForHrManagerSubmission(int year, int month,
+                                                Integer departmentId) throws SQLException {
+        StringBuilder sql = new StringBuilder(
+            "SELECT COUNT(*) "
+          + "FROM attendance_reports "
+          + "WHERE report_year=? AND report_month=? "
+          + "  AND status IN ('Submitted To HR Staff', 'Rejected By HR Manager') ");
+        if (departmentId != null) sql.append("AND department_id=? ");
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int idx = 1;
+            ps.setInt(idx++, year);
+            ps.setInt(idx++, month);
+            if (departmentId != null) ps.setInt(idx, departmentId);
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getInt(1) : 0;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public int submitReadyToHrManager(int year, int month,
+                                      Integer departmentId) throws SQLException {
+        StringBuilder sql = new StringBuilder(
+            "UPDATE attendance_reports "
+          + "SET status='Pending HR Manager Approval', submitted_at=NOW(), "
+          + "    reviewed_by=NULL, reviewed_at=NULL, hr_note=NULL, updated_at=NOW() "
+          + "WHERE report_year=? AND report_month=? "
+          + "  AND status IN ('Submitted To HR Staff', 'Rejected By HR Manager') ");
+        if (departmentId != null) sql.append("AND department_id=? ");
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int idx = 1;
+            ps.setInt(idx++, year);
+            ps.setInt(idx++, month);
+            if (departmentId != null) ps.setInt(idx, departmentId);
+            return ps.executeUpdate();
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
+    public boolean isMonthLockedForImport(int year, int month) throws SQLException {
+        String sql =
+            "SELECT 1 "
+          + "FROM attendance_reports "
+          + "WHERE report_year=? AND report_month=? "
+          + "  AND status IN ("
+          + "      'Submitted To HR Staff', "
+          + "      'Pending HR Manager Approval', "
+          + "      'Approved By HR Manager', "
+          + "      'Rejected By HR Manager'"
+          + "  ) "
+          + "LIMIT 1";
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, year);
+            ps.setInt(2, month);
+            rs = ps.executeQuery();
+            return rs.next();
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public boolean hasHrManagerApprovedMonth(int year, int month) throws SQLException {
+        String sql =
+            "SELECT 1 "
+          + "FROM attendance_reports "
+          + "WHERE report_year=? AND report_month=? "
+          + "  AND status='Approved By HR Manager' "
+          + "LIMIT 1";
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, year);
+            ps.setInt(2, month);
+            rs = ps.executeQuery();
+            return rs.next();
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public AttendanceReport findById(int attendanceReportId) throws SQLException {
+        String sql =
+            "SELECT ar.*, "
+          + "  eu.full_name AS emp_full_name, e.employee_code, "
+          + "  d.department_name, mu.full_name AS manager_full_name "
+          + "FROM attendance_reports ar "
+          + "JOIN employees e   ON ar.employee_id  = e.employee_id "
+          + "JOIN users eu      ON e.user_id       = eu.user_id "
+          + "JOIN departments d ON ar.department_id = d.department_id "
+          + "JOIN users mu      ON ar.manager_id    = mu.user_id "
+          + "WHERE ar.attendance_report_id=?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, attendanceReportId);
+            rs = ps.executeQuery();
+            return rs.next() ? mapRow(rs) : null;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public boolean updateHrManagerDecision(int attendanceReportId, Status status,
+                                           int reviewedBy, String note) throws SQLException {
+        if (status != Status.ApprovedByHrManager && status != Status.RejectedByHrManager) {
+            throw new IllegalArgumentException("Invalid HR Manager decision status.");
+        }
+        String sql = "UPDATE attendance_reports "
+                   + "SET status=?, reviewed_by=?, reviewed_at=NOW(), hr_note=?, updated_at=NOW() "
+                   + "WHERE attendance_report_id=? AND status='Pending HR Manager Approval'";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, status.getDbValue());
+            ps.setInt(2, reviewedBy);
+            ps.setString(3, note);
+            ps.setInt(4, attendanceReportId);
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
     }
 
     public List<AttendanceReport> findSubmittedByMonthPage(int year, int month,

@@ -18,6 +18,14 @@
                 </a>
             </li>
         </c:if>
+        <c:if test="${permissions.contains('APPROVE_EMPLOYEE_ACCOUNT_REQUEST')}">
+            <li class="nav-item">
+                <a class="nav-link ${activePage == 'accountRequests' ? 'active' : ''}"
+                   href="${pageContext.request.contextPath}/employee-account-requests">
+                    <i class="bi bi-person-check me-2"></i>Account Requests
+                </a>
+            </li>
+        </c:if>
         <c:if test="${permissions.contains('VIEW_ROLE_LIST')}">
             <li class="nav-item">
                 <a class="nav-link ${activePage == 'roles' ? 'active' : ''}"
@@ -39,6 +47,14 @@
                 <a class="nav-link ${activePage == 'hrEmployees' ? 'active' : ''}"
                    href="${pageContext.request.contextPath}/hr/employees">
                     <i class="bi bi-person-vcard me-2"></i>Employees
+                </a>
+            </li>
+        </c:if>
+        <c:if test="${permissions.contains('REQUEST_EMPLOYEE_ACCOUNT')}">
+            <li class="nav-item">
+                <a class="nav-link ${activePage == 'accountRequests' ? 'active' : ''}"
+                   href="${pageContext.request.contextPath}/employee-account-requests">
+                    <i class="bi bi-person-plus me-2"></i>Account Requests
                 </a>
             </li>
         </c:if>

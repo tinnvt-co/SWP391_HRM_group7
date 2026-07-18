@@ -128,6 +128,8 @@
                                     <span>+ <fmt:formatNumber value="${payslip.holidayOvertimeSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
                                 <div class="row-line"><span class="lbl">Allowances</span>
                                     <span>+ <fmt:formatNumber value="${payslip.totalAllowance}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                                <div class="row-line"><span class="lbl">Attendance bonus</span>
+                                    <span>+ <fmt:formatNumber value="${payslip.attendanceBonusAmount}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
                                 <div class="row-line"><span class="lbl">KPI bonus</span>
                                     <span>+ <fmt:formatNumber value="${payslip.kpiBonus}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
                                 <div class="row-line fw-bold border-top mt-2 pt-3"><span>Gross salary</span>

@@ -26,13 +26,15 @@ import java.util.Set;
  *   normal OT = hourly salary * normal OT hours * 1.5
  *   weekend OT = hourly salary * weekend OT hours * 2.0
  *   holiday OT = hourly salary * holiday OT hours * 3.0
- *   gross = work salary + active allowances + KPI bonus + OT salary
+ *   attendance bonus = 500,000 VND when the period has full attendance
+ *   gross = work salary + payable allowances + attendance bonus + KPI bonus + OT salary
  *   insurance base = work salary + KPI bonus + OT salary
  *   deductions = employee insurance + PIT + advance payment + late penalty
  *   net = gross - deductions
  *
- * Maternity benefit is shown separately as a social-insurance benefit and is
- * not included in the company-paid net salary.
+ * Allowances are paid by the company only when the employee has company-paid
+ * working/leave days in the period. Maternity benefit is shown separately as a
+ * social-insurance benefit and is not included in the company-paid net salary.
  */
 public class PayrollCalculationService {
 
@@ -42,6 +44,7 @@ public class PayrollCalculationService {
     public static final BigDecimal NORMAL_OT_MULTIPLIER = new BigDecimal("1.5");
     public static final BigDecimal WEEKEND_OT_MULTIPLIER = new BigDecimal("2.0");
     public static final BigDecimal HOLIDAY_OT_MULTIPLIER = new BigDecimal("3.0");
+    public static final BigDecimal FULL_ATTENDANCE_BONUS = new BigDecimal("500000");
 
     private static final BigDecimal HOURS_PER_DAY = new BigDecimal("8");
     private static final int SCALE = 0;
@@ -91,8 +94,16 @@ public class PayrollCalculationService {
         BigDecimal holidayOtSalary = hourly.multiply(overtime.holidayHours).multiply(HOLIDAY_OT_MULTIPLIER);
         BigDecimal otSalary = normalOtSalary.add(weekendOtSalary).add(holidayOtSalary);
 
-        BigDecimal allowance = nz(allowanceDAO.sumActiveAllowances());
-        BigDecimal gross = workSalary.add(allowance).add(kpi).add(otSalary);
+        boolean fullMaternityMonth = maternityLeaveDays.compareTo(stdDays) >= 0;
+        BigDecimal allowance = !fullMaternityMonth && actualDays.signum() > 0
+                ? nz(allowanceDAO.sumActiveAllowances())
+                : BigDecimal.ZERO;
+        BigDecimal attendanceBonus = qualifiesForFullAttendanceBonus(
+                actualDays, stdDays, fullMaternityMonth, overtime)
+                ? FULL_ATTENDANCE_BONUS
+                : BigDecimal.ZERO;
+
+        BigDecimal gross = workSalary.add(allowance).add(attendanceBonus).add(kpi).add(otSalary);
         BigDecimal insuranceBase = workSalary.add(kpi).add(otSalary);
         BigDecimal socialInsurance = insuranceBase.multiply(SOCIAL_INSURANCE_RATE);
         BigDecimal healthInsurance = insuranceBase.multiply(HEALTH_INSURANCE_RATE);
@@ -116,6 +127,7 @@ public class PayrollCalculationService {
         p.setActualWorkingDays(actualDays);
         p.setWorkSalary(round(workSalary));
         p.setTotalAllowance(round(allowance));
+        p.setAttendanceBonusAmount(round(attendanceBonus));
         p.setKpiBonus(round(kpi));
         p.setNormalOvertimeHours(overtime.normalHours);
         p.setWeekendOvertimeHours(overtime.weekendHours);
@@ -140,6 +152,14 @@ public class PayrollCalculationService {
         return BuildResult.ok(p);
     }
 
+    private boolean qualifiesForFullAttendanceBonus(BigDecimal actualDays, BigDecimal stdDays,
+                                                    boolean fullMaternityMonth,
+                                                    OvertimeBreakdown attendance) {
+        return !fullMaternityMonth
+                && actualDays.compareTo(stdDays) >= 0
+                && !attendance.hasFullAttendanceBlocker;
+    }
+
     private OvertimeBreakdown classifyOvertime(AttendanceReport report) throws SQLException {
         OvertimeBreakdown breakdown = new OvertimeBreakdown();
         List<AttendanceRecord> records = attendanceDAO.findVerifiedByEmployeeMonth(
@@ -149,6 +169,14 @@ public class PayrollCalculationService {
 
         for (AttendanceRecord record : records) {
             BigDecimal hours = nz(record.getOvertimeHours());
+            if (record.getAttendanceStatus() == AttendanceRecord.AttendanceStatus.Late
+                    || record.getAttendanceStatus() == AttendanceRecord.AttendanceStatus.Absent
+                    || record.getAttendanceStatus() == AttendanceRecord.AttendanceStatus.Leave
+                    || record.getAttendanceStatus() == AttendanceRecord.AttendanceStatus.UnpaidLeave
+                    || record.getAttendanceStatus() == AttendanceRecord.AttendanceStatus.MaternityLeave) {
+                breakdown.hasFullAttendanceBlocker = true;
+            }
+
             if (hours.signum() <= 0 || record.getWorkDate() == null) continue;
 
             LocalDate date = record.getWorkDate();
@@ -180,6 +208,7 @@ public class PayrollCalculationService {
         BigDecimal normalHours = BigDecimal.ZERO;
         BigDecimal weekendHours = BigDecimal.ZERO;
         BigDecimal holidayHours = BigDecimal.ZERO;
+        boolean hasFullAttendanceBlocker;
 
         BigDecimal totalHours() {
             return normalHours.add(weekendHours).add(holidayHours);

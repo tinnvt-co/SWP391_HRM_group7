@@ -138,8 +138,8 @@ public class PayrollServlet extends HttpServlet {
         BigDecimal yearlySalaryTotal = payrollDAO.sumNetSalaryByYear(year);
         PayrollTaskSummary payrollTaskSummary = periodDAO.findHrStaffTaskSummary();
 
-        // Can we generate? Only if no period yet AND there are submitted reports.
-        boolean hasReports = deptId != null && !reportDAO.findSubmittedByMonth(year, month, deptId).isEmpty();
+        // Can we generate? Only if no period yet AND HR Manager has approved attendance reports.
+        boolean hasReports = deptId != null && !reportDAO.findApprovedForPayrollByMonth(year, month, deptId).isEmpty();
 
         request.setAttribute("period", period);
         request.setAttribute("payrolls", payrolls);
@@ -181,11 +181,11 @@ public class PayrollServlet extends HttpServlet {
             return;
         }
 
-        // Must have attendance reports submitted for that month.
-        List<AttendanceReport> reports = reportDAO.findSubmittedByMonth(year, month, deptId);
+        // Must have HR Manager approved attendance reports for that month.
+        List<AttendanceReport> reports = reportDAO.findApprovedForPayrollByMonth(year, month, deptId);
         if (reports.isEmpty()) {
-            flashError(session, "No submitted attendance reports for " + monthLabel(year, month)
-                    + " in " + dept.getDepartmentName() + ". Ask managers to send attendance first.");
+            flashError(session, "No HR Manager-approved attendance reports for " + monthLabel(year, month)
+                    + " in " + dept.getDepartmentName() + ". Ask the HR Manager to approve attendance first.");
             response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month + "&deptId=" + deptId);
             return;
         }

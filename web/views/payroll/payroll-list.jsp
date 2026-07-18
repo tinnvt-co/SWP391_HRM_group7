@@ -250,6 +250,7 @@
                             <th class="text-end">Basic</th>
                             <th class="text-center">Work Days</th>
                             <th class="text-end">Allowance</th>
+                            <th class="text-end">Attendance Bonus</th>
                             <th class="text-end">KPI</th>
                             <th class="text-end">OT Salary</th>
                             <th class="text-end">Gross</th>
@@ -270,6 +271,7 @@
                                 <td class="text-end"><fmt:formatNumber value="${p.basicSalary}" type="number" maxFractionDigits="0"/></td>
                                 <td class="text-center">${p.actualWorkingDays}</td>
                                 <td class="text-end"><fmt:formatNumber value="${p.totalAllowance}" type="number" maxFractionDigits="0"/></td>
+                                <td class="text-end"><fmt:formatNumber value="${p.attendanceBonusAmount}" type="number" maxFractionDigits="0"/></td>
                                 <td class="text-end"><fmt:formatNumber value="${p.kpiBonus}" type="number" maxFractionDigits="0"/></td>
                                 <td class="text-end"><fmt:formatNumber value="${p.overtimeSalary}" type="number" maxFractionDigits="0"/></td>
                                 <td class="text-end"><fmt:formatNumber value="${p.grossSalary}" type="number" maxFractionDigits="0"/></td>
@@ -285,7 +287,7 @@
                         </c:forEach>
                         <c:if test="${empty payrolls}">
                             <tr>
-                                <td colspan="12" class="text-center text-muted py-5">
+                                <td colspan="13" class="text-center text-muted py-5">
                                     <i class="bi bi-cash-stack fs-2 d-block mb-2 opacity-25"></i>
                                     No payroll for ${monthLabel}.
                                     <c:if test="${not empty selectedDeptName}">
@@ -360,6 +362,7 @@
                 <div class="d-flex justify-content-between py-1"><span class="text-muted">Weekend OT (${p.weekendOvertimeHours}h x 200%)</span><span>+ <fmt:formatNumber value="${p.weekendOvertimeSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
                 <div class="d-flex justify-content-between py-1"><span class="text-muted">Holiday OT (${p.holidayOvertimeHours}h x 300%)</span><span>+ <fmt:formatNumber value="${p.holidayOvertimeSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
                 <div class="d-flex justify-content-between py-1"><span class="text-muted">Allowances</span><span>+ <fmt:formatNumber value="${p.totalAllowance}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Attendance bonus</span><span>+ <fmt:formatNumber value="${p.attendanceBonusAmount}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
                 <div class="d-flex justify-content-between py-1"><span class="text-muted">KPI bonus</span><span>+ <fmt:formatNumber value="${p.kpiBonus}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
                 <div class="d-flex justify-content-between fw-bold border-top mt-2 pt-2"><span>Gross salary</span><span><fmt:formatNumber value="${p.grossSalary}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
             </div>
