@@ -14,6 +14,9 @@ import java.util.List;
 
 public class AttendanceRecordDAO {
 
+    private static final String ATTENDANCE_ROLE_FILTER =
+            "ro.role_name IN ('EMPLOYEE', 'MANAGER', 'HR_STAFF') AND d.department_code <> 'IT'";
+
     public int insert(AttendanceRecord r) throws SQLException {
         String sql = "INSERT INTO attendance_records (employee_id, work_date, "
                    + "check_in_time, check_out_time, late_minutes, late_penalty_amount, "
@@ -168,9 +171,12 @@ public class AttendanceRecordDAO {
                 "UPDATE attendance_records ar "
               + "JOIN employees e ON ar.employee_id = e.employee_id "
               + "JOIN users u     ON e.user_id      = u.user_id "
+              + "JOIN roles ro    ON u.role_id      = ro.role_id "
+              + "JOIN departments d ON e.department_id = d.department_id "
               + "SET ar.verification_status='Verified', ar.verified_by=?, "
               + "    ar.verified_at=NOW(), ar.updated_at=NOW() "
-              + "WHERE u.manager_id=? AND ar.verification_status='Pending'");
+              + "WHERE u.manager_id=? AND ro.role_name='EMPLOYEE' "
+              + "AND d.department_code <> 'IT' AND ar.verification_status='Pending'");
         if (fromDate != null) sql.append(" AND ar.work_date >= ?");
         if (toDate   != null) sql.append(" AND ar.work_date <= ?");
 
@@ -195,7 +201,10 @@ public class AttendanceRecordDAO {
         String sql = "SELECT COUNT(*) FROM attendance_records ar "
                    + "JOIN employees e ON ar.employee_id = e.employee_id "
                    + "JOIN users u     ON e.user_id      = u.user_id "
-                   + "WHERE u.manager_id=? AND ar.verification_status='Pending'";
+                   + "JOIN roles ro    ON u.role_id      = ro.role_id "
+                   + "JOIN departments d ON e.department_id = d.department_id "
+                   + "WHERE u.manager_id=? AND ro.role_name='EMPLOYEE' "
+                   + "AND d.department_code <> 'IT' AND ar.verification_status='Pending'";
         Connection conn = null;
         PreparedStatement ps = null;
         ResultSet rs = null;
@@ -216,7 +225,10 @@ public class AttendanceRecordDAO {
                 "SELECT COUNT(*) FROM attendance_records ar "
               + "JOIN employees e ON ar.employee_id = e.employee_id "
               + "JOIN users u     ON e.user_id      = u.user_id "
-              + "WHERE u.manager_id=? AND ar.verification_status='Pending'");
+              + "JOIN roles ro    ON u.role_id      = ro.role_id "
+              + "JOIN departments d ON e.department_id = d.department_id "
+              + "WHERE u.manager_id=? AND ro.role_name='EMPLOYEE' "
+              + "AND d.department_code <> 'IT' AND ar.verification_status='Pending'");
         if (fromDate != null) sql.append(" AND ar.work_date >= ?");
         if (toDate != null) sql.append(" AND ar.work_date <= ?");
 
@@ -302,8 +314,10 @@ public class AttendanceRecordDAO {
           + "JOIN employees e ON ar.employee_id = e.employee_id "
           + "JOIN users u ON e.user_id = u.user_id "
           + "JOIN roles ro ON u.role_id = ro.role_id "
+          + "JOIN departments d ON e.department_id = d.department_id "
           + "WHERE u.manager_id IS NOT NULL "
           + "  AND ro.role_name = 'EMPLOYEE' "
+          + "  AND d.department_code <> 'IT' "
           + "  AND ar.verification_status = 'Pending' "
           + "GROUP BY u.manager_id, YEAR(ar.work_date), MONTH(ar.work_date) "
           + "HAVING MAX(ar.created_at) <= ? "
@@ -341,6 +355,7 @@ public class AttendanceRecordDAO {
           + "JOIN employees e ON ar.employee_id = e.employee_id "
           + "JOIN users u ON e.user_id = u.user_id "
           + "JOIN roles ro ON u.role_id = ro.role_id "
+          + "JOIN departments d ON e.department_id = d.department_id "
           + "SET ar.verification_status = 'Verified', "
           + "    ar.verified_by = NULL, "
           + "    ar.verified_at = NOW(), "
@@ -350,6 +365,7 @@ public class AttendanceRecordDAO {
           + "    ar.updated_at = NOW() "
           + "WHERE u.manager_id = ? "
           + "  AND ro.role_name = 'EMPLOYEE' "
+          + "  AND d.department_code <> 'IT' "
           + "  AND ar.verification_status = 'Pending' "
           + "  AND YEAR(ar.work_date) = ? "
           + "  AND MONTH(ar.work_date) = ?";
@@ -430,8 +446,14 @@ public class AttendanceRecordDAO {
         List<Object> params = new ArrayList<>();
         if (fromDate != null) { sql.append("AND a.work_date >= ? "); params.add(Date.valueOf(fromDate)); }
         if (toDate != null)   { sql.append("AND a.work_date <= ? "); params.add(Date.valueOf(toDate)); }
-        sql.append("WHERE u.is_active = 1 AND ro.role_name = 'EMPLOYEE' ");
-        if (managerUserId != null) { sql.append("AND u.manager_id = ? "); params.add(managerUserId); }
+        sql.append("WHERE u.is_active = 1 ");
+        if (managerUserId != null) {
+            sql.append("AND ro.role_name = 'EMPLOYEE' AND d.department_code <> 'IT' ");
+            sql.append("AND u.manager_id = ? ");
+            params.add(managerUserId);
+        } else {
+            sql.append("AND ").append(ATTENDANCE_ROLE_FILTER).append(" ");
+        }
         if (departmentId != null) { sql.append("AND e.department_id = ? "); params.add(departmentId); }
         sql.append("GROUP BY e.employee_id, e.employee_code, u.full_name, d.department_name, e.department_id ");
         sql.append("ORDER BY u.full_name");
@@ -486,8 +508,12 @@ public class AttendanceRecordDAO {
           + "FROM attendance_records ar "
           + "JOIN employees e ON ar.employee_id = e.employee_id "
           + "JOIN users u     ON e.user_id      = u.user_id "
+          + "JOIN roles ro    ON u.role_id      = ro.role_id "
+          + "JOIN departments d ON e.department_id = d.department_id "
           + "LEFT JOIN holiday_dates hd ON hd.holiday_date = ar.work_date AND hd.is_active = 1 "
           + "WHERE u.manager_id=? AND ar.verification_status='Verified' "
+          + "  AND ro.role_name = 'EMPLOYEE' "
+          + "  AND d.department_code <> 'IT' "
           + "  AND YEAR(ar.work_date)=? AND MONTH(ar.work_date)=? "
           + "GROUP BY ar.employee_id, e.department_id";
         List<MonthlySummary> list = new ArrayList<>();
@@ -500,6 +526,113 @@ public class AttendanceRecordDAO {
             ps.setInt(1, managerUserId);
             ps.setInt(2, year);
             ps.setInt(3, month);
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                MonthlySummary s = new MonthlySummary();
+                s.employeeId      = rs.getInt("employee_id");
+                s.departmentId    = rs.getInt("department_id");
+                s.actualWorkingDays = rs.getInt("work_days");
+                s.paidLeaveDays   = rs.getInt("paid_leave");
+                s.unpaidLeaveDays = rs.getInt("unpaid_leave");
+                s.maternityLeaveDays = rs.getInt("maternity_leave");
+                s.overtimeHours   = rs.getBigDecimal("ot_hours");
+                s.latePenaltyAmount = rs.getBigDecimal("late_penalty_amount");
+                list.add(s);
+            }
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
+    public int countPendingHrManagedByMonth(int year, int month) throws SQLException {
+        String sql =
+            "SELECT COUNT(*) "
+          + "FROM attendance_records ar "
+          + "JOIN employees e ON ar.employee_id = e.employee_id "
+          + "JOIN users u ON e.user_id = u.user_id "
+          + "JOIN roles ro ON u.role_id = ro.role_id "
+          + "JOIN departments d ON e.department_id = d.department_id "
+          + "WHERE ro.role_name IN ('MANAGER', 'HR_STAFF') "
+          + "  AND d.department_code <> 'IT' "
+          + "  AND ar.verification_status = 'Pending' "
+          + "  AND YEAR(ar.work_date)=? AND MONTH(ar.work_date)=?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, year);
+            ps.setInt(2, month);
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getInt(1) : 0;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public int verifyPendingHrManagedByMonth(int verifierUserId, int year, int month)
+            throws SQLException {
+        String sql =
+            "UPDATE attendance_records ar "
+          + "JOIN employees e ON ar.employee_id = e.employee_id "
+          + "JOIN users u ON e.user_id = u.user_id "
+          + "JOIN roles ro ON u.role_id = ro.role_id "
+          + "JOIN departments d ON e.department_id = d.department_id "
+          + "SET ar.verification_status='Verified', ar.verified_by=?, "
+          + "    ar.verified_at=NOW(), ar.updated_at=NOW() "
+          + "WHERE ro.role_name IN ('MANAGER', 'HR_STAFF') "
+          + "  AND d.department_code <> 'IT' "
+          + "  AND ar.verification_status = 'Pending' "
+          + "  AND YEAR(ar.work_date)=? AND MONTH(ar.work_date)=?";
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, verifierUserId);
+            ps.setInt(2, year);
+            ps.setInt(3, month);
+            return ps.executeUpdate();
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
+    public List<MonthlySummary> aggregateMonthByHrManagedRoles(int year, int month)
+            throws SQLException {
+        String sql =
+            "SELECT ar.employee_id, e.department_id, "
+          + "  SUM(CASE WHEN ar.attendance_status IN ('Present','Late','Leave') "
+          + "           OR (ar.attendance_status='Holiday' AND hd.holiday_date IS NOT NULL) "
+          + "      THEN 1 ELSE 0 END) AS work_days, "
+          + "  SUM(CASE WHEN ar.attendance_status='Leave' THEN 1 ELSE 0 END) AS paid_leave, "
+          + "  SUM(CASE WHEN ar.attendance_status='Unpaid Leave' THEN 1 ELSE 0 END) AS unpaid_leave, "
+          + "  SUM(CASE WHEN ar.attendance_status='Maternity Leave' THEN 1 ELSE 0 END) AS maternity_leave, "
+          + "  COALESCE(SUM(ar.overtime_hours),0) AS ot_hours, "
+          + "  COALESCE(SUM(ar.late_penalty_amount),0) AS late_penalty_amount "
+          + "FROM attendance_records ar "
+          + "JOIN employees e ON ar.employee_id = e.employee_id "
+          + "JOIN users u     ON e.user_id      = u.user_id "
+          + "JOIN roles ro    ON u.role_id      = ro.role_id "
+          + "JOIN departments d ON e.department_id = d.department_id "
+          + "LEFT JOIN holiday_dates hd ON hd.holiday_date = ar.work_date AND hd.is_active = 1 "
+          + "WHERE ar.verification_status='Verified' "
+          + "  AND ro.role_name IN ('MANAGER', 'HR_STAFF') "
+          + "  AND d.department_code <> 'IT' "
+          + "  AND YEAR(ar.work_date)=? AND MONTH(ar.work_date)=? "
+          + "GROUP BY ar.employee_id, e.department_id";
+        List<MonthlySummary> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, year);
+            ps.setInt(2, month);
             rs = ps.executeQuery();
             while (rs.next()) {
                 MonthlySummary s = new MonthlySummary();

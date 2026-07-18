@@ -83,14 +83,22 @@ public class DepartmentDAO {
 
     public List<Department> findEmployeeAssignable() throws SQLException {
         return findList(BASE_SELECT
-                + "WHERE d.is_active = 1 AND d.department_code NOT IN ('ADMIN_DEPT', 'HR') "
+                + "WHERE d.is_active = 1 AND d.department_code NOT IN ('ADMIN_DEPT', 'HR', 'IT') "
                 + "ORDER BY d.department_name");
     }
 
     public List<Department> findAttendanceDepartments() throws SQLException {
         return findList(BASE_SELECT
                 + "WHERE d.is_active = 1 "
-                + "AND d.department_code NOT IN ('ADMIN_DEPT', 'HR', 'IT') "
+                + "AND d.department_code <> 'IT' "
+                + "AND EXISTS ("
+                + "    SELECT 1 FROM employees ae "
+                + "    JOIN users au ON ae.user_id = au.user_id "
+                + "    JOIN roles ar ON au.role_id = ar.role_id "
+                + "    WHERE ae.department_id = d.department_id "
+                + "      AND au.is_active = 1 "
+                + "      AND ar.role_name IN ('EMPLOYEE', 'MANAGER', 'HR_STAFF')"
+                + ") "
                 + "ORDER BY d.department_name");
     }
 

@@ -317,9 +317,11 @@ public class EmployeeDAO {
         String sql = "SELECT e.*, u.full_name, d.department_name "
                    + "FROM employees e "
                    + "JOIN users u       ON e.user_id       = u.user_id "
+                   + "JOIN roles ro      ON u.role_id       = ro.role_id "
                    + "JOIN departments d ON e.department_id = d.department_id "
                    + "WHERE u.is_active = 1 "
-                   + "AND d.department_code NOT IN ('ADMIN_DEPT', 'HR', 'IT') "
+                   + "AND ro.role_name IN ('EMPLOYEE', 'MANAGER', 'HR_STAFF') "
+                   + "AND d.department_code <> 'IT' "
                    + "ORDER BY u.full_name";
         List<Employee> list = new ArrayList<>();
         Connection conn = null;
@@ -341,9 +343,11 @@ public class EmployeeDAO {
                 "SELECT e.*, u.full_name, d.department_name "
               + "FROM employees e "
               + "JOIN users u       ON e.user_id       = u.user_id "
+              + "JOIN roles ro      ON u.role_id       = ro.role_id "
               + "JOIN departments d ON e.department_id = d.department_id "
               + "WHERE u.is_active = 1 "
-              + "AND d.department_code NOT IN ('ADMIN_DEPT', 'HR', 'IT') ");
+              + "AND ro.role_name IN ('EMPLOYEE', 'MANAGER', 'HR_STAFF') "
+              + "AND d.department_code <> 'IT' ");
         if (departmentId != null) sql.append("AND e.department_id = ? ");
         sql.append("ORDER BY u.full_name");
 

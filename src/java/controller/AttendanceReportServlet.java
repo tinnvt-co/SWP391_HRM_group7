@@ -1,6 +1,7 @@
 package controller;
 
 import dao.AttendanceReportDAO;
+import dao.AttendanceRecordDAO;
 import model.AttendanceReport;
 import model.User;
 import service.AttendanceAutoConfirmService;
@@ -13,6 +14,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.YearMonth;
 import java.time.format.TextStyle;
@@ -30,6 +32,7 @@ public class AttendanceReportServlet extends HttpServlet {
     private static final int PAGE_SIZE = 10;
 
     private final AttendanceReportDAO reportDAO = new AttendanceReportDAO();
+    private final AttendanceRecordDAO attendanceDAO = new AttendanceRecordDAO();
     private final AttendanceAutoConfirmService autoConfirmService = new AttendanceAutoConfirmService();
 
     @Override
@@ -60,6 +63,7 @@ public class AttendanceReportServlet extends HttpServlet {
             int totalReports = reportDAO.countSubmittedByMonth(year, month, null, managerUserId);
             int readyToSubmitCount = hrStaffScope
                     ? reportDAO.countReadyForHrManagerSubmission(year, month, null)
+                        + attendanceDAO.countPendingHrManagedByMonth(year, month)
                     : 0;
             int totalPages = Math.max(1, (int) Math.ceil(totalReports / (double) PAGE_SIZE));
             int page = parsePageParam(request.getParameter("page"), totalPages);
@@ -142,15 +146,43 @@ public class AttendanceReportServlet extends HttpServlet {
         int year = parseIntOr(request.getParameter("year"), YearMonth.now().getYear());
         int month = parseIntOr(request.getParameter("month"), YearMonth.now().getMonthValue());
 
+        User currentUser = getCurrentUser(request);
+        int prepared = prepareHrManagedReports(currentUser.getUserId(), year, month);
         int submitted = reportDAO.submitReadyToHrManager(year, month, null);
-        if (submitted > 0) {
+        if (submitted + prepared > 0) {
             session.setAttribute("attendanceReportMessage",
-                    "Submitted " + submitted + " attendance report(s) to HR Manager.");
+                    "Submitted " + (submitted + prepared) + " attendance report(s) to HR Manager.");
         } else {
             session.setAttribute("attendanceReportError",
                     "No attendance reports are ready to submit to HR Manager for this period.");
         }
         response.sendRedirect(reportRedirect(ctx, year, month));
+    }
+
+    private int prepareHrManagedReports(int hrStaffUserId, int year, int month) throws SQLException {
+        if (reportDAO.hasHrManagerApprovedMonth(year, month)) {
+            return 0;
+        }
+        attendanceDAO.verifyPendingHrManagedByMonth(hrStaffUserId, year, month);
+        List<AttendanceRecordDAO.MonthlySummary> summaries =
+                attendanceDAO.aggregateMonthByHrManagedRoles(year, month);
+        int prepared = 0;
+        for (AttendanceRecordDAO.MonthlySummary s : summaries) {
+            AttendanceReport report = new AttendanceReport();
+            report.setEmployeeId(s.employeeId);
+            report.setManagerId(hrStaffUserId);
+            report.setDepartmentId(s.departmentId);
+            report.setReportMonth(month);
+            report.setReportYear(year);
+            report.setActualWorkingDays(BigDecimal.valueOf(s.actualWorkingDays));
+            report.setPaidLeaveDays(BigDecimal.valueOf(s.paidLeaveDays));
+            report.setUnpaidLeaveDays(BigDecimal.valueOf(s.unpaidLeaveDays));
+            report.setMaternityLeaveDays(BigDecimal.valueOf(s.maternityLeaveDays));
+            report.setOvertimeHours(s.overtimeHours);
+            report.setLatePenaltyAmount(s.latePenaltyAmount);
+            if (reportDAO.upsertPendingHrManager(report)) prepared++;
+        }
+        return prepared;
     }
 
     private void handleDecision(HttpServletRequest request, HttpServletResponse response,

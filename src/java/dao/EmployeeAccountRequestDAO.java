@@ -14,18 +14,22 @@ public class EmployeeAccountRequestDAO {
             "SELECT ear.*, d.department_name, "
           + "       req.full_name AS requested_by_name, "
           + "       rev.full_name AS reviewed_by_name, "
-          + "       cu.username AS created_username "
+          + "       cu.username AS created_username, "
+          + "       rr.role_name AS requested_role_name "
           + "FROM employee_account_requests ear "
           + "JOIN departments d ON ear.department_id = d.department_id "
           + "JOIN users req ON ear.requested_by = req.user_id "
           + "LEFT JOIN users rev ON ear.reviewed_by = rev.user_id "
-          + "LEFT JOIN users cu ON ear.created_user_id = cu.user_id ";
+          + "LEFT JOIN users cu ON ear.created_user_id = cu.user_id "
+          + "LEFT JOIN roles rr ON ear.requested_role_id = rr.role_id ";
 
     public int insert(EmployeeAccountRequest r) throws SQLException {
         String sql = "INSERT INTO employee_account_requests "
                    + "(full_name, email, phone, gender, date_of_birth, address, department_id, "
-                   + " hire_date, employee_code, requested_by) "
-                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                   + " requested_role_id, position_title, hire_date, employee_code, "
+                   + " contract_code, contract_type, contract_start_date, contract_end_date, "
+                   + " basic_salary, standard_working_days, contract_note, requested_by) "
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -39,9 +43,21 @@ public class EmployeeAccountRequestDAO {
             else                            ps.setNull(5, Types.DATE);
             ps.setString(6, r.getAddress());
             ps.setInt(7, r.getDepartmentId());
-            ps.setDate(8, Date.valueOf(r.getHireDate()));
-            ps.setString(9, r.getEmployeeCode());
-            ps.setInt(10, r.getRequestedBy());
+            if (r.getRequestedRoleId() > 0) ps.setInt(8, r.getRequestedRoleId());
+            else                            ps.setNull(8, Types.INTEGER);
+            ps.setString(9, r.getPositionTitle());
+            ps.setDate(10, Date.valueOf(r.getHireDate()));
+            ps.setString(11, r.getEmployeeCode());
+            ps.setString(12, r.getContractCode());
+            ps.setString(13, r.getContractType() == null ? null : r.getContractType().getDbValue());
+            if (r.getContractStartDate() != null) ps.setDate(14, Date.valueOf(r.getContractStartDate()));
+            else                                  ps.setNull(14, Types.DATE);
+            if (r.getContractEndDate() != null) ps.setDate(15, Date.valueOf(r.getContractEndDate()));
+            else                                ps.setNull(15, Types.DATE);
+            ps.setBigDecimal(16, r.getBasicSalary());
+            ps.setBigDecimal(17, r.getStandardWorkingDays());
+            ps.setString(18, r.getContractNote());
+            ps.setInt(19, r.getRequestedBy());
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) return keys.getInt(1);
@@ -127,11 +143,29 @@ public class EmployeeAccountRequestDAO {
         }
     }
 
+    public boolean hasPendingByContractCode(String contractCode) throws SQLException {
+        String sql = "SELECT 1 FROM employee_account_requests WHERE contract_code=? AND status='Pending'";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, contractCode);
+            rs = ps.executeQuery();
+            return rs.next();
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
     public boolean markCreated(int requestId, int reviewedBy, int createdUserId,
-                               Integer createdEmployeeId, String note) throws SQLException {
+                               Integer createdEmployeeId, Integer createdContractId,
+                               String note) throws SQLException {
         String sql = "UPDATE employee_account_requests "
                    + "SET status='Created', reviewed_by=?, reviewed_at=NOW(), "
-                   + "created_user_id=?, created_employee_id=?, admin_note=?, updated_at=NOW() "
+                   + "created_user_id=?, created_employee_id=?, created_contract_id=?, "
+                   + "admin_note=?, updated_at=NOW() "
                    + "WHERE request_id=? AND status='Pending'";
         Connection conn = null;
         PreparedStatement ps = null;
@@ -142,8 +176,10 @@ public class EmployeeAccountRequestDAO {
             ps.setInt(2, createdUserId);
             if (createdEmployeeId != null) ps.setInt(3, createdEmployeeId);
             else                           ps.setNull(3, Types.INTEGER);
-            ps.setString(4, note);
-            ps.setInt(5, requestId);
+            if (createdContractId != null) ps.setInt(4, createdContractId);
+            else                           ps.setNull(4, Types.INTEGER);
+            ps.setString(5, note);
+            ps.setInt(6, requestId);
             return ps.executeUpdate() > 0;
         } finally {
             close(conn, ps, null);
@@ -183,9 +219,21 @@ public class EmployeeAccountRequestDAO {
         if (dob != null) r.setDateOfBirth(dob.toLocalDate());
         r.setAddress(rs.getString("address"));
         r.setDepartmentId(rs.getInt("department_id"));
+        int requestedRoleId = getIntOrNull(rs, "requested_role_id");
+        if (requestedRoleId > 0) r.setRequestedRoleId(requestedRoleId);
+        r.setPositionTitle(getStringOrNull(rs, "position_title"));
         Date hire = rs.getDate("hire_date");
         if (hire != null) r.setHireDate(hire.toLocalDate());
         r.setEmployeeCode(rs.getString("employee_code"));
+        r.setContractCode(getStringOrNull(rs, "contract_code"));
+        r.setContractType(model.Contract.ContractType.fromDb(getStringOrNull(rs, "contract_type")));
+        Date contractStart = getDateOrNull(rs, "contract_start_date");
+        if (contractStart != null) r.setContractStartDate(contractStart.toLocalDate());
+        Date contractEnd = getDateOrNull(rs, "contract_end_date");
+        if (contractEnd != null) r.setContractEndDate(contractEnd.toLocalDate());
+        r.setBasicSalary(getBigDecimalOrNull(rs, "basic_salary"));
+        r.setStandardWorkingDays(getBigDecimalOrNull(rs, "standard_working_days"));
+        r.setContractNote(getStringOrNull(rs, "contract_note"));
         r.setStatus(EmployeeAccountRequest.Status.fromDb(rs.getString("status")));
         r.setRequestedBy(rs.getInt("requested_by"));
         int reviewedBy = rs.getInt("reviewed_by");
@@ -196,16 +244,52 @@ public class EmployeeAccountRequestDAO {
         if (!rs.wasNull()) r.setCreatedUserId(createdUserId);
         int createdEmployeeId = rs.getInt("created_employee_id");
         if (!rs.wasNull()) r.setCreatedEmployeeId(createdEmployeeId);
+        int createdContractId = getIntOrNull(rs, "created_contract_id");
+        if (createdContractId > 0) r.setCreatedContractId(createdContractId);
         r.setAdminNote(rs.getString("admin_note"));
         Timestamp createdAt = rs.getTimestamp("created_at");
         if (createdAt != null) r.setCreatedAt(createdAt.toLocalDateTime());
         Timestamp updatedAt = rs.getTimestamp("updated_at");
         if (updatedAt != null) r.setUpdatedAt(updatedAt.toLocalDateTime());
         r.setDepartmentName(rs.getString("department_name"));
+        r.setRequestedRoleName(getStringOrNull(rs, "requested_role_name"));
         r.setRequestedByName(rs.getString("requested_by_name"));
         r.setReviewedByName(rs.getString("reviewed_by_name"));
         r.setCreatedUsername(rs.getString("created_username"));
         return r;
+    }
+
+    private int getIntOrNull(ResultSet rs, String column) throws SQLException {
+        try {
+            int v = rs.getInt(column);
+            return rs.wasNull() ? 0 : v;
+        } catch (SQLException ignored) {
+            return 0;
+        }
+    }
+
+    private String getStringOrNull(ResultSet rs, String column) throws SQLException {
+        try {
+            return rs.getString(column);
+        } catch (SQLException ignored) {
+            return null;
+        }
+    }
+
+    private Date getDateOrNull(ResultSet rs, String column) throws SQLException {
+        try {
+            return rs.getDate(column);
+        } catch (SQLException ignored) {
+            return null;
+        }
+    }
+
+    private java.math.BigDecimal getBigDecimalOrNull(ResultSet rs, String column) throws SQLException {
+        try {
+            return rs.getBigDecimal(column);
+        } catch (SQLException ignored) {
+            return null;
+        }
     }
 
     private void close(Connection conn, PreparedStatement ps, ResultSet rs) {

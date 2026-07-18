@@ -1,6 +1,7 @@
 <%@ page contentType="text/html;charset=UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <c:set var="activePage" value="accountRequests" scope="request"/>
 <!DOCTYPE html>
 <html lang="en">
@@ -45,8 +46,8 @@
             <h5 class="fw-bold text-dark mb-0">Employee Account Requests</h5>
             <small class="text-muted">
                 <c:choose>
-                    <c:when test="${adminScope}">Review HR Staff requests and create employee accounts</c:when>
-                    <c:otherwise>Submit employee information for Admin account creation</c:otherwise>
+                    <c:when test="${adminScope}">Review onboarding requests and create accounts with contracts</c:when>
+                    <c:otherwise>Submit employee contract information for Admin account creation</c:otherwise>
                 </c:choose>
             </small>
         </div>
@@ -63,10 +64,10 @@
         </div>
     </c:if>
 
-    <c:if test="${hrStaffScope}">
+    <c:if test="${requestScope}">
         <div class="card border-0 shadow-sm rounded-3 mb-4">
             <div class="card-body">
-                <h6 class="fw-bold mb-3"><i class="bi bi-person-plus me-2"></i>New Request</h6>
+                <h6 class="fw-bold mb-3"><i class="bi bi-person-plus me-2"></i>New Contract & Account Request</h6>
                 <form method="post" action="${pageContext.request.contextPath}/employee-account-requests?action=createRequest" class="row g-3">
                     <div class="col-md-4">
                         <label class="form-label small text-muted mb-1">Full Name</label>
@@ -100,6 +101,19 @@
                         <label class="form-label small text-muted mb-1">Employee Code</label>
                         <input type="text" name="employeeCode" class="form-control" maxlength="20">
                     </div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">Requested Role</label>
+                        <select name="requestedRoleId" class="form-select" required>
+                            <c:forEach var="role" items="${requestRoles}">
+                                <option value="${role.roleId}">${role.roleName}</option>
+                            </c:forEach>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">Position Title</label>
+                        <input type="text" name="positionTitle" class="form-control" maxlength="100"
+                               placeholder="e.g. Sales Executive">
+                    </div>
                     <div class="col-md-4">
                         <label class="form-label small text-muted mb-1">Department</label>
                         <select name="departmentId" class="form-select" required>
@@ -109,9 +123,42 @@
                             </c:forEach>
                         </select>
                     </div>
-                    <div class="col-md-8">
+                    <div class="col-md-5">
                         <label class="form-label small text-muted mb-1">Address</label>
                         <input type="text" name="address" class="form-control" maxlength="255">
+                    </div>
+                    <div class="col-12"><hr class="my-1"></div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">Contract Code</label>
+                        <input type="text" name="contractCode" class="form-control" maxlength="50" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">Contract Type</label>
+                        <select name="contractType" class="form-select" required>
+                            <c:forEach var="ct" items="${contractTypes}">
+                                <option value="${ct}">${ct.dbValue}</option>
+                            </c:forEach>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">Contract Start</label>
+                        <input type="date" name="contractStartDate" class="form-control" value="${today}" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">Contract End</label>
+                        <input type="date" name="contractEndDate" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">Basic Salary</label>
+                        <input type="number" name="basicSalary" class="form-control" min="0" step="1000" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">Standard Working Days</label>
+                        <input type="number" name="standardWorkingDays" class="form-control" min="1" max="31" step="0.5" value="26" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted mb-1">Contract Note</label>
+                        <input type="text" name="contractNote" class="form-control" maxlength="255">
                     </div>
                     <div class="col-12 text-end">
                         <button type="submit" class="btn btn-primary btn-sm px-3"
@@ -136,7 +183,8 @@
                         <tr>
                             <th class="ps-4">#</th>
                             <th>Employee</th>
-                            <th>Department</th>
+                            <th>Role / Department</th>
+                            <th>Contract</th>
                             <th>Requested By</th>
                             <th>Status</th>
                             <th>Account</th>
@@ -157,7 +205,25 @@
                                         <div class="text-muted" style="font-size:0.78rem;">${req.employeeCode}</div>
                                     </c:if>
                                 </td>
-                                <td>${req.departmentName}</td>
+                                <td>
+                                    <div class="fw-medium">${not empty req.requestedRoleName ? req.requestedRoleName : 'EMPLOYEE'}</div>
+                                    <div class="text-muted" style="font-size:0.78rem;">${req.departmentName}</div>
+                                    <c:if test="${not empty req.positionTitle}">
+                                        <div class="text-muted" style="font-size:0.78rem;">${req.positionTitle}</div>
+                                    </c:if>
+                                </td>
+                                <td>
+                                    <div class="fw-medium">${req.contractCode}</div>
+                                    <div class="text-muted" style="font-size:0.78rem;">
+                                        <c:if test="${not empty req.contractType}">${req.contractType.dbValue}</c:if>
+                                        <c:if test="${not empty req.contractStartDate}"> &middot; ${req.contractStartDate}</c:if>
+                                    </div>
+                                    <c:if test="${not empty req.basicSalary}">
+                                        <div class="text-muted" style="font-size:0.78rem;">
+                                            Salary: <fmt:formatNumber value="${req.basicSalary}" type="number" maxFractionDigits="0"/>
+                                        </div>
+                                    </c:if>
+                                </td>
                                 <td class="text-muted">${req.requestedByName}</td>
                                 <td>
                                     <c:choose>
@@ -188,7 +254,7 @@
                                             <c:when test="${req.status == 'Pending'}">
                                                 <div class="d-inline-flex gap-1">
                                                     <form method="post" action="${pageContext.request.contextPath}/employee-account-requests?action=approve"
-                                                          onsubmit="return confirm('Create an employee account for ${req.fullName}?');">
+                                                          onsubmit="return confirm('Create account, employee profile, and active contract for ${req.fullName}?');">
                                                         <input type="hidden" name="requestId" value="${req.requestId}">
                                                         <button type="submit" class="btn btn-sm btn-outline-success" title="Create Account">
                                                             <i class="bi bi-person-check"></i>
@@ -212,7 +278,7 @@
                         </c:forEach>
                         <c:if test="${empty requests}">
                             <tr>
-                                <td colspan="${adminScope ? 8 : 7}" class="text-center text-muted py-5">
+                                <td colspan="${adminScope ? 9 : 8}" class="text-center text-muted py-5">
                                     <i class="bi bi-inbox fs-2 d-block mb-2 opacity-25"></i>
                                     No account requests found.
                                 </td>

@@ -58,6 +58,53 @@ public class AttendanceReportDAO {
         }
     }
 
+    public boolean upsertPendingHrManager(AttendanceReport r) throws SQLException {
+        String sql =
+            "INSERT INTO attendance_reports "
+          + "(employee_id, manager_id, department_id, report_month, report_year, "
+          + " standard_working_days, actual_working_days, paid_leave_days, "
+          + " unpaid_leave_days, maternity_leave_days, overtime_hours, late_penalty_amount, "
+          + " status, submitted_at) "
+          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending HR Manager Approval', NOW()) "
+          + "ON DUPLICATE KEY UPDATE "
+          + " manager_id=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN manager_id ELSE VALUES(manager_id) END, "
+          + " department_id=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN department_id ELSE VALUES(department_id) END, "
+          + " standard_working_days=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN standard_working_days ELSE VALUES(standard_working_days) END, "
+          + " actual_working_days=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN actual_working_days ELSE VALUES(actual_working_days) END, "
+          + " paid_leave_days=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN paid_leave_days ELSE VALUES(paid_leave_days) END, "
+          + " unpaid_leave_days=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN unpaid_leave_days ELSE VALUES(unpaid_leave_days) END, "
+          + " maternity_leave_days=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN maternity_leave_days ELSE VALUES(maternity_leave_days) END, "
+          + " overtime_hours=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN overtime_hours ELSE VALUES(overtime_hours) END, "
+          + " late_penalty_amount=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN late_penalty_amount ELSE VALUES(late_penalty_amount) END, "
+          + " status=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN status ELSE 'Pending HR Manager Approval' END, "
+          + " submitted_at=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN submitted_at ELSE NOW() END, "
+          + " reviewed_by=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN reviewed_by ELSE NULL END, "
+          + " reviewed_at=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN reviewed_at ELSE NULL END, "
+          + " hr_note=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN hr_note ELSE NULL END, "
+          + " updated_at=NOW()";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, r.getEmployeeId());
+            ps.setInt(2, r.getManagerId());
+            ps.setInt(3, r.getDepartmentId());
+            ps.setInt(4, r.getReportMonth());
+            ps.setInt(5, r.getReportYear());
+            ps.setBigDecimal(6, nz(r.getStandardWorkingDays(), new BigDecimal("26")));
+            ps.setBigDecimal(7, nz(r.getActualWorkingDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(8, nz(r.getPaidLeaveDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(9, nz(r.getUnpaidLeaveDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(10, nz(r.getMaternityLeaveDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(11, nz(r.getOvertimeHours(), BigDecimal.ZERO));
+            ps.setBigDecimal(12, nz(r.getLatePenaltyAmount(), BigDecimal.ZERO));
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
     /**
      * Reports submitted to HR for a given month, across all departments.
      * Only rows already sent to HR (not Draft) are returned.

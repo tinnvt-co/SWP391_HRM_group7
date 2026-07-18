@@ -1,5 +1,6 @@
 package model;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -26,19 +27,30 @@ public class EmployeeAccountRequest {
     private LocalDate dateOfBirth;
     private String address;
     private int departmentId;
+    private int requestedRoleId;
+    private String positionTitle;
     private LocalDate hireDate;
     private String employeeCode;
+    private String contractCode;
+    private Contract.ContractType contractType;
+    private LocalDate contractStartDate;
+    private LocalDate contractEndDate;
+    private BigDecimal basicSalary;
+    private BigDecimal standardWorkingDays;
+    private String contractNote;
     private Status status;
     private int requestedBy;
     private Integer reviewedBy;
     private LocalDateTime reviewedAt;
     private Integer createdUserId;
     private Integer createdEmployeeId;
+    private Integer createdContractId;
     private String adminNote;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     private String departmentName;
+    private String requestedRoleName;
     private String requestedByName;
     private String reviewedByName;
     private String createdUsername;
@@ -67,11 +79,38 @@ public class EmployeeAccountRequest {
     public int getDepartmentId() { return departmentId; }
     public void setDepartmentId(int departmentId) { this.departmentId = departmentId; }
 
+    public int getRequestedRoleId() { return requestedRoleId; }
+    public void setRequestedRoleId(int requestedRoleId) { this.requestedRoleId = requestedRoleId; }
+
+    public String getPositionTitle() { return positionTitle; }
+    public void setPositionTitle(String positionTitle) { this.positionTitle = positionTitle; }
+
     public LocalDate getHireDate() { return hireDate; }
     public void setHireDate(LocalDate hireDate) { this.hireDate = hireDate; }
 
     public String getEmployeeCode() { return employeeCode; }
     public void setEmployeeCode(String employeeCode) { this.employeeCode = employeeCode; }
+
+    public String getContractCode() { return contractCode; }
+    public void setContractCode(String contractCode) { this.contractCode = contractCode; }
+
+    public Contract.ContractType getContractType() { return contractType; }
+    public void setContractType(Contract.ContractType contractType) { this.contractType = contractType; }
+
+    public LocalDate getContractStartDate() { return contractStartDate; }
+    public void setContractStartDate(LocalDate contractStartDate) { this.contractStartDate = contractStartDate; }
+
+    public LocalDate getContractEndDate() { return contractEndDate; }
+    public void setContractEndDate(LocalDate contractEndDate) { this.contractEndDate = contractEndDate; }
+
+    public BigDecimal getBasicSalary() { return basicSalary; }
+    public void setBasicSalary(BigDecimal basicSalary) { this.basicSalary = basicSalary; }
+
+    public BigDecimal getStandardWorkingDays() { return standardWorkingDays; }
+    public void setStandardWorkingDays(BigDecimal standardWorkingDays) { this.standardWorkingDays = standardWorkingDays; }
+
+    public String getContractNote() { return contractNote; }
+    public void setContractNote(String contractNote) { this.contractNote = contractNote; }
 
     public Status getStatus() { return status; }
     public void setStatus(Status status) { this.status = status; }
@@ -91,6 +130,9 @@ public class EmployeeAccountRequest {
     public Integer getCreatedEmployeeId() { return createdEmployeeId; }
     public void setCreatedEmployeeId(Integer createdEmployeeId) { this.createdEmployeeId = createdEmployeeId; }
 
+    public Integer getCreatedContractId() { return createdContractId; }
+    public void setCreatedContractId(Integer createdContractId) { this.createdContractId = createdContractId; }
+
     public String getAdminNote() { return adminNote; }
     public void setAdminNote(String adminNote) { this.adminNote = adminNote; }
 
@@ -102,6 +144,9 @@ public class EmployeeAccountRequest {
 
     public String getDepartmentName() { return departmentName; }
     public void setDepartmentName(String departmentName) { this.departmentName = departmentName; }
+
+    public String getRequestedRoleName() { return requestedRoleName; }
+    public void setRequestedRoleName(String requestedRoleName) { this.requestedRoleName = requestedRoleName; }
 
     public String getRequestedByName() { return requestedByName; }
     public void setRequestedByName(String requestedByName) { this.requestedByName = requestedByName; }
