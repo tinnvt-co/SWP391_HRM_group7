@@ -240,6 +240,92 @@ public class EmployeeDAO {
         return list;
     }
 
+    public int countByRoleName(String roleName, String keyword) throws SQLException {
+        String sql = "SELECT COUNT(*) "
+                   + "FROM employees e "
+                   + "JOIN users u       ON e.user_id       = u.user_id "
+                   + "JOIN roles ro      ON u.role_id       = ro.role_id "
+                   + "JOIN departments d ON e.department_id = d.department_id "
+                   + "WHERE ro.role_name = ? ";
+        boolean hasKeyword = keyword != null && !keyword.isBlank();
+        if (hasKeyword) {
+            sql += "AND (LOWER(u.full_name) LIKE ? "
+                + "OR LOWER(e.employee_code) LIKE ? "
+                + "OR LOWER(u.email) LIKE ? "
+                + "OR LOWER(d.department_name) LIKE ?) ";
+        }
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, roleName);
+            if (hasKeyword) {
+                String like = "%" + keyword.trim().toLowerCase() + "%";
+                ps.setString(2, like);
+                ps.setString(3, like);
+                ps.setString(4, like);
+                ps.setString(5, like);
+            }
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getInt(1) : 0;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public List<Employee> findByRoleNamePage(String roleName, String keyword,
+                                             int offset, int limit) throws SQLException {
+        String sql = "SELECT e.*, u.full_name, u.username, u.email, u.phone, u.is_active, "
+                   + "       d.department_name "
+                   + "FROM employees e "
+                   + "JOIN users u       ON e.user_id       = u.user_id "
+                   + "JOIN roles ro      ON u.role_id       = ro.role_id "
+                   + "JOIN departments d ON e.department_id = d.department_id "
+                   + "WHERE ro.role_name = ? ";
+        boolean hasKeyword = keyword != null && !keyword.isBlank();
+        if (hasKeyword) {
+            sql += "AND (LOWER(u.full_name) LIKE ? "
+                + "OR LOWER(e.employee_code) LIKE ? "
+                + "OR LOWER(u.email) LIKE ? "
+                + "OR LOWER(d.department_name) LIKE ?) ";
+        }
+        sql += "ORDER BY u.full_name LIMIT ? OFFSET ?";
+
+        List<Employee> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            int idx = 1;
+            ps.setString(idx++, roleName);
+            if (hasKeyword) {
+                String like = "%" + keyword.trim().toLowerCase() + "%";
+                ps.setString(idx++, like);
+                ps.setString(idx++, like);
+                ps.setString(idx++, like);
+                ps.setString(idx++, like);
+            }
+            ps.setInt(idx++, limit);
+            ps.setInt(idx, offset);
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                Employee e = mapRow(rs);
+                e.setUsername(rs.getString("username"));
+                e.setEmail(rs.getString("email"));
+                e.setPhone(rs.getString("phone"));
+                list.add(e);
+            }
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
     public Employee findDetailById(int employeeId) throws SQLException {
         String sql = "SELECT e.*, u.full_name, u.username, u.email, u.phone, u.gender, "
                    + "       u.date_of_birth, u.address, d.department_name, ro.role_name "

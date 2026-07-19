@@ -50,16 +50,36 @@
 <div class="main-content">
     <div class="mb-4">
         <h5 class="fw-bold text-dark mb-0">Employees</h5>
-        <small class="text-muted">View employee profiles and manage employment status</small>
+        <small class="text-muted">
+            ${permissions.contains('UPDATE_EMPLOYMENT_STATUS') ? 'View employee profiles and manage employment status' : 'View employee profiles'}
+        </small>
     </div>
 
     <div class="card border-0 shadow-sm rounded-3">
         <div class="card-body p-0">
-            <div class="p-3 border-bottom d-flex align-items-center gap-2">
-                <i class="bi bi-search text-muted"></i>
-                <input type="text" id="searchInput" class="form-control form-control-sm border-0 shadow-none"
-                       placeholder="Search by name, code, email, department..." style="max-width:340px;">
-            </div>
+            <form method="get" action="${pageContext.request.contextPath}/hr/employees"
+                  class="p-3 border-bottom d-flex align-items-center gap-2 flex-wrap">
+                <div class="input-group input-group-sm" style="max-width:380px;">
+                    <span class="input-group-text bg-white border-end-0">
+                        <i class="bi bi-search text-muted"></i>
+                    </span>
+                    <input type="text" name="search" value="${search}"
+                           class="form-control border-start-0"
+                           placeholder="Search by name, code, email, department...">
+                </div>
+                <button type="submit" class="btn btn-sm btn-primary">
+                    Search
+                </button>
+                <c:if test="${not empty search}">
+                    <a href="${pageContext.request.contextPath}/hr/employees"
+                       class="btn btn-sm btn-outline-secondary">
+                        Clear
+                    </a>
+                </c:if>
+                <div class="ms-auto text-muted small">
+                    ${totalItems} employee(s)
+                </div>
+            </form>
             <div class="table-responsive">
                 <table class="table table-hover mb-0" id="empTable">
                     <thead class="table-light">
@@ -76,7 +96,7 @@
                     <tbody>
                         <c:forEach var="e" items="${employees}" varStatus="s">
                             <tr>
-                                <td class="ps-4 text-muted">${s.index + 1}</td>
+                                <td class="ps-4 text-muted">${startIndex + s.index + 1}</td>
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
                                         <div class="avatar-sm">${fn:substring(e.fullName, 0, 1)}</div>
@@ -125,18 +145,56 @@
                     </tbody>
                 </table>
             </div>
+            <c:if test="${totalPages > 1}">
+                <div class="px-3 py-3 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="text-muted small">
+                        Page ${currentPage} of ${totalPages}
+                    </div>
+                    <nav aria-label="Employee pagination">
+                        <ul class="pagination pagination-sm mb-0">
+                            <c:url var="prevUrl" value="/hr/employees">
+                                <c:param name="page" value="${currentPage - 1}"/>
+                                <c:if test="${not empty search}">
+                                    <c:param name="search" value="${search}"/>
+                                </c:if>
+                            </c:url>
+                            <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}">
+                                <a class="page-link" href="${prevUrl}" aria-label="Previous">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
+
+                            <c:forEach begin="1" end="${totalPages}" var="p">
+                                <c:url var="pageUrl" value="/hr/employees">
+                                    <c:param name="page" value="${p}"/>
+                                    <c:if test="${not empty search}">
+                                        <c:param name="search" value="${search}"/>
+                                    </c:if>
+                                </c:url>
+                                <li class="page-item ${p == currentPage ? 'active' : ''}">
+                                    <a class="page-link" href="${pageUrl}">${p}</a>
+                                </li>
+                            </c:forEach>
+
+                            <c:url var="nextUrl" value="/hr/employees">
+                                <c:param name="page" value="${currentPage + 1}"/>
+                                <c:if test="${not empty search}">
+                                    <c:param name="search" value="${search}"/>
+                                </c:if>
+                            </c:url>
+                            <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}">
+                                <a class="page-link" href="${nextUrl}" aria-label="Next">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </c:if>
         </div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    document.getElementById('searchInput').addEventListener('input', function () {
-        const q = this.value.toLowerCase();
-        document.querySelectorAll('#empTable tbody tr').forEach(row => {
-            row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-        });
-    });
-</script>
 </body>
 </html>

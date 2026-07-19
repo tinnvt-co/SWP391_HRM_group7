@@ -45,8 +45,12 @@
 <div class="main-content">
     <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
         <div>
-            <h5 class="fw-bold text-dark mb-0">Department Management</h5>
-            <small class="text-muted">View and manage company departments</small>
+            <h5 class="fw-bold text-dark mb-0">
+                ${permissions.contains('CREATE_DEPARTMENT') or permissions.contains('UPDATE_DEPARTMENT') ? 'Department Management' : 'Departments'}
+            </h5>
+            <small class="text-muted">
+                ${permissions.contains('CREATE_DEPARTMENT') or permissions.contains('UPDATE_DEPARTMENT') ? 'View and manage company departments' : 'View company departments'}
+            </small>
         </div>
         <c:if test="${permissions.contains('CREATE_DEPARTMENT')}">
             <a href="${pageContext.request.contextPath}/departments?action=add"

@@ -19,6 +19,8 @@ import java.util.List;
 @WebServlet(name = "HrEmployeeServlet", urlPatterns = {"/hr/employees"})
 public class HrEmployeeServlet extends HttpServlet {
 
+    private static final int PAGE_SIZE = 10;
+
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
 
     @Override
@@ -63,7 +65,22 @@ public class HrEmployeeServlet extends HttpServlet {
 
     private void handleList(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, ServletException, IOException {
-        request.setAttribute("employees", employeeDAO.findByRoleName("EMPLOYEE"));
+        String search = trim(request.getParameter("search"));
+        int page = parseIntOr(request.getParameter("page"), 1);
+        int totalItems = employeeDAO.countByRoleName("EMPLOYEE", search);
+        int totalPages = Math.max(1, (int) Math.ceil(totalItems / (double) PAGE_SIZE));
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+
+        int offset = (page - 1) * PAGE_SIZE;
+        request.setAttribute("employees",
+                employeeDAO.findByRoleNamePage("EMPLOYEE", search, offset, PAGE_SIZE));
+        request.setAttribute("search", search);
+        request.setAttribute("currentPage", page);
+        request.setAttribute("totalPages", totalPages);
+        request.setAttribute("totalItems", totalItems);
+        request.setAttribute("pageSize", PAGE_SIZE);
+        request.setAttribute("startIndex", offset);
         request.getRequestDispatcher("/views/hr/employee-list.jsp").forward(request, response);
     }
 
@@ -135,5 +152,17 @@ public class HrEmployeeServlet extends HttpServlet {
         if (session == null) return false;
         List<?> perms = (List<?>) session.getAttribute("permissions");
         return perms != null && perms.contains(permCode);
+    }
+
+    private int parseIntOr(String value, int fallback) {
+        try {
+            return value == null ? fallback : Integer.parseInt(value.trim());
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
+    }
+
+    private String trim(String value) {
+        return value == null ? "" : value.trim();
     }
 }
