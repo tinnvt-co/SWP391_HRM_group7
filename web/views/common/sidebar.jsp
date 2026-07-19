@@ -1,6 +1,12 @@
 <%@ page contentType="text/html;charset=UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<c:set var="canViewPayslip"
+       value="${permissions.contains('VIEW_PAYSLIP')
+                or currentUser.role.roleName == 'EMPLOYEE'
+                or currentUser.role.roleName == 'MANAGER'
+                or currentUser.role.roleName == 'HR_STAFF'
+                or currentUser.role.roleName == 'HR_MANAGER'}"/>
 <div class="sidebar">
     <div class="sidebar-label">Navigation</div>
     <ul class="nav flex-column">
@@ -138,7 +144,7 @@
         </c:if>
         <c:if test="${permissions.contains('VIEW_PAYROLL')
                    or permissions.contains('APPROVE_REJECT_PAYROLL')
-                   or permissions.contains('VIEW_PAYSLIP')
+                   or canViewPayslip
                    or (currentUser.role.roleName == 'HR_MANAGER' and permissions.contains('MANAGE_ALLOWANCE'))}">
             <div class="sidebar-label mt-2">Payroll</div>
             <c:if test="${permissions.contains('GENERATE_PAYROLL')}">
@@ -165,7 +171,7 @@
                     </a>
                 </li>
             </c:if>
-            <c:if test="${permissions.contains('VIEW_PAYSLIP')}">
+            <c:if test="${canViewPayslip}">
                 <li class="nav-item">
                     <a class="nav-link ${activePage == 'payslip' ? 'active' : ''}"
                        href="${pageContext.request.contextPath}/payslip">

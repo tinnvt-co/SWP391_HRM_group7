@@ -1,7 +1,9 @@
 package controller;
 
+import dao.DepartmentDAO;
 import dao.EmployeeDAO;
 import dao.UserDAO;
+import model.Department;
 import model.Employee;
 import model.User;
 
@@ -14,13 +16,13 @@ import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.List;
 
 @WebServlet(name = "ProfileServlet", urlPatterns = {"/profile"})
 public class ProfileServlet extends HttpServlet {
 
     private final UserDAO userDAO = new UserDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
+    private final DepartmentDAO departmentDAO = new DepartmentDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -43,14 +45,15 @@ public class ProfileServlet extends HttpServlet {
         }
     }
 
-    private boolean canManageBankAccount(HttpSession session, User user, Employee employee) {
+    private boolean canManageBankAccount(HttpSession session, User user, Employee employee)
+            throws SQLException {
         if (session == null || user == null || user.getRole() == null || employee == null) {
             return false;
         }
-        if (!"EMPLOYEE".equalsIgnoreCase(user.getRole().getRoleName())) {
+        if ("IT".equalsIgnoreCase(user.getRole().getRoleName())) {
             return false;
         }
-        List<?> permissions = (List<?>) session.getAttribute("permissions");
-        return permissions != null && permissions.contains("MANAGE_OWN_BANK_ACCOUNT");
+        Department department = departmentDAO.findById(employee.getDepartmentId());
+        return department == null || !"IT".equalsIgnoreCase(department.getDepartmentCode());
     }
 }

@@ -2,7 +2,9 @@ package controller;
 
 import dao.AttendanceReportDAO;
 import dao.AttendanceRecordDAO;
+import dao.PayrollPeriodDAO;
 import model.AttendanceReport;
+import model.PayrollTaskSummary;
 import model.User;
 import service.AttendanceAutoConfirmService;
 
@@ -33,6 +35,7 @@ public class AttendanceReportServlet extends HttpServlet {
 
     private final AttendanceReportDAO reportDAO = new AttendanceReportDAO();
     private final AttendanceRecordDAO attendanceDAO = new AttendanceRecordDAO();
+    private final PayrollPeriodDAO payrollPeriodDAO = new PayrollPeriodDAO();
     private final AttendanceAutoConfirmService autoConfirmService = new AttendanceAutoConfirmService();
 
     @Override
@@ -59,6 +62,9 @@ public class AttendanceReportServlet extends HttpServlet {
                     ? currentUser.getUserId() : null;
             boolean hrStaffScope = "HR_STAFF".equalsIgnoreCase(roleName);
             boolean hrManagerScope = "HR_MANAGER".equalsIgnoreCase(roleName);
+            PayrollTaskSummary payrollTaskSummary = hrStaffScope
+                    ? payrollPeriodDAO.findHrStaffTaskSummary()
+                    : (hrManagerScope ? payrollPeriodDAO.findHrManagerTaskSummary() : null);
 
             int totalReports = reportDAO.countSubmittedByMonth(year, month, null, managerUserId);
             int readyToSubmitCount = hrStaffScope
@@ -93,6 +99,8 @@ public class AttendanceReportServlet extends HttpServlet {
             request.setAttribute("readyToSubmitCount", readyToSubmitCount);
             request.setAttribute("pendingManagerConfirmationCount", pendingManagerConfirmationCount);
             request.setAttribute("pendingHrManagerApprovalCount", pendingHrManagerApprovalCount);
+            request.setAttribute("payrollTaskSummary", payrollTaskSummary);
+            request.setAttribute("payrollTaskApproval", hrManagerScope);
             request.setAttribute("canSubmitToHrManager",
                     hrStaffScope && hasPermission(request, "VIEW_ATTENDANCE_REPORT"));
             request.setAttribute("canApproveAttendanceReport",

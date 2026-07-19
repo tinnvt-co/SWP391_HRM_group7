@@ -1,6 +1,8 @@
 package controller;
 
+import dao.DepartmentDAO;
 import dao.EmployeeDAO;
+import model.Department;
 import model.Employee;
 import model.User;
 
@@ -13,12 +15,12 @@ import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.List;
 
 @WebServlet(name = "BankAccountServlet", urlPatterns = {"/bank-account"})
 public class BankAccountServlet extends HttpServlet {
 
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
+    private final DepartmentDAO departmentDAO = new DepartmentDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -29,13 +31,12 @@ public class BankAccountServlet extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/login");
             return;
         }
-        if (!canManageOwnBankAccount(request, currentUser)) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN);
-            return;
-        }
-
         try {
             Employee employee = employeeDAO.findByUserId(currentUser.getUserId());
+            if (!canUseBankAccount(currentUser, employee)) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                return;
+            }
             if (employee == null) {
                 request.setAttribute("error",
                         "Your account is not linked to an employee record. Please contact HR.");
@@ -56,17 +57,16 @@ public class BankAccountServlet extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/login");
             return;
         }
-        if (!canManageOwnBankAccount(request, currentUser)) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN);
-            return;
-        }
-
         String bankName    = trim(request.getParameter("bankName"));
         String bankAccount = trim(request.getParameter("bankAccountNumber"));
         String bankBranch  = trim(request.getParameter("bankBranch"));
 
         try {
             Employee employee = employeeDAO.findByUserId(currentUser.getUserId());
+            if (!canUseBankAccount(currentUser, employee)) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                return;
+            }
             if (employee == null) {
                 request.setAttribute("error",
                         "Your account is not linked to an employee record. Please contact HR.");
@@ -118,13 +118,11 @@ public class BankAccountServlet extends HttpServlet {
         return session == null ? null : (User) session.getAttribute("currentUser");
     }
 
-    private boolean canManageOwnBankAccount(HttpServletRequest request, User user) {
-        if (user == null || user.getRole() == null) return false;
-        if (!"EMPLOYEE".equalsIgnoreCase(user.getRole().getRoleName())) return false;
-        HttpSession session = request.getSession(false);
-        if (session == null) return false;
-        List<?> permissions = (List<?>) session.getAttribute("permissions");
-        return permissions != null && permissions.contains("MANAGE_OWN_BANK_ACCOUNT");
+    private boolean canUseBankAccount(User user, Employee employee) throws SQLException {
+        if (user == null || user.getRole() == null || employee == null) return false;
+        if ("IT".equalsIgnoreCase(user.getRole().getRoleName())) return false;
+        Department department = departmentDAO.findById(employee.getDepartmentId());
+        return department == null || !"IT".equalsIgnoreCase(department.getDepartmentCode());
     }
 
     private String trim(String value) {

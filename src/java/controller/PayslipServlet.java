@@ -34,12 +34,12 @@ public class PayslipServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        if (!hasPerm(request, "VIEW_PAYSLIP")) {
+        User user = currentUser(request);
+        if (!hasPerm(request, "VIEW_PAYSLIP") && !canViewOwnPayslip(user)) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
 
-        User user = currentUser(request);
         YearMonth now = YearMonth.now();
         int year  = parseIntOr(request.getParameter("year"),  now.getYear());
         int month = parseIntOr(request.getParameter("month"), now.getMonthValue());
@@ -76,6 +76,15 @@ public class PayslipServlet extends HttpServlet {
         if (s == null) return false;
         List<?> perms = (List<?>) s.getAttribute("permissions");
         return perms != null && perms.contains(code);
+    }
+
+    private boolean canViewOwnPayslip(User user) {
+        if (user == null || user.getRole() == null) return false;
+        String roleName = user.getRole().getRoleName();
+        return "EMPLOYEE".equalsIgnoreCase(roleName)
+                || "MANAGER".equalsIgnoreCase(roleName)
+                || "HR_STAFF".equalsIgnoreCase(roleName)
+                || "HR_MANAGER".equalsIgnoreCase(roleName);
     }
 
     private int parseIntOr(String s, int dflt) {

@@ -125,6 +125,27 @@ public class PayrollDAO {
         }
     }
 
+    public int countByDepartmentMonth(int departmentId, int year, int month) throws SQLException {
+        String sql = "SELECT COUNT(*) "
+                   + "FROM payrolls p "
+                   + "JOIN payroll_periods pp ON p.payroll_period_id = pp.payroll_period_id "
+                   + "WHERE pp.department_id=? AND pp.payroll_year=? AND pp.payroll_month=?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, departmentId);
+            ps.setInt(2, year);
+            ps.setInt(3, month);
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getInt(1) : 0;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
     public BigDecimal sumNetSalaryByDepartmentMonth(int departmentId, int year, int month)
             throws SQLException {
         String sql = "SELECT COALESCE(SUM(p.net_salary), 0) "
@@ -250,6 +271,32 @@ public class PayrollDAO {
             ps.setInt(2, month);
             ps.setInt(3, limit);
             ps.setInt(4, offset);
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
+    public List<Payroll> findByDepartmentMonthPage(int departmentId, int year, int month,
+                                                   int offset, int limit) throws SQLException {
+        String sql = baseSelect()
+                   + "WHERE pp.department_id=? AND pp.payroll_year=? AND pp.payroll_month=? "
+                   + "ORDER BY eu.full_name "
+                   + "LIMIT ? OFFSET ?";
+        List<Payroll> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, departmentId);
+            ps.setInt(2, year);
+            ps.setInt(3, month);
+            ps.setInt(4, limit);
+            ps.setInt(5, offset);
             rs = ps.executeQuery();
             while (rs.next()) list.add(mapRow(rs));
         } finally {

@@ -43,6 +43,12 @@
         .st-final     { background:#fef3c7; color:#854d0e; }
         .st-pending-hr { background:#fff7ed; color:#9a3412; }
         .st-approved-hr { background:#dcfce7; color:#166534; }
+        .task-card { border: none; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+            transition: box-shadow 0.2s, transform 0.2s; }
+        .task-card-link { color: inherit; text-decoration: none; display: block; }
+        .task-card-link:hover .task-card { box-shadow: 0 4px 16px rgba(0,0,0,0.11); transform: translateY(-1px); }
+        .task-icon { width: 48px; height: 48px; border-radius: 12px; background:#fff8e1;
+            display:flex; align-items:center; justify-content:center; font-size:1.25rem; }
     </style>
 </head>
 <body>
@@ -94,6 +100,52 @@
             </form>
         </c:if>
     </div>
+
+    <c:if test="${not empty payrollTaskSummary and payrollTaskSummary.actionable}">
+        <c:url var="attendancePayrollTaskUrl" value="/payroll">
+            <c:if test="${payrollTaskApproval}">
+                <c:param name="action" value="approval"/>
+            </c:if>
+            <c:param name="month" value="${payrollTaskSummary.month}"/>
+            <c:param name="year" value="${payrollTaskSummary.year}"/>
+            <c:if test="${not empty payrollTaskSummary.departmentId}">
+                <c:param name="deptId" value="${payrollTaskSummary.departmentId}"/>
+            </c:if>
+        </c:url>
+    </c:if>
+    <c:if test="${not empty payrollTaskSummary}">
+        <div class="row g-3 mb-3">
+            <div class="col-lg-4 col-md-6">
+                <a class="task-card-link ${payrollTaskSummary.actionable ? '' : 'pe-none'}"
+                   href="${payrollTaskSummary.actionable ? attendancePayrollTaskUrl : '#'}"
+                   aria-disabled="${payrollTaskSummary.actionable ? 'false' : 'true'}">
+                    <div class="task-card card p-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="task-icon">
+                                <i class="bi bi-list-task text-warning"></i>
+                            </div>
+                            <div>
+                                <div class="text-muted small">Tasks to Process</div>
+                                <div class="fw-bold fs-5">${payrollTaskSummary.count}</div>
+                                <div class="text-muted" style="font-size:0.78rem;">
+                                    <c:choose>
+                                        <c:when test="${payrollTaskSummary.actionable}">
+                                            ${payrollTaskSummary.taskLabel}
+                                            <c:if test="${not empty payrollTaskSummary.departmentName}">
+                                                &middot; ${payrollTaskSummary.departmentName}
+                                            </c:if>
+                                            &middot; Month ${payrollTaskSummary.month}/${payrollTaskSummary.year}
+                                        </c:when>
+                                        <c:otherwise>No pending payroll tasks</c:otherwise>
+                                    </c:choose>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </c:if>
 
     <div class="card border-0 shadow-sm rounded-3 mb-3">
         <div class="card-body">

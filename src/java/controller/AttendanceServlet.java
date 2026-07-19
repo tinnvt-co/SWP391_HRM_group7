@@ -4,12 +4,14 @@ import dao.AttendanceRecordDAO;
 import dao.AttendanceReportDAO;
 import dao.DepartmentDAO;
 import dao.EmployeeDAO;
+import dao.PayrollPeriodDAO;
 import model.AttendanceRecord;
 import model.AttendanceRecord.AttendanceStatus;
 import model.AttendanceRecord.VerificationStatus;
 import model.AttendanceReport;
 import model.Department;
 import model.Employee;
+import model.PayrollTaskSummary;
 import model.User;
 import service.AttendanceAutoConfirmService;
 import service.AttendanceImportService;
@@ -49,6 +51,7 @@ public class AttendanceServlet extends HttpServlet {
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
     private final AttendanceReportDAO reportDAO = new AttendanceReportDAO();
     private final DepartmentDAO departmentDAO = new DepartmentDAO();
+    private final PayrollPeriodDAO payrollPeriodDAO = new PayrollPeriodDAO();
     private final AttendanceAutoConfirmService autoConfirmService = new AttendanceAutoConfirmService();
 
     @Override
@@ -178,6 +181,7 @@ public class AttendanceServlet extends HttpServlet {
         request.setAttribute("monthEnd", monthEnd);
         request.setAttribute("importMonthLabel", monthLabel(selectedMonth));
         request.setAttribute("canImportAttendance", hasPermission(request, "IMPORT_ATTENDANCE"));
+        attachPayrollTaskSummary(request, roleName);
 
         if (managerScope) {
             // Manager: show employee cards of their team
@@ -659,6 +663,20 @@ public class AttendanceServlet extends HttpServlet {
             if (d.getDepartmentId() == departmentId) return true;
         }
         return false;
+    }
+
+    private void attachPayrollTaskSummary(HttpServletRequest request, String roleName)
+            throws SQLException {
+        PayrollTaskSummary summary = null;
+        boolean approvalTask = false;
+        if ("HR_STAFF".equalsIgnoreCase(roleName)) {
+            summary = payrollPeriodDAO.findHrStaffTaskSummary();
+        } else if ("HR_MANAGER".equalsIgnoreCase(roleName)) {
+            summary = payrollPeriodDAO.findHrManagerTaskSummary();
+            approvalTask = true;
+        }
+        request.setAttribute("payrollTaskSummary", summary);
+        request.setAttribute("payrollTaskApproval", approvalTask);
     }
 
     private List<Integer> buildYearOptions(int selectedYear) {
