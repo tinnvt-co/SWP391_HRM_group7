@@ -22,7 +22,7 @@ public class MailConfig {
         SMTP_HOST = resolve(props, "mail.smtp.host", "MAIL_SMTP_HOST", "smtp.gmail.com");
         SMTP_PORT = resolve(props, "mail.smtp.port", "MAIL_SMTP_PORT", "587");
         USERNAME  = resolve(props, "mail.username",  "MAIL_USERNAME",  "");
-        PASSWORD  = resolve(props, "mail.password",  "MAIL_PASSWORD",  "");
+        PASSWORD  = normalizePassword(resolve(props, "mail.password", "MAIL_PASSWORD", ""));
         FROM_NAME = resolve(props, "mail.from.name", "MAIL_FROM_NAME", "HRM System");
     }
 
@@ -31,5 +31,9 @@ public class MailConfig {
         if (env != null && !env.isBlank()) return env;
         String value = props.getProperty(propKey);
         return value != null && !value.isBlank() ? value.trim() : defaultValue;
+    }
+
+    private static String normalizePassword(String password) {
+        return password == null ? "" : password.replaceAll("\\s+", "");
     }
 }

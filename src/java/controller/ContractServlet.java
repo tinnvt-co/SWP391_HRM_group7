@@ -102,6 +102,7 @@ public class ContractServlet extends HttpServlet {
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalContracts", totalContracts);
+        request.setAttribute("canCreateContract", canCreateContract(request));
         request.getRequestDispatcher("/views/contract/contract-list.jsp").forward(request, response);
     }
 
@@ -128,7 +129,7 @@ public class ContractServlet extends HttpServlet {
     private void handleAddForm(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, ServletException, IOException {
 
-        if (!hasPermission(request, "CREATE_CONTRACT")) {
+        if (!canCreateContract(request)) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
@@ -141,7 +142,7 @@ public class ContractServlet extends HttpServlet {
     private void handleAdd(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, ServletException, IOException {
 
-        if (!hasPermission(request, "CREATE_CONTRACT")) {
+        if (!canCreateContract(request)) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
@@ -424,6 +425,15 @@ public class ContractServlet extends HttpServlet {
     private User getCurrentUser(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         return session == null ? null : (User) session.getAttribute("currentUser");
+    }
+
+    private boolean canCreateContract(HttpServletRequest request) {
+        User currentUser = getCurrentUser(request);
+        String roleName = currentUser != null && currentUser.getRole() != null
+                ? currentUser.getRole().getRoleName()
+                : "";
+        return hasPermission(request, "CREATE_CONTRACT")
+                && !"HR_STAFF".equalsIgnoreCase(roleName);
     }
 
     private boolean hasPermission(HttpServletRequest request, String permCode) {

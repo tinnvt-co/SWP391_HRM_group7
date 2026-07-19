@@ -546,6 +546,10 @@ public class AttendanceRecordDAO {
     }
 
     public int countPendingHrManagedByMonth(int year, int month) throws SQLException {
+        return countPendingHrManagedByMonth(year, month, null);
+    }
+
+    public int countPendingHrManagedByMonth(int year, int month, Integer departmentId) throws SQLException {
         String sql =
             "SELECT COUNT(*) "
           + "FROM attendance_records ar "
@@ -557,6 +561,7 @@ public class AttendanceRecordDAO {
           + "  AND d.department_code <> 'IT' "
           + "  AND ar.verification_status = 'Pending' "
           + "  AND YEAR(ar.work_date)=? AND MONTH(ar.work_date)=?";
+        if (departmentId != null) sql += " AND e.department_id=?";
         Connection conn = null;
         PreparedStatement ps = null;
         ResultSet rs = null;
@@ -565,6 +570,41 @@ public class AttendanceRecordDAO {
             ps = conn.prepareStatement(sql);
             ps.setInt(1, year);
             ps.setInt(2, month);
+            if (departmentId != null) ps.setInt(3, departmentId);
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getInt(1) : 0;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public int countPendingManagerConfirmationByMonth(int year, int month) throws SQLException {
+        return countPendingManagerConfirmationByMonth(year, month, null);
+    }
+
+    public int countPendingManagerConfirmationByMonth(int year, int month, Integer departmentId) throws SQLException {
+        String sql =
+            "SELECT COUNT(*) "
+          + "FROM attendance_records ar "
+          + "JOIN employees e ON ar.employee_id = e.employee_id "
+          + "JOIN users u ON e.user_id = u.user_id "
+          + "JOIN roles ro ON u.role_id = ro.role_id "
+          + "JOIN departments d ON e.department_id = d.department_id "
+          + "WHERE u.manager_id IS NOT NULL "
+          + "  AND ro.role_name = 'EMPLOYEE' "
+          + "  AND d.department_code <> 'IT' "
+          + "  AND ar.verification_status = 'Pending' "
+          + "  AND YEAR(ar.work_date)=? AND MONTH(ar.work_date)=?";
+        if (departmentId != null) sql += " AND e.department_id=?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, year);
+            ps.setInt(2, month);
+            if (departmentId != null) ps.setInt(3, departmentId);
             rs = ps.executeQuery();
             return rs.next() ? rs.getInt(1) : 0;
         } finally {
@@ -574,6 +614,11 @@ public class AttendanceRecordDAO {
 
     public int verifyPendingHrManagedByMonth(int verifierUserId, int year, int month)
             throws SQLException {
+        return verifyPendingHrManagedByMonth(verifierUserId, year, month, null);
+    }
+
+    public int verifyPendingHrManagedByMonth(int verifierUserId, int year, int month,
+                                             Integer departmentId) throws SQLException {
         String sql =
             "UPDATE attendance_records ar "
           + "JOIN employees e ON ar.employee_id = e.employee_id "
@@ -586,6 +631,7 @@ public class AttendanceRecordDAO {
           + "  AND d.department_code <> 'IT' "
           + "  AND ar.verification_status = 'Pending' "
           + "  AND YEAR(ar.work_date)=? AND MONTH(ar.work_date)=?";
+        if (departmentId != null) sql += " AND e.department_id=?";
 
         Connection conn = null;
         PreparedStatement ps = null;
@@ -595,6 +641,7 @@ public class AttendanceRecordDAO {
             ps.setInt(1, verifierUserId);
             ps.setInt(2, year);
             ps.setInt(3, month);
+            if (departmentId != null) ps.setInt(4, departmentId);
             return ps.executeUpdate();
         } finally {
             close(conn, ps, null);
@@ -602,6 +649,12 @@ public class AttendanceRecordDAO {
     }
 
     public List<MonthlySummary> aggregateMonthByHrManagedRoles(int year, int month)
+            throws SQLException {
+        return aggregateMonthByHrManagedRoles(year, month, null);
+    }
+
+    public List<MonthlySummary> aggregateMonthByHrManagedRoles(int year, int month,
+                                                               Integer departmentId)
             throws SQLException {
         String sql =
             "SELECT ar.employee_id, e.department_id, "
@@ -623,6 +676,7 @@ public class AttendanceRecordDAO {
           + "  AND ro.role_name IN ('MANAGER', 'HR_STAFF') "
           + "  AND d.department_code <> 'IT' "
           + "  AND YEAR(ar.work_date)=? AND MONTH(ar.work_date)=? "
+          + (departmentId != null ? "  AND e.department_id=? " : "")
           + "GROUP BY ar.employee_id, e.department_id";
         List<MonthlySummary> list = new ArrayList<>();
         Connection conn = null;
@@ -633,6 +687,7 @@ public class AttendanceRecordDAO {
             ps = conn.prepareStatement(sql);
             ps.setInt(1, year);
             ps.setInt(2, month);
+            if (departmentId != null) ps.setInt(3, departmentId);
             rs = ps.executeQuery();
             while (rs.next()) {
                 MonthlySummary s = new MonthlySummary();

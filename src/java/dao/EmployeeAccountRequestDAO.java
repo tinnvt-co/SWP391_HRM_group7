@@ -68,6 +68,23 @@ public class EmployeeAccountRequestDAO {
         return -1;
     }
 
+    public boolean updateContractCode(int requestId, String contractCode) throws SQLException {
+        String sql = "UPDATE employee_account_requests "
+                   + "SET contract_code=?, updated_at=NOW() "
+                   + "WHERE request_id=? AND status='Pending'";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, contractCode);
+            ps.setInt(2, requestId);
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
     public int countForUser(boolean adminScope, int requesterUserId) throws SQLException {
         String sql = "SELECT COUNT(*) FROM employee_account_requests";
         if (!adminScope) sql += " WHERE requested_by=?";

@@ -14,7 +14,7 @@ public class UserDAO {
     public List<User> findAll() throws SQLException {
         String sql = "SELECT u.*, r.role_name FROM users u "
                    + "JOIN roles r ON u.role_id = r.role_id "
-                   + "ORDER BY u.user_id";
+                   + "ORDER BY u.user_id DESC";
         List<User> list = new ArrayList<>();
         Connection conn = null;
         PreparedStatement ps = null;
@@ -49,7 +49,7 @@ public class UserDAO {
     public List<User> findPage(int offset, int limit) throws SQLException {
         String sql = "SELECT u.*, r.role_name FROM users u "
                    + "JOIN roles r ON u.role_id = r.role_id "
-                   + "ORDER BY u.user_id "
+                   + "ORDER BY u.user_id DESC "
                    + "LIMIT ? OFFSET ?";
         List<User> list = new ArrayList<>();
         Connection conn = null;

@@ -63,16 +63,32 @@
         <c:if test="${canSubmitToHrManager}">
             <form method="post"
                   action="${pageContext.request.contextPath}/attendance-report?action=submitToHrManager"
-                  onsubmit="return confirm('Submit ready attendance reports to HR Manager?');">
+                  onsubmit="return confirm('Submit all ready attendance reports to HR Manager?');">
                 <input type="hidden" name="month" value="${selectedMonth}">
                 <input type="hidden" name="year" value="${selectedYear}">
                 <button type="submit" class="btn btn-primary btn-sm px-3 fw-medium"
                         style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;"
                         ${readyToSubmitCount > 0 ? '' : 'disabled'}
-                        title="${readyToSubmitCount > 0 ? 'Submit reports returned by managers to HR Manager' : 'No reports are ready to submit'}">
+                        title="${readyToSubmitCount > 0 ? 'Submit all ready manager-confirmed reports to HR Manager' : 'No reports are ready to submit'}">
                     <i class="bi bi-send me-2"></i>Submit to HR Manager
                     <c:if test="${readyToSubmitCount > 0}">
                         <span class="badge bg-light text-primary ms-1">${readyToSubmitCount}</span>
+                    </c:if>
+                </button>
+            </form>
+        </c:if>
+        <c:if test="${canApproveAttendanceReport}">
+            <form method="post"
+                  action="${pageContext.request.contextPath}/attendance-report?action=approveAll"
+                  onsubmit="return confirm('Approve all pending attendance reports for this month?');">
+                <input type="hidden" name="month" value="${selectedMonth}">
+                <input type="hidden" name="year" value="${selectedYear}">
+                <button type="submit" class="btn btn-success btn-sm px-3 fw-medium"
+                        ${pendingHrManagerApprovalCount > 0 ? '' : 'disabled'}
+                        title="${pendingHrManagerApprovalCount > 0 ? 'Approve all pending attendance reports in this month' : 'No pending reports to approve'}">
+                    <i class="bi bi-check2-all me-2"></i>Approve All
+                    <c:if test="${pendingHrManagerApprovalCount > 0}">
+                        <span class="badge bg-light text-success ms-1">${pendingHrManagerApprovalCount}</span>
                     </c:if>
                 </button>
             </form>
@@ -120,6 +136,12 @@
     <c:if test="${not empty attendanceReportError}">
         <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-3">
             <i class="bi bi-exclamation-circle-fill"></i><span>${attendanceReportError}</span>
+        </div>
+    </c:if>
+    <c:if test="${hrStaffScope and pendingManagerConfirmationCount > 0}">
+        <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-hourglass-split"></i>
+            <span>${pendingManagerConfirmationCount} attendance record(s) are still waiting for Manager confirmation. Ready reports can still be submitted to HR Manager.</span>
         </div>
     </c:if>
 

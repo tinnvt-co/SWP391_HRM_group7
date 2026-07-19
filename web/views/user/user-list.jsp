@@ -48,13 +48,6 @@
             <h5 class="fw-bold text-dark mb-0">User Management</h5>
             <small class="text-muted">Manage all system users</small>
         </div>
-        <c:if test="${permissions.contains('ADD_NEW_USER')}">
-            <a href="${pageContext.request.contextPath}/users?action=add"
-               class="btn btn-primary btn-sm px-3 fw-medium"
-               style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;">
-                <i class="bi bi-person-plus me-2"></i>Add New User
-            </a>
-        </c:if>
     </div>
 
     <c:if test="${param.added == 'success'}">
@@ -75,6 +68,12 @@
     <c:if test="${param.toggleError == 'self'}">
         <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
             <i class="bi bi-exclamation-triangle-fill"></i><span>You cannot change your own active status.</span>
+        </div>
+    </c:if>
+    <c:if test="${param.error == 'request-required'}">
+        <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <span>New users must be created by approving an Account Request from HR Staff.</span>
         </div>
     </c:if>
 

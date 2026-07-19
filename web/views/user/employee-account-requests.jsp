@@ -64,7 +64,7 @@
         </div>
     </c:if>
 
-    <c:if test="${requestScope}">
+    <c:if test="${canRequestAccount}">
         <div class="card border-0 shadow-sm rounded-3 mb-4">
             <div class="card-body">
                 <h6 class="fw-bold mb-3"><i class="bi bi-person-plus me-2"></i>New Contract & Account Request</h6>
@@ -79,11 +79,12 @@
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small text-muted mb-1">Phone</label>
-                        <input type="text" name="phone" class="form-control" maxlength="20">
+                        <input type="text" name="phone" class="form-control" maxlength="15"
+                               pattern="[0-9]{10,15}" inputmode="numeric" required>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Gender</label>
-                        <select name="gender" class="form-select">
+                        <select name="gender" class="form-select" required>
                             <c:forEach var="g" items="${genders}">
                                 <option value="${g}">${g}</option>
                             </c:forEach>
@@ -91,47 +92,42 @@
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Date of Birth</label>
-                        <input type="date" name="dateOfBirth" class="form-control">
+                        <input id="dateOfBirth" type="date" name="dateOfBirth" class="form-control" required>
+                        <div class="invalid-feedback">Chua du 18 tuoi.</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Hire Date</label>
                         <input type="date" name="hireDate" class="form-control" value="${today}" required>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label small text-muted mb-1">Employee Code</label>
-                        <input type="text" name="employeeCode" class="form-control" maxlength="20">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label small text-muted mb-1">Requested Role</label>
-                        <select name="requestedRoleId" class="form-select" required>
-                            <c:forEach var="role" items="${requestRoles}">
-                                <option value="${role.roleId}">${role.roleName}</option>
-                            </c:forEach>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label small text-muted mb-1">Position Title</label>
-                        <input type="text" name="positionTitle" class="form-control" maxlength="100"
-                               placeholder="e.g. Sales Executive">
-                    </div>
+                    <c:if test="${hrManagerRequestScope}">
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-1">Requested Role</label>
+                            <select id="requestedRoleId" name="requestedRoleId" class="form-select" required>
+                                <option value="">Select role</option>
+                                <c:forEach var="role" items="${requestRoles}">
+                                    <option value="${role.roleId}" data-role="${fn:trim(role.roleName)}">
+                                        ${role.roleName}
+                                    </option>
+                                </c:forEach>
+                            </select>
+                        </div>
+                    </c:if>
                     <div class="col-md-4">
                         <label class="form-label small text-muted mb-1">Department</label>
-                        <select name="departmentId" class="form-select" required>
+                        <select id="departmentId" name="departmentId" class="form-select" required>
                             <option value="">Select department</option>
                             <c:forEach var="d" items="${departments}">
-                                <option value="${d.departmentId}">${d.departmentName}</option>
+                                <option value="${d.departmentId}" data-code="${fn:trim(d.departmentCode)}">
+                                    ${d.departmentName}
+                                </option>
                             </c:forEach>
                         </select>
                     </div>
                     <div class="col-md-5">
                         <label class="form-label small text-muted mb-1">Address</label>
-                        <input type="text" name="address" class="form-control" maxlength="255">
+                        <input type="text" name="address" class="form-control" maxlength="255" required>
                     </div>
                     <div class="col-12"><hr class="my-1"></div>
-                    <div class="col-md-3">
-                        <label class="form-label small text-muted mb-1">Contract Code</label>
-                        <input type="text" name="contractCode" class="form-control" maxlength="50" required>
-                    </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Contract Type</label>
                         <select name="contractType" class="form-select" required>
@@ -142,11 +138,12 @@
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Contract Start</label>
-                        <input type="date" name="contractStartDate" class="form-control" value="${today}" required>
+                        <input id="contractStartDate" type="date" name="contractStartDate" class="form-control" value="${today}" required>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Contract End</label>
-                        <input type="date" name="contractEndDate" class="form-control">
+                        <input id="contractEndDate" type="date" name="contractEndDate" class="form-control">
+                        <div class="invalid-feedback">Contract end must be at least 1 month after contract start.</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Basic Salary</label>
@@ -187,7 +184,6 @@
                             <th>Contract</th>
                             <th>Requested By</th>
                             <th>Status</th>
-                            <th>Account</th>
                             <th>Note</th>
                             <c:if test="${adminScope}">
                                 <th class="text-center">Actions</th>
@@ -239,14 +235,6 @@
                                         <c:otherwise>${req.status}</c:otherwise>
                                     </c:choose>
                                 </td>
-                                <td>
-                                    <c:choose>
-                                        <c:when test="${not empty req.createdUsername}">
-                                            <span class="text-muted">@${req.createdUsername}</span>
-                                        </c:when>
-                                        <c:otherwise><span class="text-muted">&mdash;</span></c:otherwise>
-                                    </c:choose>
-                                </td>
                                 <td class="text-muted" style="max-width:240px;">${not empty req.adminNote ? req.adminNote : '-'}</td>
                                 <c:if test="${adminScope}">
                                     <td class="text-center">
@@ -278,7 +266,7 @@
                         </c:forEach>
                         <c:if test="${empty requests}">
                             <tr>
-                                <td colspan="${adminScope ? 9 : 8}" class="text-center text-muted py-5">
+                                <td colspan="${adminScope ? 8 : 7}" class="text-center text-muted py-5">
                                     <i class="bi bi-inbox fs-2 d-block mb-2 opacity-25"></i>
                                     No account requests found.
                                 </td>
@@ -314,5 +302,121 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const dobInput = document.getElementById('dateOfBirth');
+    const contractStartInput = document.getElementById('contractStartDate');
+    const contractEndInput = document.getElementById('contractEndDate');
+    const roleSelect = document.getElementById('requestedRoleId');
+    const deptSelect = document.getElementById('departmentId');
+
+    function formatDate(date) {
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return date.getFullYear() + '-' + month + '-' + day;
+    }
+
+    function addMonths(date, months) {
+        const result = new Date(date.getTime());
+        const day = result.getDate();
+        result.setMonth(result.getMonth() + months);
+        if (result.getDate() < day) result.setDate(0);
+        return result;
+    }
+
+    function validateDob() {
+        if (!dobInput) return;
+        if (!dobInput.value) {
+            dobInput.setCustomValidity('');
+            dobInput.classList.remove('is-invalid');
+            return;
+        }
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const minimumDob = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+        const dob = new Date(dobInput.value + 'T00:00:00');
+        const invalid = dob > minimumDob;
+        dobInput.setCustomValidity(invalid ? 'Chua du 18 tuoi.' : '');
+        dobInput.classList.toggle('is-invalid', invalid);
+    }
+
+    function validateContractEnd() {
+        if (!contractStartInput || !contractEndInput) return;
+        if (contractStartInput.value) {
+            const startDate = new Date(contractStartInput.value + 'T00:00:00');
+            contractEndInput.min = formatDate(addMonths(startDate, 1));
+        }
+        if (!contractEndInput.value || !contractStartInput.value) {
+            if (contractEndInput) {
+                contractEndInput.setCustomValidity('');
+                contractEndInput.classList.remove('is-invalid');
+            }
+            return;
+        }
+        const startDate = new Date(contractStartInput.value + 'T00:00:00');
+        const endDate = new Date(contractEndInput.value + 'T00:00:00');
+        const minimumEndDate = addMonths(startDate, 1);
+        const invalid = endDate < minimumEndDate;
+        contractEndInput.setCustomValidity(invalid ? 'Contract end must be at least 1 month after contract start.' : '');
+        contractEndInput.classList.toggle('is-invalid', invalid);
+    }
+
+    if (dobInput) {
+        const today = new Date();
+        dobInput.max = formatDate(new Date(today.getFullYear() - 18, today.getMonth(), today.getDate()));
+        dobInput.addEventListener('input', validateDob);
+        dobInput.addEventListener('blur', validateDob);
+        validateDob();
+    }
+
+    if (contractStartInput && contractEndInput) {
+        contractStartInput.addEventListener('input', validateContractEnd);
+        contractEndInput.addEventListener('input', validateContractEnd);
+        validateContractEnd();
+    }
+
+    if (!deptSelect) return;
+
+    function selectedRoleName() {
+        if (!roleSelect) return 'EMPLOYEE';
+        const option = roleSelect.options[roleSelect.selectedIndex];
+        return option ? (option.getAttribute('data-role') || '').trim().toUpperCase() : '';
+    }
+
+    function applyDepartmentFilter() {
+        const roleName = selectedRoleName();
+        let firstAllowed = '';
+
+        Array.from(deptSelect.options).forEach(function (option) {
+            if (!option.value) {
+                option.hidden = false;
+                option.disabled = false;
+                return;
+            }
+
+            const code = (option.getAttribute('data-code') || '').trim().toUpperCase();
+            const allowed = roleName === 'HR_STAFF'
+                    ? code === 'HR'
+                    : code !== 'HR' && code !== 'ADMIN_DEPT' && code !== 'IT';
+
+            option.hidden = !allowed;
+            option.disabled = !allowed;
+            if (allowed && !firstAllowed) firstAllowed = option.value;
+        });
+
+        const selected = deptSelect.options[deptSelect.selectedIndex];
+        if (selected && selected.disabled) {
+            deptSelect.value = roleName === 'HR_STAFF' ? firstAllowed : '';
+        } else if (roleName === 'HR_STAFF' && !deptSelect.value) {
+            deptSelect.value = firstAllowed;
+        }
+    }
+
+    if (roleSelect) {
+        roleSelect.addEventListener('change', applyDepartmentFilter);
+    }
+    applyDepartmentFilter();
+});
+</script>
 </body>
 </html>

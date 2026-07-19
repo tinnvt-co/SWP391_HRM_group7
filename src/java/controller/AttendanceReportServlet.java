@@ -65,12 +65,22 @@ public class AttendanceReportServlet extends HttpServlet {
                     ? reportDAO.countReadyForHrManagerSubmission(year, month, null)
                         + attendanceDAO.countPendingHrManagedByMonth(year, month)
                     : 0;
+            int pendingManagerConfirmationCount = hrStaffScope
+                    ? attendanceDAO.countPendingManagerConfirmationByMonth(year, month)
+                    : 0;
+            int pendingHrManagerApprovalCount = hrManagerScope
+                    ? reportDAO.countPendingHrManagerByMonth(year, month, null)
+                    : 0;
+            if (hrManagerScope) {
+                totalReports = reportDAO.countForHrManagerByMonth(year, month, null);
+            }
             int totalPages = Math.max(1, (int) Math.ceil(totalReports / (double) PAGE_SIZE));
             int page = parsePageParam(request.getParameter("page"), totalPages);
             int offset = (page - 1) * PAGE_SIZE;
 
-            List<AttendanceReport> reports =
-                    reportDAO.findSubmittedByMonthPage(year, month, null, managerUserId, offset, PAGE_SIZE);
+            List<AttendanceReport> reports = hrManagerScope
+                    ? reportDAO.findForHrManagerByMonthPage(year, month, null, offset, PAGE_SIZE)
+                    : reportDAO.findSubmittedByMonthPage(year, month, null, managerUserId, offset, PAGE_SIZE);
             request.setAttribute("reports", reports);
             request.setAttribute("selectedYear", year);
             request.setAttribute("selectedMonth", month);
@@ -81,6 +91,8 @@ public class AttendanceReportServlet extends HttpServlet {
             request.setAttribute("hrStaffScope", hrStaffScope);
             request.setAttribute("hrManagerScope", hrManagerScope);
             request.setAttribute("readyToSubmitCount", readyToSubmitCount);
+            request.setAttribute("pendingManagerConfirmationCount", pendingManagerConfirmationCount);
+            request.setAttribute("pendingHrManagerApprovalCount", pendingHrManagerApprovalCount);
             request.setAttribute("canSubmitToHrManager",
                     hrStaffScope && hasPermission(request, "VIEW_ATTENDANCE_REPORT"));
             request.setAttribute("canApproveAttendanceReport",
@@ -124,6 +136,14 @@ public class AttendanceReportServlet extends HttpServlet {
                     }
                     handleDecision(request, response, AttendanceReport.Status.ApprovedByHrManager);
                 }
+                case "approveAll" -> {
+                    if (!"HR_MANAGER".equalsIgnoreCase(roleName)
+                            || !hasPermission(request, "APPROVE_ATTENDANCE_REPORT")) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleApproveAll(request, response);
+                }
                 case "reject" -> {
                     if (!"HR_MANAGER".equalsIgnoreCase(roleName)
                             || !hasPermission(request, "APPROVE_ATTENDANCE_REPORT")) {
@@ -147,6 +167,7 @@ public class AttendanceReportServlet extends HttpServlet {
         int month = parseIntOr(request.getParameter("month"), YearMonth.now().getMonthValue());
 
         User currentUser = getCurrentUser(request);
+        autoConfirmService.runDueAutoConfirm();
         int prepared = prepareHrManagedReports(currentUser.getUserId(), year, month);
         int submitted = reportDAO.submitReadyToHrManager(year, month, null);
         if (submitted + prepared > 0) {
@@ -183,6 +204,26 @@ public class AttendanceReportServlet extends HttpServlet {
             if (reportDAO.upsertPendingHrManager(report)) prepared++;
         }
         return prepared;
+    }
+
+    private void handleApproveAll(HttpServletRequest request, HttpServletResponse response)
+            throws SQLException, IOException {
+        HttpSession session = request.getSession(true);
+        User currentUser = getCurrentUser(request);
+        String ctx = request.getContextPath();
+        int year = parseIntOr(request.getParameter("year"), YearMonth.now().getYear());
+        int month = parseIntOr(request.getParameter("month"), YearMonth.now().getMonthValue());
+
+        int approved = reportDAO.approvePendingHrManagerByMonth(
+                year, month, null, currentUser.getUserId());
+        if (approved > 0) {
+            session.setAttribute("attendanceReportMessage",
+                    "Approved " + approved + " pending attendance report(s).");
+        } else {
+            session.setAttribute("attendanceReportError",
+                    "No pending attendance reports are waiting for HR Manager approval.");
+        }
+        response.sendRedirect(reportRedirect(ctx, year, month));
     }
 
     private void handleDecision(HttpServletRequest request, HttpServletResponse response,

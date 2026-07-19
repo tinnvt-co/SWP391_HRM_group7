@@ -148,6 +148,132 @@ public class AttendanceReportDAO {
         return findSubmittedByMonthPage(year, month, departmentId, managerUserId, 0, Integer.MAX_VALUE);
     }
 
+    public int countForHrManagerByMonth(int year, int month,
+                                        Integer departmentId) throws SQLException {
+        StringBuilder sql = new StringBuilder(
+            "SELECT COUNT(*) "
+          + "FROM attendance_reports ar "
+          + "WHERE ar.report_year=? AND ar.report_month=? "
+          + "  AND ar.status IN ("
+          + "      'Pending HR Manager Approval', "
+          + "      'Approved By HR Manager', "
+          + "      'Rejected By HR Manager'"
+          + "  ) ");
+        if (departmentId != null) sql.append("AND ar.department_id=? ");
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int idx = 1;
+            ps.setInt(idx++, year);
+            ps.setInt(idx++, month);
+            if (departmentId != null) ps.setInt(idx, departmentId);
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getInt(1) : 0;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public List<AttendanceReport> findForHrManagerByMonthPage(int year, int month,
+                                                              Integer departmentId,
+                                                              int offset, int limit)
+            throws SQLException {
+        StringBuilder sql = new StringBuilder(
+            "SELECT ar.*, "
+          + "  eu.full_name AS emp_full_name, e.employee_code, "
+          + "  d.department_name, mu.full_name AS manager_full_name "
+          + "FROM attendance_reports ar "
+          + "JOIN employees e   ON ar.employee_id  = e.employee_id "
+          + "JOIN users eu      ON e.user_id       = eu.user_id "
+          + "JOIN departments d ON ar.department_id = d.department_id "
+          + "JOIN users mu      ON ar.manager_id    = mu.user_id "
+          + "WHERE ar.report_year=? AND ar.report_month=? "
+          + "  AND ar.status IN ("
+          + "      'Pending HR Manager Approval', "
+          + "      'Approved By HR Manager', "
+          + "      'Rejected By HR Manager'"
+          + "  ) ");
+        if (departmentId != null) sql.append("AND ar.department_id=? ");
+        sql.append("ORDER BY d.department_name, eu.full_name LIMIT ? OFFSET ?");
+
+        List<AttendanceReport> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int idx = 1;
+            ps.setInt(idx++, year);
+            ps.setInt(idx++, month);
+            if (departmentId != null) ps.setInt(idx++, departmentId);
+            ps.setInt(idx++, limit);
+            ps.setInt(idx, offset);
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
+    public int countPendingHrManagerByMonth(int year, int month,
+                                            Integer departmentId) throws SQLException {
+        StringBuilder sql = new StringBuilder(
+            "SELECT COUNT(*) "
+          + "FROM attendance_reports "
+          + "WHERE report_year=? AND report_month=? "
+          + "  AND status='Pending HR Manager Approval' ");
+        if (departmentId != null) sql.append("AND department_id=? ");
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int idx = 1;
+            ps.setInt(idx++, year);
+            ps.setInt(idx++, month);
+            if (departmentId != null) ps.setInt(idx, departmentId);
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getInt(1) : 0;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public int approvePendingHrManagerByMonth(int year, int month,
+                                              Integer departmentId,
+                                              int reviewedBy) throws SQLException {
+        StringBuilder sql = new StringBuilder(
+            "UPDATE attendance_reports "
+          + "SET status='Approved By HR Manager', reviewed_by=?, reviewed_at=NOW(), "
+          + "    hr_note=NULL, updated_at=NOW() "
+          + "WHERE report_year=? AND report_month=? "
+          + "  AND status='Pending HR Manager Approval' ");
+        if (departmentId != null) sql.append("AND department_id=? ");
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int idx = 1;
+            ps.setInt(idx++, reviewedBy);
+            ps.setInt(idx++, year);
+            ps.setInt(idx++, month);
+            if (departmentId != null) ps.setInt(idx, departmentId);
+            return ps.executeUpdate();
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
     public List<AttendanceReport> findApprovedForPayrollByMonth(int year, int month,
                                                                  Integer departmentId) throws SQLException {
         StringBuilder sql = new StringBuilder(

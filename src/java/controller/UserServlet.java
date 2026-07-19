@@ -131,6 +131,11 @@ public class UserServlet extends HttpServlet {
     private void handleAddForm(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, ServletException, IOException {
 
+        if (!canCreateUserDirectly(request)) {
+            response.sendRedirect(request.getContextPath() + "/users?error=request-required");
+            return;
+        }
+
         if (!hasPermission(request, "ADD_NEW_USER")) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN);
             return;
@@ -142,6 +147,11 @@ public class UserServlet extends HttpServlet {
 
     private void handleAdd(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, ServletException, IOException {
+
+        if (!canCreateUserDirectly(request)) {
+            response.sendRedirect(request.getContextPath() + "/users?error=request-required");
+            return;
+        }
 
         if (!hasPermission(request, "ADD_NEW_USER")) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN);
@@ -464,6 +474,15 @@ public class UserServlet extends HttpServlet {
     private User getCurrentUser(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         return session == null ? null : (User) session.getAttribute("currentUser");
+    }
+
+    private boolean canCreateUserDirectly(HttpServletRequest request) {
+        User currentUser = getCurrentUser(request);
+        String roleName = currentUser != null && currentUser.getRole() != null
+                ? currentUser.getRole().getRoleName()
+                : "";
+        return hasPermission(request, "ADD_NEW_USER")
+                && !"ADMIN".equalsIgnoreCase(roleName);
     }
 
     private boolean hasPermission(HttpServletRequest request, String permCode) {

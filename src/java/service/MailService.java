@@ -44,6 +44,11 @@ public class MailService {
         Transport.send(message);
     }
 
+    public boolean isConfigured() {
+        return MailConfig.USERNAME != null && !MailConfig.USERNAME.isBlank()
+                && MailConfig.PASSWORD != null && !MailConfig.PASSWORD.isBlank();
+    }
+
     public void sendPasswordResetEmail(String toEmail, String fullName, String resetLink)
             throws MessagingException, UnsupportedEncodingException {
         String subject = "HRM System - Password Reset Request";

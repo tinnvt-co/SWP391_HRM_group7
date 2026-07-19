@@ -53,7 +53,6 @@
 
     <c:if test="${payrollTaskSummary.actionable}">
         <c:url var="payrollTaskUrl" value="/payroll">
-            <c:param name="deptId" value="${payrollTaskSummary.departmentId}"/>
             <c:param name="month" value="${payrollTaskSummary.month}"/>
             <c:param name="year" value="${payrollTaskSummary.year}"/>
         </c:url>
@@ -110,7 +109,7 @@
                             <div class="text-muted" style="font-size:0.78rem;">
                                 <c:choose>
                                     <c:when test="${payrollTaskSummary.actionable}">
-                                        ${payrollTaskSummary.taskLabel} &middot; ${payrollTaskSummary.departmentName}
+                                        ${payrollTaskSummary.taskLabel}
                                         &middot; Month ${payrollTaskSummary.month}/${payrollTaskSummary.year}
                                     </c:when>
                                     <c:otherwise>No pending payroll tasks</c:otherwise>
@@ -137,16 +136,6 @@
     <div class="card border-0 shadow-sm rounded-3 mb-3">
         <div class="card-body">
             <form method="get" class="row g-2 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label small text-muted mb-1">Department</label>
-                    <select name="deptId" class="form-select form-select-sm">
-                        <c:forEach var="dept" items="${departments}">
-                            <option value="${dept.departmentId}" ${dept.departmentId == selectedDeptId ? 'selected' : ''}>
-                                ${dept.departmentName}
-                            </option>
-                        </c:forEach>
-                    </select>
-                </div>
                 <div class="col-md-3">
                     <label class="form-label small text-muted mb-1">Month</label>
                     <select name="month" class="form-select form-select-sm">
@@ -179,6 +168,10 @@
                     <span class="text-muted ms-2">${selectedDeptName}</span>
                 </c:if>
                 <c:choose>
+                    <c:when test="${allDepartmentsScope}">
+                        <span class="text-muted ms-2">Showing generated payroll across departments.</span>
+                        <span class="text-muted ms-2">${totalPayrolls} employee(s)</span>
+                    </c:when>
                     <c:when test="${empty period}">
                         <span class="text-muted ms-2">No payroll generated yet.</span>
                     </c:when>
@@ -205,10 +198,33 @@
                     <form method="post" action="${pageContext.request.contextPath}/payroll?action=generate">
                         <input type="hidden" name="year" value="${selectedYear}">
                         <input type="hidden" name="month" value="${selectedMonth}">
-                        <input type="hidden" name="deptId" value="${selectedDeptId}">
                         <button type="submit" class="btn btn-sm btn-primary"
                                 style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;">
-                            <i class="bi bi-calculator me-1"></i>Calculate Payroll
+                            <i class="bi bi-calculator me-1"></i>
+                            Calculate Payroll
+                        </button>
+                    </form>
+                </c:if>
+                <c:if test="${submittablePayrollBatchCount > 0}">
+                    <form method="post" action="${pageContext.request.contextPath}/payroll?action=submit"
+                          onsubmit="return confirm('Submit all Draft/Rejected payroll batches in this month to HR Manager?');">
+                        <input type="hidden" name="year" value="${selectedYear}">
+                        <input type="hidden" name="month" value="${selectedMonth}">
+                        <button type="submit" class="btn btn-sm btn-primary"
+                                style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;">
+                            <i class="bi bi-send me-1"></i>Submit for Approval
+                            <span class="badge bg-light text-primary ms-1">${submittablePayrollBatchCount}</span>
+                        </button>
+                    </form>
+                </c:if>
+                <c:if test="${payablePayrollBatchCount > 0}">
+                    <form method="post" action="${pageContext.request.contextPath}/payroll?action=confirmPayment"
+                          onsubmit="return confirm('Confirm payment for all Approved payroll batches in this month?');">
+                        <input type="hidden" name="year" value="${selectedYear}">
+                        <input type="hidden" name="month" value="${selectedMonth}">
+                        <button type="submit" class="btn btn-sm btn-success">
+                            <i class="bi bi-cash-coin me-1"></i>Confirm Payment
+                            <span class="badge bg-light text-success ms-1">${payablePayrollBatchCount}</span>
                         </button>
                     </form>
                 </c:if>
@@ -294,7 +310,7 @@
                                         <span>${selectedDeptName}.</span>
                                     </c:if>
                                     <c:if test="${not hasReports}">
-                                        <div class="small mt-1">No attendance reports have been submitted for this month yet.</div>
+                                        <div class="small mt-1">No HR Manager-approved attendance reports are waiting for payroll generation.</div>
                                     </c:if>
                                 </td>
                             </tr>
@@ -312,17 +328,17 @@
                     <ul class="pagination pagination-sm mb-0">
                         <li class="page-item ${currentPage == 1 ? 'disabled' : ''}">
                             <a class="page-link"
-                               href="?month=${selectedMonth}&year=${selectedYear}&deptId=${selectedDeptId}&page=${currentPage - 1}">Previous</a>
+                               href="?month=${selectedMonth}&year=${selectedYear}&page=${currentPage - 1}">Previous</a>
                         </li>
                         <c:forEach var="pg" begin="1" end="${totalPages}">
                             <li class="page-item ${pg == currentPage ? 'active' : ''}">
                                 <a class="page-link"
-                                   href="?month=${selectedMonth}&year=${selectedYear}&deptId=${selectedDeptId}&page=${pg}">${pg}</a>
+                                   href="?month=${selectedMonth}&year=${selectedYear}&page=${pg}">${pg}</a>
                             </li>
                         </c:forEach>
                         <li class="page-item ${currentPage == totalPages ? 'disabled' : ''}">
                             <a class="page-link"
-                               href="?month=${selectedMonth}&year=${selectedYear}&deptId=${selectedDeptId}&page=${currentPage + 1}">Next</a>
+                               href="?month=${selectedMonth}&year=${selectedYear}&page=${currentPage + 1}">Next</a>
                         </li>
                     </ul>
                 </nav>

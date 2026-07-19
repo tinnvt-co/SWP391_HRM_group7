@@ -101,12 +101,12 @@
                 <form method="post"
                       action="${pageContext.request.contextPath}/attendance?action=confirmToHr"
                       class="d-inline"
-                      onsubmit="return confirm('Confirm attendance and send to HR Staff? This will verify ${pendingCount} pending record(s) and generate reports.');">
+                      onsubmit="return confirm('Confirm attendance for ${pendingCount} pending record(s)? HR Staff can submit confirmed reports to HR Manager after this.');">
                     <input type="hidden" name="month" value="${selectedMonth}">
                     <input type="hidden" name="year" value="${selectedYear}">
                     <button type="submit" class="btn btn-success btn-sm px-3 fw-medium"
                             ${pendingCount > 0 ? '' : 'disabled'}
-                            title="${pendingCount > 0 ? 'Verify and send attendance reports to HR Staff' : 'No pending records to confirm'}">
+                            title="${pendingCount > 0 ? 'Verify attendance so HR Staff can submit reports to HR Manager' : 'No pending records to confirm'}">
                         <i class="bi bi-check2-all me-2"></i>Confirm Attendance
                         <c:if test="${pendingCount > 0}">
                             <span class="badge bg-light text-success ms-1">${pendingCount}</span>
@@ -262,13 +262,13 @@
           <p class="small text-muted mb-3">
             Import the attendance file for <strong>attendance departments</strong>,
             for <strong>${importMonthLabel}</strong>.
-            Department managers will review and confirm their team's records.
+            Department managers must confirm their team's records before HR Staff can submit reports to HR Manager.
           </p>
 
           <div class="alert alert-light border d-flex align-items-center gap-2 py-2 small mb-3">
             <i class="bi bi-calendar-event text-primary"></i>
             <span>Records are imported into the selected month
-              (<strong>${importMonthLabel}</strong>). All records start as <strong>Pending</strong>.</span>
+              (<strong>${importMonthLabel}</strong>). All records start as <strong>Pending Manager Confirmation</strong>.</span>
           </div>
 
           <div class="mb-2">

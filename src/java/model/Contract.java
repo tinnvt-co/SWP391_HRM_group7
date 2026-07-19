@@ -17,8 +17,9 @@ public class Contract {
         public String getDbValue() { return dbValue; }
 
         public static ContractType fromDb(String value) {
+            if (value == null || value.isBlank()) return null;
             for (ContractType t : values()) {
-                if (t.dbValue.equals(value)) return t;
+                if (t.dbValue.equals(value) || t.name().equals(value)) return t;
             }
             return null;
         }

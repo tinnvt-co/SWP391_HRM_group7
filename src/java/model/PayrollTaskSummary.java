@@ -60,6 +60,6 @@ public class PayrollTaskSummary {
     }
 
     public boolean isActionable() {
-        return count > 0 && departmentId != null && month > 0 && year > 0;
+        return count > 0 && month > 0 && year > 0;
     }
 }

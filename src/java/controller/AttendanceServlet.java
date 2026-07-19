@@ -574,8 +574,8 @@ public class AttendanceServlet extends HttpServlet {
         }
 
         session.setAttribute("importMessage",
-                "Sent to HR Staff: " + reports + " attendance report(s) submitted for "
-                        + monthLabel(month) + ".");
+                "Manager confirmed " + reports + " attendance report(s) for "
+                        + monthLabel(month) + ". HR Staff can now submit them to HR Manager.");
         response.sendRedirect(ctx + "/attendance");
     }
 

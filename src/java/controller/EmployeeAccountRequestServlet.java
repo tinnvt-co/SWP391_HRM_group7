@@ -79,12 +79,12 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
 
             request.setAttribute("requests", requestDAO.findPageForUser(
                     adminScope, currentUser.getUserId(), offset, PAGE_SIZE));
-            request.setAttribute("departments", departmentDAO.findAllActive());
+            request.setAttribute("departments", requestDepartments(currentUser));
             request.setAttribute("requestRoles", allowedRequestRoles(currentUser));
             request.setAttribute("genders", User.Gender.values());
             request.setAttribute("contractTypes", Contract.ContractType.values());
             request.setAttribute("adminScope", adminScope);
-            request.setAttribute("requestScope", requestScope);
+            request.setAttribute("canRequestAccount", requestScope);
             request.setAttribute("hrStaffScope", isRole(currentUser, "HR_STAFF") && requestScope);
             request.setAttribute("hrManagerRequestScope", isRole(currentUser, "HR_MANAGER") && requestScope);
             request.setAttribute("currentPage", page);
@@ -146,19 +146,11 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/employee-account-requests");
             return;
         }
-        if (!isBlank(accountRequest.getEmployeeCode())
-                && employeeDAO.existsByEmployeeCode(accountRequest.getEmployeeCode())) {
-            flashError(request, "Employee code '" + accountRequest.getEmployeeCode() + "' already exists.");
-            response.sendRedirect(request.getContextPath() + "/employee-account-requests");
-            return;
+        int requestId = requestDAO.insert(accountRequest);
+        String contractCode = generatedContractCode(requestId);
+        if (!requestDAO.updateContractCode(requestId, contractCode)) {
+            throw new SQLException("Could not assign contract code.");
         }
-        if (requestDAO.hasPendingByContractCode(accountRequest.getContractCode())) {
-            flashError(request, "There is already a pending account request for this contract code.");
-            response.sendRedirect(request.getContextPath() + "/employee-account-requests");
-            return;
-        }
-
-        requestDAO.insert(accountRequest);
         flash(request, "Contract and account request submitted to Admin.");
         response.sendRedirect(request.getContextPath() + "/employee-account-requests");
     }
@@ -199,12 +191,6 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             return;
         }
 
-        String requestedCode = trim(accountRequest.getEmployeeCode());
-        if (!requestedCode.isEmpty() && employeeDAO.existsByEmployeeCode(requestedCode)) {
-            flashError(request, "Employee code '" + requestedCode + "' already exists.");
-            response.sendRedirect(request.getContextPath() + "/employee-account-requests");
-            return;
-        }
         if (isBlank(accountRequest.getContractCode()) || accountRequest.getContractType() == null
                 || accountRequest.getContractStartDate() == null
                 || accountRequest.getBasicSalary() == null
@@ -215,6 +201,12 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
         }
         if (contractExists(accountRequest.getContractCode())) {
             flashError(request, "Contract code '" + accountRequest.getContractCode() + "' already exists.");
+            response.sendRedirect(request.getContextPath() + "/employee-account-requests");
+            return;
+        }
+        if (!mailService.isConfigured()) {
+            flashError(request, "Email is not configured. Please set MAIL_USERNAME and MAIL_PASSWORD "
+                    + "or add mail.properties before approving account requests.");
             response.sendRedirect(request.getContextPath() + "/employee-account-requests");
             return;
         }
@@ -268,7 +260,6 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
         r.setEmail(trim(request.getParameter("email")).toLowerCase(Locale.ROOT));
         r.setPhone(trim(request.getParameter("phone")));
         r.setAddress(trim(request.getParameter("address")));
-        r.setEmployeeCode(trim(request.getParameter("employeeCode")).toUpperCase(Locale.ROOT));
 
         String gender = request.getParameter("gender");
         if (!isBlank(gender)) {
@@ -285,7 +276,6 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
 
         Integer requestedRoleId = parseIntOrNull(request.getParameter("requestedRoleId"));
         if (requestedRoleId != null) r.setRequestedRoleId(requestedRoleId);
-        r.setPositionTitle(limit(trim(request.getParameter("positionTitle")), 100));
 
         String hireDate = trim(request.getParameter("hireDate"));
         try {
@@ -294,7 +284,6 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             r.setHireDate(null);
         }
 
-        r.setContractCode(trim(request.getParameter("contractCode")).toUpperCase(Locale.ROOT));
         String type = trim(request.getParameter("contractType"));
         if (!type.isEmpty()) {
             try { r.setContractType(Contract.ContractType.valueOf(type)); }
@@ -319,9 +308,9 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
     }
 
     private String validateRequestForm(EmployeeAccountRequest r, User requester) throws SQLException {
-        if (r.getFullName().isEmpty() || r.getEmail().isEmpty()
+        if (r.getFullName().isEmpty() || r.getEmail().isEmpty() || isBlank(r.getPhone())
+                || r.getGender() == null || r.getDateOfBirth() == null || isBlank(r.getAddress())
                 || r.getDepartmentId() <= 0 || r.getHireDate() == null
-                || r.getRequestedRoleId() <= 0 || isBlank(r.getContractCode())
                 || r.getContractType() == null || r.getContractStartDate() == null
                 || r.getBasicSalary() == null || r.getStandardWorkingDays() == null) {
             return "Please fill in all required fields.";
@@ -329,51 +318,79 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
         if (!r.getEmail().matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
             return "Please enter a valid email address.";
         }
-        if (!isBlank(r.getPhone()) && !r.getPhone().matches("^[0-9]{10,15}$")) {
+        if (!r.getPhone().matches("^[0-9]{10,15}$")) {
             return "Phone number must contain digits only and be 10 to 15 characters long.";
         }
-        if (r.getDateOfBirth() != null && r.getDateOfBirth().isAfter(LocalDate.now())) {
+        if (r.getDateOfBirth().isAfter(LocalDate.now())) {
             return "Date of birth cannot be in the future.";
         }
-        if (r.getHireDate().isAfter(LocalDate.now())) {
-            return "Hire date cannot be in the future.";
-        }
-        if (!isBlank(r.getEmployeeCode()) && !r.getEmployeeCode().matches("^[A-Z0-9_-]{2,20}$")) {
-            return "Employee code must be 2 to 20 characters and contain letters, digits, dash, or underscore only.";
-        }
-        if (!r.getContractCode().matches("^[A-Z0-9_-]{2,50}$")) {
-            return "Contract code must be 2 to 50 characters and contain letters, digits, dash, or underscore only.";
+        if (r.getDateOfBirth().isAfter(LocalDate.now().minusYears(18))) {
+            return "Employee must be at least 18 years old.";
         }
         if (r.getContractStartDate().isBefore(r.getHireDate())) {
             return "Contract start date cannot be before hire date.";
         }
-        if (r.getContractEndDate() != null && r.getContractEndDate().isBefore(r.getContractStartDate())) {
-            return "Contract end date must be on or after contract start date.";
+        if (r.getContractEndDate() != null
+                && r.getContractEndDate().isBefore(r.getContractStartDate().plusMonths(1))) {
+            return "Contract end date must be at least 1 month after contract start date.";
         }
         if (r.getBasicSalary().signum() < 0 || r.getStandardWorkingDays().signum() <= 0) {
             return "Salary must be non-negative and standard working days must be greater than 0.";
         }
-        if (contractDAO.existsByCode(r.getContractCode())) {
-            return "Contract code '" + r.getContractCode() + "' already exists.";
+        if (isRole(requester, "HR_MANAGER") && r.getRequestedRoleId() <= 0) {
+            return "Please select a requested role.";
         }
-        Role requestedRole = roleDAO.findById(r.getRequestedRoleId());
+        Role requestedRole = requestedRoleForRequester(r, requester);
+        if (requestedRole == null || !requestedRole.isActive()) {
+            return "The requested role is not configured or inactive.";
+        }
+        r.setRequestedRoleId(requestedRole.getRoleId());
         String roleError = validateRequestedRoleAndDepartment(r, requestedRole, requester);
         if (roleError != null) return roleError;
+        Department department = departmentDAO.findById(r.getDepartmentId());
+        r.setPositionTitle(generatedPositionTitle(requestedRole, department));
         return null;
+    }
+
+    private List<Department> requestDepartments(User requester) throws SQLException {
+        return departmentDAO.findAllActive();
     }
 
     private List<Role> allowedRequestRoles(User requester) throws SQLException {
         List<Role> roles = new ArrayList<>();
-        if (isRole(requester, "HR_STAFF")) {
-            Role employee = roleDAO.findByName("EMPLOYEE");
-            if (employee != null && employee.isActive()) roles.add(employee);
-        } else if (isRole(requester, "HR_MANAGER")) {
-            Role manager = roleDAO.findByName("MANAGER");
-            Role hrStaff = roleDAO.findByName("HR_STAFF");
-            if (manager != null && manager.isActive()) roles.add(manager);
-            if (hrStaff != null && hrStaff.isActive()) roles.add(hrStaff);
+        String[] roleNames = {"EMPLOYEE", "HR_STAFF", "MANAGER"};
+        for (String roleName : roleNames) {
+            Role role = roleDAO.findByName(roleName);
+            if (role != null && role.isActive()) {
+                roles.add(role);
+            }
         }
         return roles;
+    }
+
+    private Role defaultRequestRole() throws SQLException {
+        return roleDAO.findByName("EMPLOYEE");
+    }
+
+    private Role requestedRoleForRequester(EmployeeAccountRequest r, User requester) throws SQLException {
+        if (isRole(requester, "HR_MANAGER")) {
+            return r.getRequestedRoleId() > 0 ? roleDAO.findById(r.getRequestedRoleId()) : null;
+        }
+        return defaultRequestRole();
+    }
+
+    private String generatedPositionTitle(Role role, Department department) {
+        String departmentName = department == null || isBlank(department.getDepartmentName())
+                ? "Department"
+                : department.getDepartmentName().trim();
+        String roleName = role == null ? "" : role.getRoleName();
+        if ("MANAGER".equalsIgnoreCase(roleName)) {
+            return limit(departmentName + " Manager", 100);
+        }
+        if ("HR_STAFF".equalsIgnoreCase(roleName)) {
+            return limit(departmentName + " Staff", 100);
+        }
+        return limit(departmentName + " Employee", 100);
     }
 
     private Role resolveRequestedRole(EmployeeAccountRequest r) throws SQLException {
@@ -389,14 +406,6 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             return "Please select an active role.";
         }
         String roleName = role.getRoleName();
-        boolean requesterKnown = requester != null && requester.getRole() != null;
-        if (requesterKnown && isRole(requester, "HR_STAFF") && !"EMPLOYEE".equalsIgnoreCase(roleName)) {
-            return "HR Staff can only request Employee accounts.";
-        }
-        if (requesterKnown && isRole(requester, "HR_MANAGER")
-                && !("MANAGER".equalsIgnoreCase(roleName) || "HR_STAFF".equalsIgnoreCase(roleName))) {
-            return "HR Manager can only request Manager or HR Staff accounts.";
-        }
         if (!("EMPLOYEE".equalsIgnoreCase(roleName)
                 || "MANAGER".equalsIgnoreCase(roleName)
                 || "HR_STAFF".equalsIgnoreCase(roleName))) {
@@ -438,13 +447,13 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             Department dept = departmentDAO.findById(r.getDepartmentId());
             Integer managerId = managerIdForNewUser(role, dept);
             int newUserId = insertUser(conn, r, role, username, temporaryPassword, managerId);
-            String employeeCode = isBlank(r.getEmployeeCode())
-                    ? generatedEmployeeCode(newUserId)
-                    : r.getEmployeeCode();
-            int employeeId = insertEmployee(conn, r, newUserId, employeeCode, adminUserId);
+            int employeeId = insertEmployee(conn, r, newUserId, adminUserId);
+            String employeeCode = generatedEmployeeCode(employeeId);
+            updateEmployeeCode(conn, employeeId, employeeCode, adminUserId);
             int contractId = insertContract(conn, r, employeeId, adminUserId);
             markRequestCreated(conn, r.getRequestId(), adminUserId, newUserId, employeeId,
-                    contractId, "Created account " + username + " and contract " + r.getContractCode());
+                    contractId, "Created account " + username + ", employee " + employeeCode
+                            + ", and contract " + r.getContractCode());
 
             conn.commit();
             return new CreatedOnboarding(newUserId, employeeId, contractId);
@@ -497,13 +506,13 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
     }
 
     private int insertEmployee(Connection conn, EmployeeAccountRequest r, int userId,
-                               String employeeCode, int adminUserId) throws SQLException {
+                               int adminUserId) throws SQLException {
         String sql = "INSERT INTO employees (user_id, employee_code, department_id, "
                    + "hire_date, employment_status, created_by, updated_by) "
                    + "VALUES (?, ?, ?, ?, 'Working', ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, userId);
-            ps.setString(2, employeeCode);
+            ps.setString(2, temporaryEmployeeCode(r.getRequestId()));
             ps.setInt(3, r.getDepartmentId());
             ps.setDate(4, Date.valueOf(r.getHireDate()));
             ps.setInt(5, adminUserId);
@@ -514,6 +523,20 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             }
         }
         throw new SQLException("Could not create employee profile.");
+    }
+
+    private void updateEmployeeCode(Connection conn, int employeeId, String employeeCode, int adminUserId)
+            throws SQLException {
+        String sql = "UPDATE employees SET employee_code=?, updated_by=?, updated_at=NOW() "
+                   + "WHERE employee_id=?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, employeeCode);
+            ps.setInt(2, adminUserId);
+            ps.setInt(3, employeeId);
+            if (ps.executeUpdate() <= 0) {
+                throw new SQLException("Could not update employee code.");
+            }
+        }
     }
 
     private int insertContract(Connection conn, EmployeeAccountRequest r, int employeeId,
@@ -588,8 +611,25 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
         return sb.toString();
     }
 
-    private String generatedEmployeeCode(int userId) {
-        return String.format("MP-U%05d", userId);
+    private String temporaryEmployeeCode(int requestId) {
+        return String.format("REQ-%05d", requestId);
+    }
+
+    private String generatedEmployeeCode(int employeeId) {
+        return String.format("MP%05d", employeeId);
+    }
+
+    private String generatedContractCode(int requestId) throws SQLException {
+        if (requestId <= 0) {
+            throw new SQLException("Could not create account request.");
+        }
+        String base = String.format("HD%05d", requestId);
+        String candidate = base;
+        int suffix = 1;
+        while (contractDAO.existsByCode(candidate) || requestDAO.hasPendingByContractCode(candidate)) {
+            candidate = String.format("%s_%02d", base, suffix++);
+        }
+        return candidate;
     }
 
     private BigDecimal parsePositiveDecimal(String value) {

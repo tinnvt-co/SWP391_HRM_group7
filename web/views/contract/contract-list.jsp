@@ -56,7 +56,7 @@
             <h5 class="fw-bold text-dark mb-0">Contract Management</h5>
             <small class="text-muted">Manage all employee contracts</small>
         </div>
-        <c:if test="${permissions.contains('CREATE_CONTRACT')}">
+        <c:if test="${canCreateContract}">
             <a href="${pageContext.request.contextPath}/contracts?action=add"
                class="btn btn-primary btn-sm px-3 fw-medium"
                style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;">

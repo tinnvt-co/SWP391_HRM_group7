@@ -54,7 +54,6 @@
     <c:if test="${payrollTaskSummary.actionable}">
         <c:url var="payrollTaskUrl" value="/payroll">
             <c:param name="action" value="approval"/>
-            <c:param name="deptId" value="${payrollTaskSummary.departmentId}"/>
             <c:param name="month" value="${payrollTaskSummary.month}"/>
             <c:param name="year" value="${payrollTaskSummary.year}"/>
         </c:url>
@@ -111,7 +110,7 @@
                             <div class="text-muted" style="font-size:0.78rem;">
                                 <c:choose>
                                     <c:when test="${payrollTaskSummary.actionable}">
-                                        ${payrollTaskSummary.taskLabel} &middot; ${payrollTaskSummary.departmentName}
+                                        ${payrollTaskSummary.taskLabel}
                                         &middot; Month ${payrollTaskSummary.month}/${payrollTaskSummary.year}
                                     </c:when>
                                     <c:otherwise>No pending payroll tasks</c:otherwise>
@@ -139,16 +138,6 @@
         <div class="card-body">
             <form method="get" class="row g-2 align-items-end">
                 <input type="hidden" name="action" value="approval">
-                <div class="col-md-3">
-                    <label class="form-label small text-muted mb-1">Department</label>
-                    <select name="deptId" class="form-select form-select-sm">
-                        <c:forEach var="dept" items="${departments}">
-                            <option value="${dept.departmentId}" ${dept.departmentId == selectedDeptId ? 'selected' : ''}>
-                                ${dept.departmentName}
-                            </option>
-                        </c:forEach>
-                    </select>
-                </div>
                 <div class="col-md-3">
                     <label class="form-label small text-muted mb-1">Month</label>
                     <select name="month" class="form-select form-select-sm">
@@ -180,6 +169,10 @@
                     <span class="text-muted ms-2">${selectedDeptName}</span>
                 </c:if>
                 <c:choose>
+                    <c:when test="${allDepartmentsScope}">
+                        <span class="text-muted ms-2">Showing payroll across departments.</span>
+                        <span class="text-muted ms-2">${totalPayrolls} employee(s)</span>
+                    </c:when>
                     <c:when test="${empty period}">
                         <span class="text-muted ms-2">No payroll for this month.</span>
                     </c:when>
@@ -195,6 +188,23 @@
                     </c:otherwise>
                 </c:choose>
             </div>
+            <c:if test="${pendingApprovalBatchCount > 0}">
+                <div class="d-flex gap-2">
+                    <form method="post" action="${pageContext.request.contextPath}/payroll?action=approve"
+                          onsubmit="return confirm('Approve all pending payroll batches for this month?');">
+                        <input type="hidden" name="year" value="${selectedYear}">
+                        <input type="hidden" name="month" value="${selectedMonth}">
+                        <button type="submit" class="btn btn-sm btn-success">
+                            <i class="bi bi-check2-circle me-1"></i>Approve All
+                            <span class="badge bg-light text-success ms-1">${pendingApprovalBatchCount}</span>
+                        </button>
+                    </form>
+                    <button type="button" class="btn btn-sm btn-outline-danger"
+                            data-bs-toggle="modal" data-bs-target="#rejectModal">
+                        <i class="bi bi-x-circle me-1"></i>Reject All
+                    </button>
+                </div>
+            </c:if>
             <c:if test="${not empty period and period.status == 'PendingApproval'}">
                 <div class="d-flex gap-2">
                     <form method="post" action="${pageContext.request.contextPath}/payroll?action=approve"
@@ -284,17 +294,17 @@
                     <ul class="pagination pagination-sm mb-0">
                         <li class="page-item ${currentPage == 1 ? 'disabled' : ''}">
                             <a class="page-link"
-                               href="?action=approval&month=${selectedMonth}&year=${selectedYear}&deptId=${selectedDeptId}&page=${currentPage - 1}">Previous</a>
+                               href="?action=approval&month=${selectedMonth}&year=${selectedYear}&page=${currentPage - 1}">Previous</a>
                         </li>
                         <c:forEach var="pg" begin="1" end="${totalPages}">
                             <li class="page-item ${pg == currentPage ? 'active' : ''}">
                                 <a class="page-link"
-                                   href="?action=approval&month=${selectedMonth}&year=${selectedYear}&deptId=${selectedDeptId}&page=${pg}">${pg}</a>
+                                   href="?action=approval&month=${selectedMonth}&year=${selectedYear}&page=${pg}">${pg}</a>
                             </li>
                         </c:forEach>
                         <li class="page-item ${currentPage == totalPages ? 'disabled' : ''}">
                             <a class="page-link"
-                               href="?action=approval&month=${selectedMonth}&year=${selectedYear}&deptId=${selectedDeptId}&page=${currentPage + 1}">Next</a>
+                               href="?action=approval&month=${selectedMonth}&year=${selectedYear}&page=${currentPage + 1}">Next</a>
                         </li>
                     </ul>
                 </nav>
@@ -304,12 +314,20 @@
 </div>
 
 <%-- Reject modal --%>
-<c:if test="${not empty period and period.status == 'PendingApproval'}">
+<c:if test="${pendingApprovalBatchCount > 0 or (not empty period and period.status == 'PendingApproval')}">
 <div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow">
       <form method="post" action="${pageContext.request.contextPath}/payroll?action=reject">
-        <input type="hidden" name="periodId" value="${period.payrollPeriodId}">
+        <c:choose>
+            <c:when test="${not empty period}">
+                <input type="hidden" name="periodId" value="${period.payrollPeriodId}">
+            </c:when>
+            <c:otherwise>
+                <input type="hidden" name="year" value="${selectedYear}">
+                <input type="hidden" name="month" value="${selectedMonth}">
+            </c:otherwise>
+        </c:choose>
         <div class="modal-header bg-danger">
           <h6 class="modal-title text-white mb-0"><i class="bi bi-x-octagon me-2"></i>Reject Payroll</h6>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
