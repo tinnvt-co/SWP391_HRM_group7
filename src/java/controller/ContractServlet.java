@@ -555,17 +555,21 @@ public class ContractServlet extends HttpServlet {
 
     private void handleUploadTooLarge(HttpServletRequest request, HttpServletResponse response,
                                       String action)
-            throws SQLException, ServletException, IOException {
+            throws ServletException, IOException {
         String message = "Contract document must be 10 MB or smaller.";
-        if ("edit".equals(action)) {
-            String idParam = queryParam(request, "id");
-            if (idParam == null || idParam.isBlank()) {
-                response.sendRedirect(request.getContextPath() + "/contracts?error=upload-too-large");
+        try {
+            if ("edit".equals(action)) {
+                String idParam = queryParam(request, "id");
+                if (idParam == null || idParam.isBlank()) {
+                    response.sendRedirect(request.getContextPath() + "/contracts?error=upload-too-large");
+                    return;
+                }
+                forwardEditForm(request, response, Integer.parseInt(idParam), message);
                 return;
             }
-            forwardEditForm(request, response, Integer.parseInt(idParam), message);
-            return;
+            forwardAddForm(request, response, message);
+        } catch (SQLException ex) {
+            throw new ServletException(ex);
         }
-        forwardAddForm(request, response, message);
     }
 }
