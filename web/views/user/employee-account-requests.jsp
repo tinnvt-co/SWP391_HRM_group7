@@ -72,33 +72,38 @@
                       enctype="multipart/form-data" class="row g-3">
                     <div class="col-md-4">
                         <label class="form-label small text-muted mb-1">Full Name</label>
-                        <input type="text" name="fullName" class="form-control" maxlength="100" required>
+                        <input type="text" name="fullName" class="form-control" maxlength="100"
+                               value="${accountRequestForm.fullName}" required>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small text-muted mb-1">Email</label>
-                        <input type="email" name="email" class="form-control" maxlength="100" required>
+                        <input type="email" name="email" class="form-control" maxlength="100"
+                               value="${accountRequestForm.email}" required>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small text-muted mb-1">Phone</label>
                         <input type="text" name="phone" class="form-control" maxlength="15"
+                               value="${accountRequestForm.phone}"
                                pattern="[0-9]{10,15}" inputmode="numeric" required>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Gender</label>
                         <select name="gender" class="form-select" required>
                             <c:forEach var="g" items="${genders}">
-                                <option value="${g}">${g}</option>
+                                <option value="${g}" ${accountRequestForm.gender == g ? 'selected' : ''}>${g}</option>
                             </c:forEach>
                         </select>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Date of Birth</label>
-                        <input id="dateOfBirth" type="date" name="dateOfBirth" class="form-control" required>
+                        <input id="dateOfBirth" type="date" name="dateOfBirth" class="form-control"
+                               value="${accountRequestForm.dateOfBirth}" required>
                         <div class="invalid-feedback">Chua du 18 tuoi.</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Hire Date</label>
-                        <input type="date" name="hireDate" class="form-control" value="${today}" required>
+                        <input type="date" name="hireDate" class="form-control"
+                               value="${not empty accountRequestForm.hireDate ? accountRequestForm.hireDate : today}" required>
                     </div>
                     <c:if test="${hrManagerRequestScope}">
                         <div class="col-md-3">
@@ -106,7 +111,8 @@
                             <select id="requestedRoleId" name="requestedRoleId" class="form-select" required>
                                 <option value="">Select role</option>
                                 <c:forEach var="role" items="${requestRoles}">
-                                    <option value="${role.roleId}" data-role="${fn:trim(role.roleName)}">
+                                    <option value="${role.roleId}" data-role="${fn:trim(role.roleName)}"
+                                            ${accountRequestForm.requestedRoleId == role.roleId ? 'selected' : ''}>
                                         ${role.roleName}
                                     </option>
                                 </c:forEach>
@@ -118,7 +124,8 @@
                         <select id="departmentId" name="departmentId" class="form-select" required>
                             <option value="">Select department</option>
                             <c:forEach var="d" items="${departments}">
-                                <option value="${d.departmentId}" data-code="${fn:trim(d.departmentCode)}">
+                                <option value="${d.departmentId}" data-code="${fn:trim(d.departmentCode)}"
+                                        ${accountRequestForm.departmentId == d.departmentId ? 'selected' : ''}>
                                     ${d.departmentName}
                                 </option>
                             </c:forEach>
@@ -126,43 +133,52 @@
                     </div>
                     <div class="col-md-5">
                         <label class="form-label small text-muted mb-1">Address</label>
-                        <input type="text" name="address" class="form-control" maxlength="255" required>
+                        <input type="text" name="address" class="form-control" maxlength="255"
+                               value="${accountRequestForm.address}" required>
                     </div>
                     <div class="col-12"><hr class="my-1"></div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Contract Type</label>
                         <select name="contractType" class="form-select" required>
                             <c:forEach var="ct" items="${contractTypes}">
-                                <option value="${ct}">${ct.dbValue}</option>
+                                <option value="${ct}" ${accountRequestForm.contractType == ct ? 'selected' : ''}>${ct.dbValue}</option>
                             </c:forEach>
                         </select>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Contract Start</label>
-                        <input id="contractStartDate" type="date" name="contractStartDate" class="form-control" value="${today}" required>
+                        <input id="contractStartDate" type="date" name="contractStartDate" class="form-control"
+                               value="${not empty accountRequestForm.contractStartDate ? accountRequestForm.contractStartDate : today}" required>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Contract End</label>
-                        <input id="contractEndDate" type="date" name="contractEndDate" class="form-control">
+                        <input id="contractEndDate" type="date" name="contractEndDate" class="form-control"
+                               value="${accountRequestForm.contractEndDate}">
                         <div class="invalid-feedback">Contract end must be at least 1 month after contract start.</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Basic Salary</label>
-                        <input type="number" name="basicSalary" class="form-control" min="0" step="1000" required>
+                        <input type="number" name="basicSalary" class="form-control" min="0" step="1000"
+                               value="${accountRequestForm.basicSalary}" required>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Standard Working Days</label>
-                        <input type="number" name="standardWorkingDays" class="form-control" min="1" max="31" step="0.5" value="26" required>
+                        <input type="number" name="standardWorkingDays" class="form-control" min="1" max="31" step="0.5"
+                               value="${not empty accountRequestForm.standardWorkingDays ? accountRequestForm.standardWorkingDays : '26'}" required>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label small text-muted mb-1">Contract Note</label>
-                        <input type="text" name="contractNote" class="form-control" maxlength="255">
+                        <label class="form-label small text-muted mb-1">Contract Note (Optional)</label>
+                        <input type="text" name="contractNote" class="form-control" maxlength="255"
+                               value="${accountRequestForm.contractNote}">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small text-muted mb-1">Signed Contract Document</label>
                         <input type="file" name="contractDocument" class="form-control"
                                accept="application/pdf,image/png,image/jpeg" required>
                         <div class="form-text">PDF, JPG, or PNG. Maximum 10 MB.</div>
+                        <c:if test="${not empty accountRequestForm}">
+                            <div class="form-text text-warning">Please re-select the contract document before submitting again.</div>
+                        </c:if>
                     </div>
                     <div class="col-12 text-end">
                         <button type="submit" class="btn btn-primary btn-sm px-3"

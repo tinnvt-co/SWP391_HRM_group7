@@ -43,8 +43,10 @@ import java.sql.Types;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 @WebServlet(name = "EmployeeAccountRequestServlet", urlPatterns = {"/employee-account-requests"})
 @MultipartConfig(
@@ -55,6 +57,7 @@ import java.util.Locale;
 public class EmployeeAccountRequestServlet extends HttpServlet {
 
     private static final int PAGE_SIZE = 10;
+    private static final String REQUEST_FORM_SESSION_KEY = "employeeAccountRequestForm";
     private static final String TEMP_PASSWORD_CHARS =
             "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
@@ -130,6 +133,7 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
         } catch (SQLException e) {
             throw new ServletException(e);
         } catch (IllegalStateException e) {
+            preserveRequestForm(request);
             flashError(request, "Contract document must be 10 MB or smaller.");
             response.sendRedirect(request.getContextPath() + "/employee-account-requests");
         }
@@ -149,17 +153,20 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
 
         String error = validateRequestForm(accountRequest, currentUser);
         if (error != null) {
+            preserveRequestForm(request);
             flashError(request, error);
             response.sendRedirect(request.getContextPath() + "/employee-account-requests");
             return;
         }
 
         if (userDAO.findByEmail(accountRequest.getEmail()) != null) {
+            preserveRequestForm(request);
             flashError(request, "This email is already linked to an existing account.");
             response.sendRedirect(request.getContextPath() + "/employee-account-requests");
             return;
         }
         if (requestDAO.hasPendingByEmail(accountRequest.getEmail())) {
+            preserveRequestForm(request);
             flashError(request, "There is already a pending account request for this email.");
             response.sendRedirect(request.getContextPath() + "/employee-account-requests");
             return;
@@ -169,6 +176,7 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
         try {
             document = readUploadedRequestDocument(request, currentUser.getUserId());
         } catch (IOException | ServletException ex) {
+            preserveRequestForm(request);
             flashError(request, ex.getMessage());
             response.sendRedirect(request.getContextPath() + "/employee-account-requests");
             return;
@@ -180,6 +188,7 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
         if (!requestDAO.updateContractCode(requestId, contractCode)) {
             throw new SQLException("Could not assign contract code.");
         }
+        clearPreservedRequestForm(request);
         flash(request, "Contract and account request submitted to Admin.");
         response.sendRedirect(request.getContextPath() + "/employee-account-requests");
     }
@@ -337,12 +346,22 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
     }
 
     private String validateRequestForm(EmployeeAccountRequest r, User requester) throws SQLException {
-        if (r.getFullName().isEmpty() || r.getEmail().isEmpty() || isBlank(r.getPhone())
-                || r.getGender() == null || r.getDateOfBirth() == null || isBlank(r.getAddress())
-                || r.getDepartmentId() <= 0 || r.getHireDate() == null
-                || r.getContractType() == null || r.getContractStartDate() == null
-                || r.getBasicSalary() == null || r.getStandardWorkingDays() == null) {
-            return "Please fill in all required fields.";
+        List<String> missing = new ArrayList<>();
+        if (isBlank(r.getFullName())) missing.add("Full Name");
+        if (isBlank(r.getEmail())) missing.add("Email");
+        if (isBlank(r.getPhone())) missing.add("Phone");
+        if (r.getGender() == null) missing.add("Gender");
+        if (r.getDateOfBirth() == null) missing.add("Date of Birth");
+        if (isBlank(r.getAddress())) missing.add("Address");
+        if (r.getDepartmentId() <= 0) missing.add("Department");
+        if (r.getHireDate() == null) missing.add("Hire Date");
+        if (isRole(requester, "HR_MANAGER") && r.getRequestedRoleId() <= 0) missing.add("Requested Role");
+        if (r.getContractType() == null) missing.add("Contract Type");
+        if (r.getContractStartDate() == null) missing.add("Contract Start");
+        if (r.getBasicSalary() == null) missing.add("Basic Salary");
+        if (r.getStandardWorkingDays() == null) missing.add("Standard Working Days");
+        if (!missing.isEmpty()) {
+            return "Please fill in: " + String.join(", ", missing) + ".";
         }
         if (!r.getEmail().matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
             return "Please enter a valid email address.";
@@ -365,9 +384,6 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
         }
         if (r.getBasicSalary().signum() < 0 || r.getStandardWorkingDays().signum() <= 0) {
             return "Salary must be non-negative and standard working days must be greater than 0.";
-        }
-        if (isRole(requester, "HR_MANAGER") && r.getRequestedRoleId() <= 0) {
-            return "Please select a requested role.";
         }
         Role requestedRole = requestedRoleForRequester(r, requester);
         if (requestedRole == null || !requestedRole.isActive()) {
@@ -752,6 +768,7 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
         if (session == null) return;
         Object msg = session.getAttribute("accountRequestMessage");
         Object err = session.getAttribute("accountRequestError");
+        Object form = session.getAttribute(REQUEST_FORM_SESSION_KEY);
         if (msg != null) {
             request.setAttribute("accountRequestMessage", msg);
             session.removeAttribute("accountRequestMessage");
@@ -759,6 +776,10 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
         if (err != null) {
             request.setAttribute("accountRequestError", err);
             session.removeAttribute("accountRequestError");
+        }
+        if (form != null) {
+            request.setAttribute("accountRequestForm", form);
+            session.removeAttribute(REQUEST_FORM_SESSION_KEY);
         }
     }
 
@@ -768,6 +789,30 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
 
     private void flashError(HttpServletRequest request, String message) {
         request.getSession(true).setAttribute("accountRequestError", message);
+    }
+
+    private void preserveRequestForm(HttpServletRequest request) {
+        String[] fields = {
+            "fullName", "email", "phone", "gender", "dateOfBirth", "hireDate",
+            "requestedRoleId", "departmentId", "address", "contractType",
+            "contractStartDate", "contractEndDate", "basicSalary",
+            "standardWorkingDays", "contractNote"
+        };
+        Map<String, String> values = new LinkedHashMap<>();
+        for (String field : fields) {
+            String value = request.getParameter(field);
+            if (value != null) {
+                values.put(field, value);
+            }
+        }
+        request.getSession(true).setAttribute(REQUEST_FORM_SESSION_KEY, values);
+    }
+
+    private void clearPreservedRequestForm(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.removeAttribute(REQUEST_FORM_SESSION_KEY);
+        }
     }
 
     private boolean isBlank(String value) {

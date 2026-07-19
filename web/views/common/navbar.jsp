@@ -2,7 +2,60 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ include file="/views/common/tab-session.jsp" %>
-<nav class="navbar navbar-dark" style="background-color: #1a3c5e; height: 56px;">
+<style>
+    body {
+        padding-top: 56px;
+        background-color: #f4f6f9;
+    }
+
+    .app-navbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1030;
+        height: 56px;
+    }
+
+    .sidebar {
+        position: fixed !important;
+        top: 56px !important;
+        bottom: 0;
+        height: calc(100vh - 56px) !important;
+        min-height: auto !important;
+        overflow-x: hidden;
+        overflow-y: auto;
+        padding-bottom: 1rem;
+    }
+
+    .main-content {
+        min-height: calc(100vh - 56px);
+    }
+
+    @media (max-width: 768px) {
+        body {
+            padding-top: 0;
+        }
+
+        .app-navbar {
+            position: sticky;
+        }
+
+        .sidebar {
+            position: static !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: auto !important;
+            overflow: visible;
+        }
+
+        .main-content {
+            margin-left: 0 !important;
+            min-height: auto;
+        }
+    }
+</style>
+<nav class="navbar navbar-dark app-navbar" style="background-color: #1a3c5e;">
     <div class="container-fluid px-4 d-flex align-items-center justify-content-between">
         <a class="navbar-brand fw-bold mb-0" href="${pageContext.request.contextPath}/home">
             <i class="bi bi-building me-2"></i>HRM System
