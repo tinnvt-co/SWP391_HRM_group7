@@ -215,12 +215,6 @@
     if (reasonInput) reasonInput.addEventListener('input', updateCharCount);
     updateCharCount();
 
-    const today = new Date();
-    today.setDate(today.getDate() + 1);
-    const tomorrow = today.toISOString().split('T')[0];
-    if (startInput && !startInput.min) startInput.min = tomorrow;
-    if (endInput   && !endInput.min)   endInput.min   = tomorrow;
-
     if (startInput) {
         startInput.addEventListener('change', () => {
             if (endInput && (!endInput.value || endInput.value < startInput.value)) {

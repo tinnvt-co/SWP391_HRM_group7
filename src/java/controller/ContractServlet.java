@@ -70,7 +70,10 @@ public class ContractServlet extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        String action = request.getParameter("action");
+        String action = actionFromQuery(request);
+        if (action == null || action.isBlank()) {
+            action = request.getParameter("action");
+        }
         if (action == null) action = "";
 
         try {
@@ -82,6 +85,8 @@ public class ContractServlet extends HttpServlet {
             }
         } catch (SQLException e) {
             throw new ServletException(e);
+        } catch (IllegalStateException e) {
+            handleUploadTooLarge(request, response, action);
         }
     }
 
@@ -115,6 +120,7 @@ public class ContractServlet extends HttpServlet {
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalContracts", totalContracts);
         request.setAttribute("canCreateContract", canCreateContract(request));
+        request.setAttribute("canEditSystemContracts", canEditSystemContracts(request));
         request.getRequestDispatcher("/views/contract/contract-list.jsp").forward(request, response);
     }
 
@@ -289,11 +295,13 @@ public class ContractServlet extends HttpServlet {
             return;
         }
 
-        boolean readonly = c.isSystemContract();
+        boolean readonly = c.getStatus() != Status.Active
+                || (c.isSystemContract() && !canEditSystemContracts(request));
         request.setAttribute("contract", c);
         request.setAttribute("contractTypes", ContractType.values());
         request.setAttribute("readonly", readonly);
         request.setAttribute("systemContract", c.isSystemContract());
+        request.setAttribute("canEditSystemContract", c.isSystemContract() && canEditSystemContracts(request));
         loadAllowanceAttributes(request);
         request.getRequestDispatcher("/views/contract/edit-contract.jsp").forward(request, response);
     }
@@ -329,7 +337,7 @@ public class ContractServlet extends HttpServlet {
                     + "/contracts?error=not-active");
             return;
         }
-        if (existing.isSystemContract()) {
+        if (existing.isSystemContract() && !canEditSystemContracts(request)) {
             forwardEditForm(request, response, contractId,
                     "System contracts are seeded from the database and cannot be edited.");
             return;
@@ -402,7 +410,7 @@ public class ContractServlet extends HttpServlet {
         c.setNote(note.isEmpty() ? null : note);
         c.setUpdatedBy(currentUser.getUserId());
 
-        if (!contractDAO.update(c)) {
+        if (!contractDAO.update(c, canEditSystemContracts(request))) {
             forwardEditForm(request, response, contractId,
                     "System contracts are seeded from the database and cannot be edited.");
             return;
@@ -449,8 +457,14 @@ public class ContractServlet extends HttpServlet {
         request.setAttribute("error", error);
         Contract contract = contractDAO.findById(contractId);
         request.setAttribute("contract", contract);
-        request.setAttribute("readonly", contract != null && contract.isSystemContract());
+        boolean readonly = contract == null
+                || contract.getStatus() != Status.Active
+                || (contract.isSystemContract() && !canEditSystemContracts(request));
+        request.setAttribute("readonly", readonly);
         request.setAttribute("systemContract", contract != null && contract.isSystemContract());
+        request.setAttribute("canEditSystemContract", contract != null
+                && contract.isSystemContract()
+                && canEditSystemContracts(request));
         request.setAttribute("contractTypes", ContractType.values());
         loadAllowanceAttributes(request);
         request.getRequestDispatcher("/views/contract/edit-contract.jsp").forward(request, response);
@@ -459,7 +473,12 @@ public class ContractServlet extends HttpServlet {
     private ContractDocument readUploadedDocument(HttpServletRequest request, boolean required,
                                                   String namespace, int uploadedBy)
             throws IOException, ServletException {
-        Part part = request.getPart("contractDocument");
+        Part part;
+        try {
+            part = request.getPart("contractDocument");
+        } catch (IllegalStateException ex) {
+            throw new IOException("Contract document must be 10 MB or smaller.");
+        }
         if (part == null || part.getSize() <= 0) {
             if (required) {
                 throw new IOException("Please upload the signed contract document.");
@@ -498,6 +517,14 @@ public class ContractServlet extends HttpServlet {
                 && !"HR_STAFF".equalsIgnoreCase(roleName);
     }
 
+    private boolean canEditSystemContracts(HttpServletRequest request) {
+        User currentUser = getCurrentUser(request);
+        return currentUser != null
+                && currentUser.getRole() != null
+                && "HR_MANAGER".equalsIgnoreCase(currentUser.getRole().getRoleName())
+                && hasPermission(request, "UPDATE_CONTRACT");
+    }
+
     private boolean hasPermission(HttpServletRequest request, String permCode) {
         HttpSession session = request.getSession(false);
         if (session == null) return false;
@@ -507,5 +534,38 @@ public class ContractServlet extends HttpServlet {
 
     private String trim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String actionFromQuery(HttpServletRequest request) {
+        return queryParam(request, "action");
+    }
+
+    private String queryParam(HttpServletRequest request, String name) {
+        String query = request.getQueryString();
+        if (query == null || query.isBlank()) return null;
+        for (String part : query.split("&")) {
+            int eq = part.indexOf('=');
+            String key = eq >= 0 ? part.substring(0, eq) : part;
+            if (name.equals(key)) {
+                return eq >= 0 ? part.substring(eq + 1) : "";
+            }
+        }
+        return null;
+    }
+
+    private void handleUploadTooLarge(HttpServletRequest request, HttpServletResponse response,
+                                      String action)
+            throws SQLException, ServletException, IOException {
+        String message = "Contract document must be 10 MB or smaller.";
+        if ("edit".equals(action)) {
+            String idParam = queryParam(request, "id");
+            if (idParam == null || idParam.isBlank()) {
+                response.sendRedirect(request.getContextPath() + "/contracts?error=upload-too-large");
+                return;
+            }
+            forwardEditForm(request, response, Integer.parseInt(idParam), message);
+            return;
+        }
+        forwardAddForm(request, response, message);
     }
 }

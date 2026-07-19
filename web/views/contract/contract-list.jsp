@@ -90,6 +90,11 @@
             <i class="bi bi-lock-fill"></i><span>System-seeded contracts cannot be edited or terminated from the UI.</span>
         </div>
     </c:if>
+    <c:if test="${param.error == 'upload-too-large'}">
+        <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-exclamation-triangle-fill"></i><span>Contract document must be 10 MB or smaller.</span>
+        </div>
+    </c:if>
 
     <div class="card border-0 shadow-sm rounded-3">
         <div class="card-body p-0">
@@ -162,7 +167,7 @@
                                     <div class="d-flex justify-content-end gap-1">
                                         <a href="${pageContext.request.contextPath}/contracts?action=view&id=${ct.contractId}"
                                            class="btn btn-sm btn-outline-primary"><i class="bi bi-eye me-1"></i>View</a>
-                                        <c:if test="${permissions.contains('UPDATE_CONTRACT') && ct.status == 'Active' && !ct.systemContract}">
+                                        <c:if test="${permissions.contains('UPDATE_CONTRACT') && ct.status == 'Active' && (!ct.systemContract || canEditSystemContracts)}">
                                             <a href="${pageContext.request.contextPath}/contracts?action=edit&id=${ct.contractId}"
                                                class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit</a>
                                         </c:if>

@@ -91,12 +91,14 @@
             <c:if test="${systemContract}">
                 <div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-3">
                     <i class="bi bi-lock-fill"></i>
-                    <span>This is a system-seeded contract and cannot be edited from the UI.</span>
+                    <span>
+                        ${canEditSystemContract ? 'This is a system-seeded contract. HR Manager can edit it.' : 'This is a system-seeded contract and cannot be edited from the UI.'}
+                    </span>
                 </div>
             </c:if>
 
             <div class="card border-0 shadow-sm rounded-3 p-4">
-                <form action="${pageContext.request.contextPath}/contracts?action=edit" method="post"
+                <form action="${pageContext.request.contextPath}/contracts?action=edit&id=${contract.contractId}" method="post"
                       enctype="multipart/form-data" novalidate>
                     <input type="hidden" name="contractId" value="${contract.contractId}">
 

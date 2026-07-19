@@ -215,9 +215,16 @@ public class ContractDAO {
     }
 
     public boolean update(Contract c) throws SQLException {
+        return update(c, false);
+    }
+
+    public boolean update(Contract c, boolean includeSystemContracts) throws SQLException {
         String sql = "UPDATE contracts SET contract_type=?, start_date=?, end_date=?, basic_salary=?, "
                    + "standard_working_days=?, note=?, updated_by=?, updated_at=NOW() "
-                   + "WHERE contract_id=? AND is_system_contract=0";
+                   + "WHERE contract_id=?";
+        if (!includeSystemContracts) {
+            sql += " AND is_system_contract=0";
+        }
         Connection conn = null;
         PreparedStatement ps = null;
         try {

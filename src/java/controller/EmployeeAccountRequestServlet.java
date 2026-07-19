@@ -114,7 +114,10 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        String action = request.getParameter("action");
+        String action = queryParam(request, "action");
+        if (action == null || action.isBlank()) {
+            action = request.getParameter("action");
+        }
         if (action == null) action = "";
 
         try {
@@ -126,6 +129,9 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             }
         } catch (SQLException e) {
             throw new ServletException(e);
+        } catch (IllegalStateException e) {
+            flashError(request, "Contract document must be 10 MB or smaller.");
+            response.sendRedirect(request.getContextPath() + "/employee-account-requests");
         }
     }
 
@@ -675,7 +681,12 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
 
     private ContractDocument readUploadedRequestDocument(HttpServletRequest request, int uploadedBy)
             throws IOException, ServletException {
-        Part part = request.getPart("contractDocument");
+        Part part;
+        try {
+            part = request.getPart("contractDocument");
+        } catch (IllegalStateException ex) {
+            throw new IOException("Contract document must be 10 MB or smaller.");
+        }
         return documentStorage.save(getServletContext(), part, "account-requests", uploadedBy);
     }
 
@@ -765,6 +776,19 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
 
     private String trim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String queryParam(HttpServletRequest request, String name) {
+        String query = request.getQueryString();
+        if (query == null || query.isBlank()) return null;
+        for (String part : query.split("&")) {
+            int eq = part.indexOf('=');
+            String key = eq >= 0 ? part.substring(0, eq) : part;
+            if (name.equals(key)) {
+                return eq >= 0 ? part.substring(eq + 1) : "";
+            }
+        }
+        return null;
     }
 
     private String limit(String value, int max) {

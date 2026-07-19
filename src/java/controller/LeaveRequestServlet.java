@@ -472,11 +472,6 @@ public class LeaveRequestServlet extends HttpServlet {
             return;
         }
 
-        if (!startDate.isAfter(LocalDate.now())) {
-            forwardForm(request, response, employee, "Start date must be in the future.");
-            return;
-        }
-
         if (reason.length() > 500) {
             forwardForm(request, response, employee, "Reason must be 500 characters or fewer.");
             return;
