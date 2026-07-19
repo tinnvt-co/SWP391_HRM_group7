@@ -85,6 +85,11 @@
             <i class="bi bi-exclamation-triangle-fill"></i><span>Only active contracts can be updated.</span>
         </div>
     </c:if>
+    <c:if test="${param.error == 'system-contract'}">
+        <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-lock-fill"></i><span>System-seeded contracts cannot be edited or terminated from the UI.</span>
+        </div>
+    </c:if>
 
     <div class="card border-0 shadow-sm rounded-3">
         <div class="card-body p-0">
@@ -129,7 +134,12 @@
                                     </div>
                                 </td>
                                 <td><span class="code-badge">${ct.contractCode}</span></td>
-                                <td>${ct.contractType.dbValue}</td>
+                                <td>
+                                    <div>${ct.contractType.dbValue}</div>
+                                    <c:if test="${ct.systemContract}">
+                                        <span class="badge text-bg-light border mt-1">System</span>
+                                    </c:if>
+                                </td>
                                 <td class="small">
                                     <div>${ct.startDate}</div>
                                     <div class="text-muted">${not empty ct.endDate ? ct.endDate : 'No end date'}</div>
@@ -152,11 +162,11 @@
                                     <div class="d-flex justify-content-end gap-1">
                                         <a href="${pageContext.request.contextPath}/contracts?action=view&id=${ct.contractId}"
                                            class="btn btn-sm btn-outline-primary"><i class="bi bi-eye me-1"></i>View</a>
-                                        <c:if test="${permissions.contains('UPDATE_CONTRACT') && ct.status == 'Active'}">
+                                        <c:if test="${permissions.contains('UPDATE_CONTRACT') && ct.status == 'Active' && !ct.systemContract}">
                                             <a href="${pageContext.request.contextPath}/contracts?action=edit&id=${ct.contractId}"
                                                class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit</a>
                                         </c:if>
-                                        <c:if test="${permissions.contains('TERMINATE_CONTRACT') && ct.status == 'Active'}">
+                                        <c:if test="${permissions.contains('TERMINATE_CONTRACT') && ct.status == 'Active' && !ct.systemContract}">
                                             <form method="post" action="${pageContext.request.contextPath}/contracts?action=terminate"
                                                   class="d-inline"
                                                   onsubmit="return confirm('Terminate contract ${ct.contractCode} of ${ct.employeeFullName}? This cannot be undone.')">

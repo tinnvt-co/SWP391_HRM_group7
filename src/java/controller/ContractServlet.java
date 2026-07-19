@@ -1,20 +1,25 @@
 package controller;
 
 import dao.AllowanceTypeDAO;
+import dao.ContractDocumentDAO;
 import dao.ContractDAO;
 import dao.EmployeeDAO;
 import model.Contract;
+import model.ContractDocument;
 import model.Contract.ContractType;
 import model.Contract.Status;
 import model.Employee;
 import model.User;
+import service.ContractDocumentStorage;
 
 import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.Part;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -24,11 +29,18 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 
 @WebServlet(name = "ContractServlet", urlPatterns = {"/contracts"})
+@MultipartConfig(
+        fileSizeThreshold = 1024 * 1024,
+        maxFileSize = 10L * 1024 * 1024,
+        maxRequestSize = 12L * 1024 * 1024
+)
 public class ContractServlet extends HttpServlet {
 
     private final ContractDAO contractDAO = new ContractDAO();
+    private final ContractDocumentDAO documentDAO = new ContractDocumentDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
     private final AllowanceTypeDAO allowanceDAO = new AllowanceTypeDAO();
+    private final ContractDocumentStorage documentStorage = new ContractDocumentStorage();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -121,6 +133,7 @@ public class ContractServlet extends HttpServlet {
         }
         request.setAttribute("contract", c);
         request.setAttribute("readonly", true);
+        request.setAttribute("systemContract", c.isSystemContract());
         request.setAttribute("contractTypes", ContractType.values());
         loadAllowanceAttributes(request);
         request.getRequestDispatcher("/views/contract/edit-contract.jsp").forward(request, response);
@@ -229,6 +242,13 @@ public class ContractServlet extends HttpServlet {
         }
 
         User currentUser = getCurrentUser(request);
+        ContractDocument document;
+        try {
+            document = readUploadedDocument(request, true, "manual-contracts", currentUser.getUserId());
+        } catch (IOException ex) {
+            forwardAddForm(request, response, ex.getMessage());
+            return;
+        }
 
         Contract c = new Contract();
         c.setEmployeeId(employeeId);
@@ -243,7 +263,9 @@ public class ContractServlet extends HttpServlet {
         c.setCreatedBy(currentUser.getUserId());
         c.setUpdatedBy(currentUser.getUserId());
 
-        contractDAO.insert(c);
+        int contractId = contractDAO.insert(c);
+        document.setContractId(contractId);
+        documentDAO.replaceForContract(document);
         response.sendRedirect(request.getContextPath() + "/contracts?added=success");
     }
 
@@ -267,8 +289,11 @@ public class ContractServlet extends HttpServlet {
             return;
         }
 
+        boolean readonly = c.isSystemContract();
         request.setAttribute("contract", c);
         request.setAttribute("contractTypes", ContractType.values());
+        request.setAttribute("readonly", readonly);
+        request.setAttribute("systemContract", c.isSystemContract());
         loadAllowanceAttributes(request);
         request.getRequestDispatcher("/views/contract/edit-contract.jsp").forward(request, response);
     }
@@ -302,6 +327,11 @@ public class ContractServlet extends HttpServlet {
         if (existing.getStatus() != Status.Active) {
             response.sendRedirect(request.getContextPath()
                     + "/contracts?error=not-active");
+            return;
+        }
+        if (existing.isSystemContract()) {
+            forwardEditForm(request, response, contractId,
+                    "System contracts are seeded from the database and cannot be edited.");
             return;
         }
 
@@ -354,6 +384,13 @@ public class ContractServlet extends HttpServlet {
         }
 
         User currentUser = getCurrentUser(request);
+        ContractDocument document;
+        try {
+            document = readUploadedDocument(request, false, "manual-contracts", currentUser.getUserId());
+        } catch (IOException ex) {
+            forwardEditForm(request, response, contractId, ex.getMessage());
+            return;
+        }
 
         Contract c = new Contract();
         c.setContractId(contractId);
@@ -365,7 +402,15 @@ public class ContractServlet extends HttpServlet {
         c.setNote(note.isEmpty() ? null : note);
         c.setUpdatedBy(currentUser.getUserId());
 
-        contractDAO.update(c);
+        if (!contractDAO.update(c)) {
+            forwardEditForm(request, response, contractId,
+                    "System contracts are seeded from the database and cannot be edited.");
+            return;
+        }
+        if (document != null) {
+            document.setContractId(contractId);
+            documentDAO.replaceForContract(document);
+        }
         response.sendRedirect(request.getContextPath() + "/contracts?updated=success");
     }
 
@@ -384,8 +429,9 @@ public class ContractServlet extends HttpServlet {
         }
 
         User currentUser = getCurrentUser(request);
-        contractDAO.terminate(Integer.parseInt(idParam), currentUser.getUserId());
-        response.sendRedirect(request.getContextPath() + "/contracts?terminated=success");
+        boolean terminated = contractDAO.terminate(Integer.parseInt(idParam), currentUser.getUserId());
+        response.sendRedirect(request.getContextPath() + "/contracts?"
+                + (terminated ? "terminated=success" : "error=system-contract"));
     }
 
     private void forwardAddForm(HttpServletRequest request, HttpServletResponse response, String error)
@@ -401,10 +447,26 @@ public class ContractServlet extends HttpServlet {
                                  int contractId, String error)
             throws SQLException, ServletException, IOException {
         request.setAttribute("error", error);
-        request.setAttribute("contract", contractDAO.findById(contractId));
+        Contract contract = contractDAO.findById(contractId);
+        request.setAttribute("contract", contract);
+        request.setAttribute("readonly", contract != null && contract.isSystemContract());
+        request.setAttribute("systemContract", contract != null && contract.isSystemContract());
         request.setAttribute("contractTypes", ContractType.values());
         loadAllowanceAttributes(request);
         request.getRequestDispatcher("/views/contract/edit-contract.jsp").forward(request, response);
+    }
+
+    private ContractDocument readUploadedDocument(HttpServletRequest request, boolean required,
+                                                  String namespace, int uploadedBy)
+            throws IOException, ServletException {
+        Part part = request.getPart("contractDocument");
+        if (part == null || part.getSize() <= 0) {
+            if (required) {
+                throw new IOException("Please upload the signed contract document.");
+            }
+            return null;
+        }
+        return documentStorage.save(getServletContext(), part, namespace, uploadedBy);
     }
 
     private void loadAllowanceAttributes(HttpServletRequest request) throws SQLException {

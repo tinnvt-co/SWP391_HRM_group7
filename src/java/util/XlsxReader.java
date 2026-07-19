@@ -118,7 +118,7 @@ public final class XlsxReader {
         List<String> out = new ArrayList<>();
         if (xml == null) return out;
         Document doc = parse(xml);
-        NodeList siList = doc.getElementsByTagName("si");
+        NodeList siList = elementsByTagName(doc, "si");
         for (int i = 0; i < siList.getLength(); i++) {
             out.add(concatText((Element) siList.item(i)));
         }
@@ -128,7 +128,7 @@ public final class XlsxReader {
     /** Concatenate all <t> descendants (handles rich text runs). */
     private static String concatText(Element parent) {
         StringBuilder sb = new StringBuilder();
-        NodeList tList = parent.getElementsByTagName("t");
+        NodeList tList = elementsByTagName(parent, "t");
         for (int i = 0; i < tList.getLength(); i++) {
             sb.append(tList.item(i).getTextContent());
         }
@@ -139,14 +139,14 @@ public final class XlsxReader {
         Document doc = parse(xml);
         List<List<String>> rows = new ArrayList<>();
 
-        NodeList rowList = doc.getElementsByTagName("row");
+        NodeList rowList = elementsByTagName(doc, "row");
         for (int i = 0; i < rowList.getLength(); i++) {
             Element rowEl = (Element) rowList.item(i);
             int rowIdx = parseInt(rowEl.getAttribute("r"), i + 1) - 1; // 1-based -> 0-based
             while (rows.size() <= rowIdx) rows.add(new ArrayList<>());
             List<String> cells = rows.get(rowIdx);
 
-            NodeList cList = rowEl.getElementsByTagName("c");
+            NodeList cList = elementsByTagName(rowEl, "c");
             for (int j = 0; j < cList.getLength(); j++) {
                 Element c = (Element) cList.item(j);
                 int colIdx = colFromRef(c.getAttribute("r"), j);
@@ -162,7 +162,7 @@ public final class XlsxReader {
         String t = c.getAttribute("t"); // "s","inlineStr","str","b","e", or "" (number)
 
         if ("inlineStr".equals(t)) {
-            NodeList isList = c.getElementsByTagName("is");
+            NodeList isList = elementsByTagName(c, "is");
             if (isList.getLength() > 0) return concatText((Element) isList.item(0));
             return "";
         }
@@ -181,7 +181,7 @@ public final class XlsxReader {
     }
 
     private static String firstChildText(Element parent, String tag) {
-        NodeList nl = parent.getElementsByTagName(tag);
+        NodeList nl = elementsByTagName(parent, tag);
         if (nl.getLength() == 0) return null;
         // Only count direct <v>, not nested ones from other namespaces.
         for (int i = 0; i < nl.getLength(); i++) {
@@ -216,10 +216,20 @@ public final class XlsxReader {
         catch (Exception ex) { return dflt; }
     }
 
+    private static NodeList elementsByTagName(Document doc, String localName) {
+        NodeList nl = doc.getElementsByTagNameNS("*", localName);
+        return nl.getLength() > 0 ? nl : doc.getElementsByTagName(localName);
+    }
+
+    private static NodeList elementsByTagName(Element parent, String localName) {
+        NodeList nl = parent.getElementsByTagNameNS("*", localName);
+        return nl.getLength() > 0 ? nl : parent.getElementsByTagName(localName);
+    }
+
     private static Document parse(byte[] xml) throws IOException {
         try {
             DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
-            f.setNamespaceAware(false);
+            f.setNamespaceAware(true);
             // Harden against XXE — these files are user uploads.
             f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
             f.setExpandEntityReferences(false);

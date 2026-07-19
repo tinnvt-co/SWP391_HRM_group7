@@ -68,7 +68,8 @@
         <div class="card border-0 shadow-sm rounded-3 mb-4">
             <div class="card-body">
                 <h6 class="fw-bold mb-3"><i class="bi bi-person-plus me-2"></i>New Contract & Account Request</h6>
-                <form method="post" action="${pageContext.request.contextPath}/employee-account-requests?action=createRequest" class="row g-3">
+                <form method="post" action="${pageContext.request.contextPath}/employee-account-requests?action=createRequest"
+                      enctype="multipart/form-data" class="row g-3">
                     <div class="col-md-4">
                         <label class="form-label small text-muted mb-1">Full Name</label>
                         <input type="text" name="fullName" class="form-control" maxlength="100" required>
@@ -157,6 +158,12 @@
                         <label class="form-label small text-muted mb-1">Contract Note</label>
                         <input type="text" name="contractNote" class="form-control" maxlength="255">
                     </div>
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted mb-1">Signed Contract Document</label>
+                        <input type="file" name="contractDocument" class="form-control"
+                               accept="application/pdf,image/png,image/jpeg" required>
+                        <div class="form-text">PDF, JPG, or PNG. Maximum 10 MB.</div>
+                    </div>
                     <div class="col-12 text-end">
                         <button type="submit" class="btn btn-primary btn-sm px-3"
                                 style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;">
@@ -217,6 +224,11 @@
                                     <c:if test="${not empty req.basicSalary}">
                                         <div class="text-muted" style="font-size:0.78rem;">
                                             Salary: <fmt:formatNumber value="${req.basicSalary}" type="number" maxFractionDigits="0"/>
+                                        </div>
+                                    </c:if>
+                                    <c:if test="${not empty req.contractDocumentOriginalName}">
+                                        <div class="text-muted" style="font-size:0.78rem;">
+                                            Document: ${req.contractDocumentOriginalName}
                                         </div>
                                     </c:if>
                                 </td>

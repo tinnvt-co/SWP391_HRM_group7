@@ -15,7 +15,9 @@ import java.util.List;
 public class AttendanceRecordDAO {
 
     private static final String ATTENDANCE_ROLE_FILTER =
-            "ro.role_name IN ('EMPLOYEE', 'MANAGER', 'HR_STAFF') AND d.department_code <> 'IT'";
+            "ro.role_name IN ('EMPLOYEE', 'MANAGER', 'HR_STAFF', 'HR_MANAGER') AND d.department_code <> 'IT'";
+    private static final String HR_MANAGED_ROLE_FILTER =
+            "ro.role_name IN ('MANAGER', 'HR_STAFF', 'HR_MANAGER')";
 
     public int insert(AttendanceRecord r) throws SQLException {
         String sql = "INSERT INTO attendance_records (employee_id, work_date, "
@@ -557,7 +559,7 @@ public class AttendanceRecordDAO {
           + "JOIN users u ON e.user_id = u.user_id "
           + "JOIN roles ro ON u.role_id = ro.role_id "
           + "JOIN departments d ON e.department_id = d.department_id "
-          + "WHERE ro.role_name IN ('MANAGER', 'HR_STAFF') "
+          + "WHERE " + HR_MANAGED_ROLE_FILTER + " "
           + "  AND d.department_code <> 'IT' "
           + "  AND ar.verification_status = 'Pending' "
           + "  AND YEAR(ar.work_date)=? AND MONTH(ar.work_date)=?";
@@ -627,7 +629,7 @@ public class AttendanceRecordDAO {
           + "JOIN departments d ON e.department_id = d.department_id "
           + "SET ar.verification_status='Verified', ar.verified_by=?, "
           + "    ar.verified_at=NOW(), ar.updated_at=NOW() "
-          + "WHERE ro.role_name IN ('MANAGER', 'HR_STAFF') "
+          + "WHERE " + HR_MANAGED_ROLE_FILTER + " "
           + "  AND d.department_code <> 'IT' "
           + "  AND ar.verification_status = 'Pending' "
           + "  AND YEAR(ar.work_date)=? AND MONTH(ar.work_date)=?";
@@ -673,7 +675,7 @@ public class AttendanceRecordDAO {
           + "JOIN departments d ON e.department_id = d.department_id "
           + "LEFT JOIN holiday_dates hd ON hd.holiday_date = ar.work_date AND hd.is_active = 1 "
           + "WHERE ar.verification_status='Verified' "
-          + "  AND ro.role_name IN ('MANAGER', 'HR_STAFF') "
+          + "  AND " + HR_MANAGED_ROLE_FILTER + " "
           + "  AND d.department_code <> 'IT' "
           + "  AND YEAR(ar.work_date)=? AND MONTH(ar.work_date)=? "
           + (departmentId != null ? "  AND e.department_id=? " : "")

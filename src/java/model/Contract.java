@@ -27,6 +27,23 @@ public class Contract {
 
     public enum Status { Active, Expired, Terminated }
 
+    public enum SalaryPolicy {
+        AttendanceBased("Attendance Based"),
+        FixedMonthly("Fixed Monthly");
+
+        private final String dbValue;
+        SalaryPolicy(String dbValue) { this.dbValue = dbValue; }
+        public String getDbValue() { return dbValue; }
+
+        public static SalaryPolicy fromDb(String value) {
+            if (value == null || value.isBlank()) return AttendanceBased;
+            for (SalaryPolicy p : values()) {
+                if (p.dbValue.equalsIgnoreCase(value) || p.name().equalsIgnoreCase(value)) return p;
+            }
+            return AttendanceBased;
+        }
+    }
+
     private int contractId;
     private int employeeId;
     private String contractCode;
@@ -35,6 +52,9 @@ public class Contract {
     private LocalDate endDate;
     private BigDecimal basicSalary;
     private BigDecimal standardWorkingDays;
+    private SalaryPolicy salaryPolicy = SalaryPolicy.AttendanceBased;
+    private BigDecimal fixedAllowanceAmount;
+    private boolean systemContract;
     private Status status;
     private String note;
     private Integer createdBy;
@@ -45,6 +65,7 @@ public class Contract {
     private String employeeFullName;
     private String employeeCode;
     private String departmentName;
+    private ContractDocument document;
 
     public Contract() {}
 
@@ -72,6 +93,15 @@ public class Contract {
     public BigDecimal getStandardWorkingDays()              { return standardWorkingDays; }
     public void setStandardWorkingDays(BigDecimal d)        { this.standardWorkingDays = d; }
 
+    public SalaryPolicy getSalaryPolicy()                   { return salaryPolicy; }
+    public void setSalaryPolicy(SalaryPolicy salaryPolicy)  { this.salaryPolicy = salaryPolicy; }
+
+    public BigDecimal getFixedAllowanceAmount()             { return fixedAllowanceAmount; }
+    public void setFixedAllowanceAmount(BigDecimal amount)  { this.fixedAllowanceAmount = amount; }
+
+    public boolean isSystemContract()                       { return systemContract; }
+    public void setSystemContract(boolean systemContract)   { this.systemContract = systemContract; }
+
     public Status getStatus()                               { return status; }
     public void setStatus(Status status)                    { this.status = status; }
 
@@ -98,4 +128,7 @@ public class Contract {
 
     public String getDepartmentName()                       { return departmentName; }
     public void setDepartmentName(String departmentName)    { this.departmentName = departmentName; }
+
+    public ContractDocument getDocument()                   { return document; }
+    public void setDocument(ContractDocument document)      { this.document = document; }
 }

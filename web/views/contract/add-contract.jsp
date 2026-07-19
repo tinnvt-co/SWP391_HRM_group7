@@ -65,7 +65,8 @@
                     </div>
                 </c:if>
 
-                <form action="${pageContext.request.contextPath}/contracts?action=add" method="post" novalidate>
+                <form action="${pageContext.request.contextPath}/contracts?action=add" method="post"
+                      enctype="multipart/form-data" novalidate>
 
                     <div class="section-title">Contract Details</div>
                     <div class="row g-3 mb-4">
@@ -167,9 +168,18 @@
                     </div>
 
                     <div class="section-title">Note</div>
-                    <div class="mb-4">
-                        <textarea id="note" name="note" class="form-control" rows="2" maxlength="255"
-                                  placeholder="Optional note">${not empty param.note ? param.note : ''}</textarea>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label for="contractDocument" class="form-label required">Signed Contract Document</label>
+                            <input type="file" id="contractDocument" name="contractDocument" class="form-control"
+                                   accept="application/pdf,image/png,image/jpeg" required>
+                            <div class="form-text">PDF, JPG, or PNG. Maximum 10 MB.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="note" class="form-label">Note</label>
+                            <textarea id="note" name="note" class="form-control" rows="3" maxlength="255"
+                                      placeholder="Optional note">${not empty param.note ? param.note : ''}</textarea>
+                        </div>
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">

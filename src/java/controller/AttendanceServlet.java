@@ -320,7 +320,7 @@ public class AttendanceServlet extends HttpServlet {
             return;
         }
 
-        // HR Staff can import for active attendance departments only (Admin/HR/IT excluded).
+        // HR Staff can import for active attendance employees. IT is excluded from payroll attendance.
         List<Employee> allEmps = employeeDAO.findAttendanceActive();
         if (allEmps.isEmpty()) {
             session.setAttribute("importError",

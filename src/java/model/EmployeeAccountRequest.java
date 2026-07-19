@@ -38,6 +38,11 @@ public class EmployeeAccountRequest {
     private BigDecimal basicSalary;
     private BigDecimal standardWorkingDays;
     private String contractNote;
+    private String contractDocumentOriginalName;
+    private String contractDocumentStoredName;
+    private String contractDocumentPath;
+    private String contractDocumentMimeType;
+    private Long contractDocumentSize;
     private Status status;
     private int requestedBy;
     private Integer reviewedBy;
@@ -111,6 +116,31 @@ public class EmployeeAccountRequest {
 
     public String getContractNote() { return contractNote; }
     public void setContractNote(String contractNote) { this.contractNote = contractNote; }
+
+    public String getContractDocumentOriginalName() { return contractDocumentOriginalName; }
+    public void setContractDocumentOriginalName(String contractDocumentOriginalName) {
+        this.contractDocumentOriginalName = contractDocumentOriginalName;
+    }
+
+    public String getContractDocumentStoredName() { return contractDocumentStoredName; }
+    public void setContractDocumentStoredName(String contractDocumentStoredName) {
+        this.contractDocumentStoredName = contractDocumentStoredName;
+    }
+
+    public String getContractDocumentPath() { return contractDocumentPath; }
+    public void setContractDocumentPath(String contractDocumentPath) {
+        this.contractDocumentPath = contractDocumentPath;
+    }
+
+    public String getContractDocumentMimeType() { return contractDocumentMimeType; }
+    public void setContractDocumentMimeType(String contractDocumentMimeType) {
+        this.contractDocumentMimeType = contractDocumentMimeType;
+    }
+
+    public Long getContractDocumentSize() { return contractDocumentSize; }
+    public void setContractDocumentSize(Long contractDocumentSize) {
+        this.contractDocumentSize = contractDocumentSize;
+    }
 
     public Status getStatus() { return status; }
     public void setStatus(Status status) { this.status = status; }

@@ -1,6 +1,7 @@
 package controller;
 
 import config.DBContext;
+import dao.ContractDocumentDAO;
 import dao.DepartmentDAO;
 import dao.EmployeeAccountRequestDAO;
 import dao.EmployeeDAO;
@@ -8,21 +9,25 @@ import dao.ContractDAO;
 import dao.RoleDAO;
 import dao.UserDAO;
 import model.Contract;
+import model.ContractDocument;
 import model.Department;
 import model.Employee;
 import model.EmployeeAccountRequest;
 import model.Role;
 import model.User;
 import service.MailService;
+import service.ContractDocumentStorage;
 import util.PasswordUtil;
 
 import jakarta.mail.MessagingException;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.Part;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -42,6 +47,11 @@ import java.util.List;
 import java.util.Locale;
 
 @WebServlet(name = "EmployeeAccountRequestServlet", urlPatterns = {"/employee-account-requests"})
+@MultipartConfig(
+        fileSizeThreshold = 1024 * 1024,
+        maxFileSize = 10L * 1024 * 1024,
+        maxRequestSize = 12L * 1024 * 1024
+)
 public class EmployeeAccountRequestServlet extends HttpServlet {
 
     private static final int PAGE_SIZE = 10;
@@ -49,12 +59,14 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
     private final EmployeeAccountRequestDAO requestDAO = new EmployeeAccountRequestDAO();
+    private final ContractDocumentDAO documentDAO = new ContractDocumentDAO();
     private final DepartmentDAO departmentDAO = new DepartmentDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
     private final ContractDAO contractDAO = new ContractDAO();
     private final UserDAO userDAO = new UserDAO();
     private final RoleDAO roleDAO = new RoleDAO();
     private final MailService mailService = new MailService();
+    private final ContractDocumentStorage documentStorage = new ContractDocumentStorage();
     private final SecureRandom random = new SecureRandom();
 
     @Override
@@ -146,6 +158,17 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/employee-account-requests");
             return;
         }
+
+        ContractDocument document;
+        try {
+            document = readUploadedRequestDocument(request, currentUser.getUserId());
+        } catch (IOException | ServletException ex) {
+            flashError(request, ex.getMessage());
+            response.sendRedirect(request.getContextPath() + "/employee-account-requests");
+            return;
+        }
+        applyDocumentMetadata(accountRequest, document);
+
         int requestId = requestDAO.insert(accountRequest);
         String contractCode = generatedContractCode(requestId);
         if (!requestDAO.updateContractCode(requestId, contractCode)) {
@@ -451,6 +474,7 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             String employeeCode = generatedEmployeeCode(employeeId);
             updateEmployeeCode(conn, employeeId, employeeCode, adminUserId);
             int contractId = insertContract(conn, r, employeeId, adminUserId);
+            attachRequestDocument(conn, r, contractId);
             markRequestCreated(conn, r.getRequestId(), adminUserId, newUserId, employeeId,
                     contractId, "Created account " + username + ", employee " + employeeCode
                             + ", and contract " + r.getContractCode());
@@ -542,8 +566,9 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
     private int insertContract(Connection conn, EmployeeAccountRequest r, int employeeId,
                                int adminUserId) throws SQLException {
         String sql = "INSERT INTO contracts (employee_id, contract_code, contract_type, start_date, end_date, "
-                   + "basic_salary, standard_working_days, status, note, created_by, updated_by) "
-                   + "VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?, ?)";
+                   + "basic_salary, standard_working_days, salary_policy, fixed_allowance_amount, "
+                   + "is_system_contract, status, note, created_by, updated_by) "
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, 'Attendance Based', 0.00, 0, 'Active', ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, employeeId);
             ps.setString(2, r.getContractCode());
@@ -562,6 +587,22 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             }
         }
         throw new SQLException("Could not create contract.");
+    }
+
+    private void attachRequestDocument(Connection conn, EmployeeAccountRequest r, int contractId)
+            throws SQLException {
+        if (isBlank(r.getContractDocumentPath())) {
+            throw new SQLException("Contract document is missing.");
+        }
+        ContractDocument document = new ContractDocument();
+        document.setContractId(contractId);
+        document.setOriginalFileName(r.getContractDocumentOriginalName());
+        document.setStoredFileName(r.getContractDocumentStoredName());
+        document.setRelativePath(r.getContractDocumentPath());
+        document.setMimeType(r.getContractDocumentMimeType());
+        document.setFileSize(r.getContractDocumentSize() == null ? 0L : r.getContractDocumentSize());
+        document.setUploadedBy(r.getRequestedBy());
+        documentDAO.replaceForContract(conn, document);
     }
 
     private void markRequestCreated(Connection conn, int requestId, int reviewedBy,
@@ -630,6 +671,20 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             candidate = String.format("%s_%02d", base, suffix++);
         }
         return candidate;
+    }
+
+    private ContractDocument readUploadedRequestDocument(HttpServletRequest request, int uploadedBy)
+            throws IOException, ServletException {
+        Part part = request.getPart("contractDocument");
+        return documentStorage.save(getServletContext(), part, "account-requests", uploadedBy);
+    }
+
+    private void applyDocumentMetadata(EmployeeAccountRequest request, ContractDocument document) {
+        request.setContractDocumentOriginalName(document.getOriginalFileName());
+        request.setContractDocumentStoredName(document.getStoredFileName());
+        request.setContractDocumentPath(document.getRelativePath());
+        request.setContractDocumentMimeType(document.getMimeType());
+        request.setContractDocumentSize(document.getFileSize());
     }
 
     private BigDecimal parsePositiveDecimal(String value) {

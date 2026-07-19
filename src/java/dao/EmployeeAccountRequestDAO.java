@@ -28,8 +28,11 @@ public class EmployeeAccountRequestDAO {
                    + "(full_name, email, phone, gender, date_of_birth, address, department_id, "
                    + " requested_role_id, position_title, hire_date, employee_code, "
                    + " contract_code, contract_type, contract_start_date, contract_end_date, "
-                   + " basic_salary, standard_working_days, contract_note, requested_by) "
-                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                   + " basic_salary, standard_working_days, contract_note, "
+                   + " contract_document_original_name, contract_document_stored_name, "
+                   + " contract_document_path, contract_document_mime_type, contract_document_size, "
+                   + " requested_by) "
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -57,7 +60,13 @@ public class EmployeeAccountRequestDAO {
             ps.setBigDecimal(16, r.getBasicSalary());
             ps.setBigDecimal(17, r.getStandardWorkingDays());
             ps.setString(18, r.getContractNote());
-            ps.setInt(19, r.getRequestedBy());
+            ps.setString(19, r.getContractDocumentOriginalName());
+            ps.setString(20, r.getContractDocumentStoredName());
+            ps.setString(21, r.getContractDocumentPath());
+            ps.setString(22, r.getContractDocumentMimeType());
+            if (r.getContractDocumentSize() != null) ps.setLong(23, r.getContractDocumentSize());
+            else                                     ps.setNull(23, Types.BIGINT);
+            ps.setInt(24, r.getRequestedBy());
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) return keys.getInt(1);
@@ -251,6 +260,12 @@ public class EmployeeAccountRequestDAO {
         r.setBasicSalary(getBigDecimalOrNull(rs, "basic_salary"));
         r.setStandardWorkingDays(getBigDecimalOrNull(rs, "standard_working_days"));
         r.setContractNote(getStringOrNull(rs, "contract_note"));
+        r.setContractDocumentOriginalName(getStringOrNull(rs, "contract_document_original_name"));
+        r.setContractDocumentStoredName(getStringOrNull(rs, "contract_document_stored_name"));
+        r.setContractDocumentPath(getStringOrNull(rs, "contract_document_path"));
+        r.setContractDocumentMimeType(getStringOrNull(rs, "contract_document_mime_type"));
+        long docSize = getLongOrNull(rs, "contract_document_size");
+        if (docSize >= 0) r.setContractDocumentSize(docSize);
         r.setStatus(EmployeeAccountRequest.Status.fromDb(rs.getString("status")));
         r.setRequestedBy(rs.getInt("requested_by"));
         int reviewedBy = rs.getInt("reviewed_by");
@@ -306,6 +321,15 @@ public class EmployeeAccountRequestDAO {
             return rs.getBigDecimal(column);
         } catch (SQLException ignored) {
             return null;
+        }
+    }
+
+    private long getLongOrNull(ResultSet rs, String column) throws SQLException {
+        try {
+            long v = rs.getLong(column);
+            return rs.wasNull() ? -1L : v;
+        } catch (SQLException ignored) {
+            return -1L;
         }
     }
 

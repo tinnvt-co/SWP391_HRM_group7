@@ -97,7 +97,7 @@ public class DepartmentDAO {
                 + "    JOIN roles ar ON au.role_id = ar.role_id "
                 + "    WHERE ae.department_id = d.department_id "
                 + "      AND au.is_active = 1 "
-                + "      AND ar.role_name IN ('EMPLOYEE', 'MANAGER', 'HR_STAFF')"
+                + "      AND ar.role_name IN ('EMPLOYEE', 'MANAGER', 'HR_STAFF', 'HR_MANAGER')"
                 + ") "
                 + "ORDER BY d.department_name");
     }

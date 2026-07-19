@@ -3,7 +3,9 @@ package dao;
 import config.DBContext;
 import model.Contract;
 import model.Contract.ContractType;
+import model.Contract.SalaryPolicy;
 import model.Contract.Status;
+import model.ContractDocument;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -14,12 +16,17 @@ public class ContractDAO {
     private static final String BASE_SELECT =
             "SELECT c.contract_id, c.employee_id, c.contract_code, c.contract_type, "
           + "       c.start_date, c.end_date, c.basic_salary, c.standard_working_days, "
+          + "       c.salary_policy, c.fixed_allowance_amount, c.is_system_contract, "
           + "       c.status, c.note, c.created_by, c.updated_by, c.created_at, c.updated_at, "
-          + "       u.full_name AS emp_full_name, e.employee_code, d.department_name "
+          + "       u.full_name AS emp_full_name, e.employee_code, d.department_name, "
+          + "       cd.document_id, cd.original_file_name, cd.stored_file_name, "
+          + "       cd.relative_path, cd.mime_type, cd.file_size, cd.uploaded_by, "
+          + "       cd.uploaded_at, cd.is_active AS document_active "
           + "FROM contracts c "
           + "JOIN employees e   ON c.employee_id   = e.employee_id "
           + "JOIN users u       ON e.user_id       = u.user_id "
-          + "JOIN departments d ON e.department_id = d.department_id ";
+          + "JOIN departments d ON e.department_id = d.department_id "
+          + "LEFT JOIN contract_documents cd ON cd.contract_id = c.contract_id AND cd.is_active = 1 ";
 
     public List<Contract> findAll(Status statusFilter) throws SQLException {
         StringBuilder sql = new StringBuilder(BASE_SELECT);
@@ -172,8 +179,9 @@ public class ContractDAO {
 
     public int insert(Contract c) throws SQLException {
         String sql = "INSERT INTO contracts (employee_id, contract_code, contract_type, start_date, end_date, "
-                   + "basic_salary, standard_working_days, status, note, created_by, updated_by) "
-                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                   + "basic_salary, standard_working_days, salary_policy, fixed_allowance_amount, "
+                   + "is_system_contract, status, note, created_by, updated_by) "
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -186,10 +194,16 @@ public class ContractDAO {
             ps.setObject(5, c.getEndDate() != null ? Date.valueOf(c.getEndDate()) : null);
             ps.setBigDecimal(6, c.getBasicSalary());
             ps.setBigDecimal(7, c.getStandardWorkingDays());
-            ps.setString(8, c.getStatus() == null ? Status.Active.name() : c.getStatus().name());
-            ps.setString(9, c.getNote());
-            if (c.getCreatedBy() != null) ps.setInt(10, c.getCreatedBy()); else ps.setNull(10, Types.INTEGER);
-            if (c.getUpdatedBy() != null) ps.setInt(11, c.getUpdatedBy()); else ps.setNull(11, Types.INTEGER);
+            ps.setString(8, c.getSalaryPolicy() == null
+                    ? SalaryPolicy.AttendanceBased.getDbValue()
+                    : c.getSalaryPolicy().getDbValue());
+            ps.setBigDecimal(9, c.getFixedAllowanceAmount() == null
+                    ? java.math.BigDecimal.ZERO : c.getFixedAllowanceAmount());
+            ps.setBoolean(10, c.isSystemContract());
+            ps.setString(11, c.getStatus() == null ? Status.Active.name() : c.getStatus().name());
+            ps.setString(12, c.getNote());
+            if (c.getCreatedBy() != null) ps.setInt(13, c.getCreatedBy()); else ps.setNull(13, Types.INTEGER);
+            if (c.getUpdatedBy() != null) ps.setInt(14, c.getUpdatedBy()); else ps.setNull(14, Types.INTEGER);
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) return keys.getInt(1);
@@ -203,7 +217,7 @@ public class ContractDAO {
     public boolean update(Contract c) throws SQLException {
         String sql = "UPDATE contracts SET contract_type=?, start_date=?, end_date=?, basic_salary=?, "
                    + "standard_working_days=?, note=?, updated_by=?, updated_at=NOW() "
-                   + "WHERE contract_id=?";
+                   + "WHERE contract_id=? AND is_system_contract=0";
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -225,7 +239,7 @@ public class ContractDAO {
 
     public boolean terminate(int contractId, int actorUserId) throws SQLException {
         String sql = "UPDATE contracts SET status='Terminated', updated_by=?, updated_at=NOW() "
-                   + "WHERE contract_id=? AND status='Active'";
+                   + "WHERE contract_id=? AND status='Active' AND is_system_contract=0";
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -251,6 +265,9 @@ public class ContractDAO {
         if (end != null) c.setEndDate(end.toLocalDate());
         c.setBasicSalary(rs.getBigDecimal("basic_salary"));
         c.setStandardWorkingDays(rs.getBigDecimal("standard_working_days"));
+        c.setSalaryPolicy(SalaryPolicy.fromDb(getStringOrNull(rs, "salary_policy")));
+        c.setFixedAllowanceAmount(getBigDecimalOrZero(rs, "fixed_allowance_amount"));
+        c.setSystemContract(getBooleanOrFalse(rs, "is_system_contract"));
         String status = rs.getString("status");
         if (status != null) {
             try { c.setStatus(Status.valueOf(status)); } catch (IllegalArgumentException ignored) {}
@@ -267,7 +284,58 @@ public class ContractDAO {
         try { c.setEmployeeFullName(rs.getString("emp_full_name")); } catch (SQLException ignored) {}
         try { c.setEmployeeCode(rs.getString("employee_code")); } catch (SQLException ignored) {}
         try { c.setDepartmentName(rs.getString("department_name")); } catch (SQLException ignored) {}
+        ContractDocument document = mapDocument(rs, c.getContractId());
+        if (document != null) c.setDocument(document);
         return c;
+    }
+
+    private ContractDocument mapDocument(ResultSet rs, int contractId) throws SQLException {
+        int documentId;
+        try {
+            documentId = rs.getInt("document_id");
+            if (rs.wasNull()) return null;
+        } catch (SQLException ex) {
+            return null;
+        }
+        ContractDocument d = new ContractDocument();
+        d.setDocumentId(documentId);
+        d.setContractId(contractId);
+        d.setOriginalFileName(rs.getString("original_file_name"));
+        d.setStoredFileName(rs.getString("stored_file_name"));
+        d.setRelativePath(rs.getString("relative_path"));
+        d.setMimeType(rs.getString("mime_type"));
+        d.setFileSize(rs.getLong("file_size"));
+        int uploadedBy = rs.getInt("uploaded_by");
+        if (!rs.wasNull()) d.setUploadedBy(uploadedBy);
+        Timestamp uploadedAt = rs.getTimestamp("uploaded_at");
+        if (uploadedAt != null) d.setUploadedAt(uploadedAt.toLocalDateTime());
+        d.setActive(rs.getBoolean("document_active"));
+        return d;
+    }
+
+    private String getStringOrNull(ResultSet rs, String column) throws SQLException {
+        try {
+            return rs.getString(column);
+        } catch (SQLException ignored) {
+            return null;
+        }
+    }
+
+    private java.math.BigDecimal getBigDecimalOrZero(ResultSet rs, String column) throws SQLException {
+        try {
+            java.math.BigDecimal value = rs.getBigDecimal(column);
+            return value == null ? java.math.BigDecimal.ZERO : value;
+        } catch (SQLException ignored) {
+            return java.math.BigDecimal.ZERO;
+        }
+    }
+
+    private boolean getBooleanOrFalse(ResultSet rs, String column) throws SQLException {
+        try {
+            return rs.getBoolean(column);
+        } catch (SQLException ignored) {
+            return false;
+        }
     }
 
     private void close(Connection conn, PreparedStatement ps, ResultSet rs) {

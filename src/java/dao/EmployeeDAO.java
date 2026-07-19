@@ -320,7 +320,7 @@ public class EmployeeDAO {
                    + "JOIN roles ro      ON u.role_id       = ro.role_id "
                    + "JOIN departments d ON e.department_id = d.department_id "
                    + "WHERE u.is_active = 1 "
-                   + "AND ro.role_name IN ('EMPLOYEE', 'MANAGER', 'HR_STAFF') "
+                   + "AND ro.role_name IN ('EMPLOYEE', 'MANAGER', 'HR_STAFF', 'HR_MANAGER') "
                    + "AND d.department_code <> 'IT' "
                    + "ORDER BY u.full_name";
         List<Employee> list = new ArrayList<>();
@@ -346,7 +346,7 @@ public class EmployeeDAO {
               + "JOIN roles ro      ON u.role_id       = ro.role_id "
               + "JOIN departments d ON e.department_id = d.department_id "
               + "WHERE u.is_active = 1 "
-              + "AND ro.role_name IN ('EMPLOYEE', 'MANAGER', 'HR_STAFF') "
+              + "AND ro.role_name IN ('EMPLOYEE', 'MANAGER', 'HR_STAFF', 'HR_MANAGER') "
               + "AND d.department_code <> 'IT' ");
         if (departmentId != null) sql.append("AND e.department_id = ? ");
         sql.append("ORDER BY u.full_name");

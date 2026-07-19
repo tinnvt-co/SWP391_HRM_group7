@@ -183,7 +183,7 @@ public class LeaveRequestDAO {
             .append("WHERE lr.status = 'Approved' ")
             .append("  AND lr.start_date <= ? ")
             .append("  AND lr.end_date >= ? ")
-            .append("  AND d.department_code NOT IN ('ADMIN_DEPT', 'HR', 'IT') ");
+            .append("  AND d.department_code <> 'IT' ");
         List<Object> params = new ArrayList<>();
         params.add(Date.valueOf(toDate));
         params.add(Date.valueOf(fromDate));

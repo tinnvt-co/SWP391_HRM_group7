@@ -42,6 +42,11 @@
             background: linear-gradient(135deg, #1a3c5e, #2d6a9f);
             color: white; border-radius: 12px; padding: 1rem 1.25rem;
         }
+        .document-preview {
+            width: 180px; height: 120px; border: 1px solid #dbe3ea;
+            border-radius: 8px; background: #f8fafc; object-fit: cover;
+        }
+        .document-frame { width: 100%; height: 100%; border: 0; border-radius: 8px; }
     </style>
 </head>
 <body>
@@ -83,9 +88,16 @@
                     <span>This contract is <strong>${contract.status}</strong> and is read-only.</span>
                 </div>
             </c:if>
+            <c:if test="${systemContract}">
+                <div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-3">
+                    <i class="bi bi-lock-fill"></i>
+                    <span>This is a system-seeded contract and cannot be edited from the UI.</span>
+                </div>
+            </c:if>
 
             <div class="card border-0 shadow-sm rounded-3 p-4">
-                <form action="${pageContext.request.contextPath}/contracts?action=edit" method="post" novalidate>
+                <form action="${pageContext.request.contextPath}/contracts?action=edit" method="post"
+                      enctype="multipart/form-data" novalidate>
                     <input type="hidden" name="contractId" value="${contract.contractId}">
 
                     <div class="section-title">Contract Details</div>
@@ -125,6 +137,17 @@
                             <label for="standardWorkingDays" class="form-label required">Standard Working Days</label>
                             <input type="number" step="0.5" min="1" max="31" id="standardWorkingDays" name="standardWorkingDays" class="form-control"
                                    value="${contract.standardWorkingDays}" ${readonly ? 'disabled' : ''} required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted">Salary Policy</label>
+                            <input type="text" class="form-control bg-light" value="${contract.salaryPolicy.dbValue}" disabled>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted">Fixed Allowance</label>
+                            <fmt:formatNumber var="fixedAllowanceFormatted" value="${contract.fixedAllowanceAmount}"
+                                              type="number" maxFractionDigits="0"/>
+                            <input type="text" class="form-control bg-light"
+                                   value="${fixedAllowanceFormatted} &#8363;" disabled>
                         </div>
                         <div class="col-12">
                             <div class="table-responsive">
@@ -172,10 +195,54 @@
                         </div>
                     </div>
 
-                    <div class="section-title">Note</div>
-                    <div class="mb-4">
-                        <textarea id="note" name="note" class="form-control" rows="2" maxlength="255"
-                                  ${readonly ? 'disabled' : ''}>${contract.note}</textarea>
+                    <div class="section-title">Document & Note</div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label">Current Contract Document</label>
+                            <c:choose>
+                                <c:when test="${not empty contract.document}">
+                                    <c:url var="docUrl" value="/contract-document">
+                                        <c:param name="id" value="${contract.document.documentId}"/>
+                                    </c:url>
+                                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                                        <button type="button" class="btn p-0 border-0 bg-transparent"
+                                                data-bs-toggle="modal" data-bs-target="#contractDocumentModal">
+                                            <c:choose>
+                                                <c:when test="${contract.document.image}">
+                                                    <img src="${docUrl}" alt="Contract document preview" class="document-preview">
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <span class="document-preview d-inline-block">
+                                                        <iframe src="${docUrl}" class="document-frame" title="Contract PDF preview"></iframe>
+                                                    </span>
+                                                </c:otherwise>
+                                            </c:choose>
+                                        </button>
+                                        <div>
+                                            <div class="fw-medium">${contract.document.originalFileName}</div>
+                                            <button type="button" class="btn btn-sm btn-outline-primary mt-2"
+                                                    data-bs-toggle="modal" data-bs-target="#contractDocumentModal">
+                                                <i class="bi bi-arrows-fullscreen me-1"></i>View Large
+                                            </button>
+                                        </div>
+                                    </div>
+                                </c:when>
+                                <c:otherwise>
+                                    <div class="text-muted small">No contract document has been uploaded.</div>
+                                </c:otherwise>
+                            </c:choose>
+                        </div>
+                        <div class="col-md-6">
+                            <c:if test="${not readonly}">
+                                <label for="contractDocument" class="form-label">Replace Contract Document</label>
+                                <input type="file" id="contractDocument" name="contractDocument" class="form-control"
+                                       accept="application/pdf,image/png,image/jpeg">
+                                <div class="form-text">PDF, JPG, or PNG. Maximum 10 MB.</div>
+                            </c:if>
+                            <label for="note" class="form-label mt-3">Note</label>
+                            <textarea id="note" name="note" class="form-control" rows="2" maxlength="255"
+                                      ${readonly ? 'disabled' : ''}>${contract.note}</textarea>
+                        </div>
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">
@@ -194,6 +261,30 @@
         </div>
     </div>
 </div>
+
+<c:if test="${not empty contract.document}">
+    <div class="modal fade" id="contractDocumentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title fw-bold">${contract.document.originalFileName}</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-2">
+                    <c:choose>
+                        <c:when test="${contract.document.image}">
+                            <img src="${docUrl}" alt="Contract document" class="w-100 rounded">
+                        </c:when>
+                        <c:otherwise>
+                            <iframe src="${docUrl}" title="Contract document"
+                                    style="width:100%;height:75vh;border:0;border-radius:8px;"></iframe>
+                        </c:otherwise>
+                    </c:choose>
+                </div>
+            </div>
+        </div>
+    </div>
+</c:if>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

@@ -49,8 +49,12 @@ public class MyContractServlet extends HttpServlet {
             }
 
             List<Contract> contracts = contractDAO.findByEmployeeId(employee.getEmployeeId());
+            boolean hasFixedMonthlyContract = contracts.stream()
+                    .anyMatch(c -> c.getStatus() == Contract.Status.Active
+                            && c.getSalaryPolicy() == Contract.SalaryPolicy.FixedMonthly);
             request.setAttribute("employee", employee);
             request.setAttribute("contracts", contracts);
+            request.setAttribute("hasFixedMonthlyContract", hasFixedMonthlyContract);
             request.setAttribute("activeAllowanceTypes", allowanceDAO.findActive());
             request.setAttribute("totalActiveAllowance", allowanceDAO.sumActiveAllowances());
             request.getRequestDispatcher("/views/contract/my-contract.jsp").forward(request, response);

@@ -40,6 +40,11 @@
         }
         .money { font-weight: 600; }
         .salary-total { background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; padding:1rem; }
+        .document-preview {
+            width: 180px; height: 120px; border: 1px solid #dbe3ea;
+            border-radius: 8px; background: #f8fafc; object-fit: cover;
+        }
+        .document-frame { width:100%; height:100%; border:0; border-radius:8px; }
     </style>
 </head>
 <body>
@@ -58,50 +63,60 @@
         </div>
     </c:if>
 
-    <div class="card border-0 shadow-sm rounded-3 mb-4">
-        <div class="card-body p-4">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                <h6 class="fw-semibold mb-0 text-secondary">
-                    <i class="bi bi-wallet2 me-2"></i>Current Monthly Allowances
-                </h6>
-                <span class="badge text-bg-primary">
-                    Total:
-                    <fmt:formatNumber value="${totalActiveAllowance}" type="number" maxFractionDigits="0"/>
-                    &#8363;
-                </span>
+    <c:choose>
+        <c:when test="${hasFixedMonthlyContract}">
+            <div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-4">
+                <i class="bi bi-lock-fill"></i>
+                <span>Your active contract uses a fixed monthly salary policy.</span>
             </div>
-            <c:choose>
-                <c:when test="${empty activeAllowanceTypes}">
-                    <div class="text-muted small">No active allowance policy is configured.</div>
-                </c:when>
-                <c:otherwise>
-                    <div class="table-responsive">
-                        <table class="table table-sm align-middle mb-0">
-                            <thead class="table-light">
-                            <tr>
-                                <th>Allowance</th>
-                                <th class="text-end">Amount</th>
-                                <th>Description</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <c:forEach var="allowance" items="${activeAllowanceTypes}">
-                                <tr>
-                                    <td class="fw-medium">${allowance.allowanceName}</td>
-                                    <td class="text-end">
-                                        <fmt:formatNumber value="${allowance.amount}" type="number" maxFractionDigits="0"/>
-                                        &#8363;
-                                    </td>
-                                    <td class="text-muted small">${not empty allowance.description ? allowance.description : '-'}</td>
-                                </tr>
-                            </c:forEach>
-                            </tbody>
-                        </table>
+        </c:when>
+        <c:otherwise>
+            <div class="card border-0 shadow-sm rounded-3 mb-4">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                        <h6 class="fw-semibold mb-0 text-secondary">
+                            <i class="bi bi-wallet2 me-2"></i>Current Monthly Allowances
+                        </h6>
+                        <span class="badge text-bg-primary">
+                            Total:
+                            <fmt:formatNumber value="${totalActiveAllowance}" type="number" maxFractionDigits="0"/>
+                            &#8363;
+                        </span>
                     </div>
-                </c:otherwise>
-            </c:choose>
-        </div>
-    </div>
+                    <c:choose>
+                        <c:when test="${empty activeAllowanceTypes}">
+                            <div class="text-muted small">No active allowance policy is configured.</div>
+                        </c:when>
+                        <c:otherwise>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Allowance</th>
+                                        <th class="text-end">Amount</th>
+                                        <th>Description</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <c:forEach var="allowance" items="${activeAllowanceTypes}">
+                                        <tr>
+                                            <td class="fw-medium">${allowance.allowanceName}</td>
+                                            <td class="text-end">
+                                                <fmt:formatNumber value="${allowance.amount}" type="number" maxFractionDigits="0"/>
+                                                &#8363;
+                                            </td>
+                                            <td class="text-muted small">${not empty allowance.description ? allowance.description : '-'}</td>
+                                        </tr>
+                                    </c:forEach>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </c:otherwise>
+                    </c:choose>
+                </div>
+            </div>
+        </c:otherwise>
+    </c:choose>
 
     <c:choose>
         <c:when test="${empty contracts}">
@@ -152,6 +167,10 @@
                                     <div class="col-5 text-muted small">Standard Working Days</div>
                                     <div class="col-7">${ct.standardWorkingDays}</div>
                                 </div>
+                                <div class="info-row row align-items-center">
+                                    <div class="col-5 text-muted small">Salary Policy</div>
+                                    <div class="col-7">${ct.salaryPolicy.dbValue}</div>
+                                </div>
                                 <c:if test="${not empty ct.note}">
                                     <div class="info-row row align-items-center">
                                         <div class="col-5 text-muted small">Note</div>
@@ -166,17 +185,79 @@
                                     <div class="col-7 text-muted small">Basic Salary</div>
                                     <div class="col-5 money"><fmt:formatNumber value="${ct.basicSalary}" type="number" maxFractionDigits="0"/> &#8363;</div>
                                 </div>
-                                <div class="alert alert-info d-flex align-items-center gap-2 py-2 mt-3 mb-0">
-                                    <i class="bi bi-wallet2"></i>
-                                    <span>Monthly allowances above are applied during payroll calculation.</span>
-                                </div>
+                                <c:if test="${ct.fixedAllowanceAmount > 0}">
+                                    <div class="info-row row align-items-center">
+                                        <div class="col-7 text-muted small">Fixed Responsibility Allowance</div>
+                                        <div class="col-5 money">
+                                            <fmt:formatNumber value="${ct.fixedAllowanceAmount}" type="number" maxFractionDigits="0"/> &#8363;
+                                        </div>
+                                    </div>
+                                </c:if>
                                 <div class="salary-total d-flex justify-content-between align-items-center mt-3">
-                                    <span class="fw-semibold text-primary">Contract Salary</span>
+                                    <span class="fw-semibold text-primary">Monthly Contract Package</span>
                                     <span class="fw-bold text-primary">
-                                        <fmt:formatNumber value="${ct.basicSalary}" type="number" maxFractionDigits="0"/> &#8363;
+                                        <fmt:formatNumber value="${ct.basicSalary + ct.fixedAllowanceAmount}" type="number" maxFractionDigits="0"/> &#8363;
                                     </span>
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="border-top mt-4 pt-4">
+                            <h6 class="fw-semibold mb-3 text-secondary"><i class="bi bi-file-earmark-pdf me-2"></i>Contract Document</h6>
+                            <c:choose>
+                                <c:when test="${not empty ct.document}">
+                                    <c:url var="docUrl" value="/contract-document">
+                                        <c:param name="id" value="${ct.document.documentId}"/>
+                                    </c:url>
+                                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                                        <button type="button" class="btn p-0 border-0 bg-transparent"
+                                                data-bs-toggle="modal" data-bs-target="#contractDocumentModal${ct.contractId}">
+                                            <c:choose>
+                                                <c:when test="${ct.document.image}">
+                                                    <img src="${docUrl}" alt="Contract document preview" class="document-preview">
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <span class="document-preview d-inline-block">
+                                                        <iframe src="${docUrl}" class="document-frame" title="Contract PDF preview"></iframe>
+                                                    </span>
+                                                </c:otherwise>
+                                            </c:choose>
+                                        </button>
+                                        <div>
+                                            <div class="fw-medium">${ct.document.originalFileName}</div>
+                                            <button type="button" class="btn btn-sm btn-outline-primary mt-2"
+                                                    data-bs-toggle="modal" data-bs-target="#contractDocumentModal${ct.contractId}">
+                                                <i class="bi bi-arrows-fullscreen me-1"></i>View Large
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="modal fade" id="contractDocumentModal${ct.contractId}" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-xl modal-dialog-centered">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h6 class="modal-title fw-bold">${ct.document.originalFileName}</h6>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body p-2">
+                                                    <c:choose>
+                                                        <c:when test="${ct.document.image}">
+                                                            <img src="${docUrl}" alt="Contract document" class="w-100 rounded">
+                                                        </c:when>
+                                                        <c:otherwise>
+                                                            <iframe src="${docUrl}" title="Contract document"
+                                                                    style="width:100%;height:75vh;border:0;border-radius:8px;"></iframe>
+                                                        </c:otherwise>
+                                                    </c:choose>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </c:when>
+                                <c:otherwise>
+                                    <div class="text-muted small">No contract document has been uploaded.</div>
+                                </c:otherwise>
+                            </c:choose>
                         </div>
                     </div>
                 </div>

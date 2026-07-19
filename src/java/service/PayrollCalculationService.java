@@ -35,6 +35,10 @@ import java.util.Set;
  * Allowances are paid by the company only when the employee has company-paid
  * working/leave days in the period. Maternity benefit is shown separately as a
  * social-insurance benefit and is not included in the company-paid net salary.
+ *
+ * Fixed monthly contracts ignore attendance deductions for company-paid salary:
+ * work salary equals the contract basic salary, allowance comes from the
+ * contract fixed allowance amount, and attendance remains an audit record.
  */
 public class PayrollCalculationService {
 
@@ -82,26 +86,36 @@ public class PayrollCalculationService {
         BigDecimal advance = nz(report.getAdvancePayment());
         BigDecimal latePenalty = nz(report.getLatePenaltyAmount());
         BigDecimal maternityLeaveDays = nz(report.getMaternityLeaveDays());
+        boolean fixedMonthly = c.getSalaryPolicy() == Contract.SalaryPolicy.FixedMonthly;
 
         BigDecimal daily = basic.divide(stdDays, 4, RoundingMode.HALF_UP);
-        BigDecimal workSalary = daily.multiply(actualDays);
+        BigDecimal workSalary = fixedMonthly ? basic : daily.multiply(actualDays);
 
         BigDecimal hourly = basic.divide(new BigDecimal("26"), 4, RoundingMode.HALF_UP)
                 .divide(HOURS_PER_DAY, 4, RoundingMode.HALF_UP);
         OvertimeBreakdown overtime = classifyOvertime(report);
-        BigDecimal normalOtSalary = hourly.multiply(overtime.normalHours).multiply(NORMAL_OT_MULTIPLIER);
-        BigDecimal weekendOtSalary = hourly.multiply(overtime.weekendHours).multiply(WEEKEND_OT_MULTIPLIER);
-        BigDecimal holidayOtSalary = hourly.multiply(overtime.holidayHours).multiply(HOLIDAY_OT_MULTIPLIER);
+        BigDecimal normalOtSalary = fixedMonthly
+                ? BigDecimal.ZERO
+                : hourly.multiply(overtime.normalHours).multiply(NORMAL_OT_MULTIPLIER);
+        BigDecimal weekendOtSalary = fixedMonthly
+                ? BigDecimal.ZERO
+                : hourly.multiply(overtime.weekendHours).multiply(WEEKEND_OT_MULTIPLIER);
+        BigDecimal holidayOtSalary = fixedMonthly
+                ? BigDecimal.ZERO
+                : hourly.multiply(overtime.holidayHours).multiply(HOLIDAY_OT_MULTIPLIER);
         BigDecimal otSalary = normalOtSalary.add(weekendOtSalary).add(holidayOtSalary);
 
         boolean fullMaternityMonth = maternityLeaveDays.compareTo(stdDays) >= 0;
-        BigDecimal allowance = !fullMaternityMonth && actualDays.signum() > 0
-                ? nz(allowanceDAO.sumActiveAllowances())
-                : BigDecimal.ZERO;
-        BigDecimal attendanceBonus = qualifiesForFullAttendanceBonus(
-                actualDays, stdDays, fullMaternityMonth, overtime)
-                ? FULL_ATTENDANCE_BONUS
-                : BigDecimal.ZERO;
+        BigDecimal allowance = fixedMonthly
+                ? nz(c.getFixedAllowanceAmount())
+                : (!fullMaternityMonth && actualDays.signum() > 0
+                    ? nz(allowanceDAO.sumActiveAllowances())
+                    : BigDecimal.ZERO);
+        BigDecimal attendanceBonus = !fixedMonthly
+                && qualifiesForFullAttendanceBonus(actualDays, stdDays, fullMaternityMonth, overtime)
+                    ? FULL_ATTENDANCE_BONUS
+                    : BigDecimal.ZERO;
+        BigDecimal payableLatePenalty = fixedMonthly ? BigDecimal.ZERO : latePenalty;
 
         BigDecimal gross = workSalary.add(allowance).add(attendanceBonus).add(kpi).add(otSalary);
         BigDecimal insuranceBase = workSalary.add(kpi).add(otSalary);
@@ -114,7 +128,7 @@ public class PayrollCalculationService {
                 .add(unemploymentInsurance)
                 .add(personalIncomeTax)
                 .add(advance)
-                .add(latePenalty);
+                .add(payableLatePenalty);
         BigDecimal net = gross.subtract(deduction);
         BigDecimal socialInsuranceBenefit = daily.multiply(maternityLeaveDays);
 
@@ -143,12 +157,15 @@ public class PayrollCalculationService {
         p.setUnemploymentInsurance(round(unemploymentInsurance));
         p.setPersonalIncomeTax(round(personalIncomeTax));
         p.setAdvancePayment(round(advance));
-        p.setLatePenaltyAmount(round(latePenalty));
+        p.setLatePenaltyAmount(round(payableLatePenalty));
         p.setTotalDeduction(round(deduction));
         p.setNetSalary(round(net));
         p.setMaternityLeaveDays(maternityLeaveDays);
         p.setSocialInsuranceBenefit(round(socialInsuranceBenefit));
         p.setOvertimeHours(overtime.totalHours());
+        if (fixedMonthly) {
+            p.setNote("Fixed monthly salary policy; attendance is recorded for audit only.");
+        }
         return BuildResult.ok(p);
     }
 
