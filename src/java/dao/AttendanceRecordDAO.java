@@ -57,6 +57,75 @@ public class AttendanceRecordDAO {
         return -1;
     }
 
+    public boolean insertIfAbsent(AttendanceRecord r) throws SQLException {
+        String sql = "INSERT IGNORE INTO attendance_records (employee_id, work_date, "
+                   + "check_in_time, check_out_time, late_minutes, late_penalty_amount, "
+                   + "overtime_hours, attendance_status, verification_status, "
+                   + "verified_by, verified_at, note) "
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            bindAttendanceValues(ps, r);
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
+    public boolean upsertImported(AttendanceRecord r) throws SQLException {
+        String sql = "INSERT INTO attendance_records (employee_id, work_date, "
+                   + "check_in_time, check_out_time, late_minutes, late_penalty_amount, "
+                   + "overtime_hours, attendance_status, verification_status, "
+                   + "verified_by, verified_at, note) "
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                   + "ON DUPLICATE KEY UPDATE "
+                   + "check_in_time=VALUES(check_in_time), "
+                   + "check_out_time=VALUES(check_out_time), "
+                   + "late_minutes=VALUES(late_minutes), "
+                   + "late_penalty_amount=VALUES(late_penalty_amount), "
+                   + "overtime_hours=VALUES(overtime_hours), "
+                   + "attendance_status=VALUES(attendance_status), "
+                   + "verification_status=VALUES(verification_status), "
+                   + "verified_by=NULL, verified_at=NULL, "
+                   + "note=VALUES(note), updated_at=NOW()";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            bindAttendanceValues(ps, r);
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
+    private void bindAttendanceValues(PreparedStatement ps, AttendanceRecord r)
+            throws SQLException {
+        ps.setInt(1, r.getEmployeeId());
+        ps.setDate(2, Date.valueOf(r.getWorkDate()));
+        if (r.getCheckInTime() != null) ps.setTime(3, Time.valueOf(r.getCheckInTime()));
+        else                            ps.setNull(3, Types.TIME);
+        if (r.getCheckOutTime() != null) ps.setTime(4, Time.valueOf(r.getCheckOutTime()));
+        else                             ps.setNull(4, Types.TIME);
+        ps.setInt(5, r.getLateMinutes());
+        ps.setBigDecimal(6, r.getLatePenaltyAmount() != null
+                ? r.getLatePenaltyAmount() : java.math.BigDecimal.ZERO);
+        ps.setBigDecimal(7, r.getOvertimeHours() != null
+                ? r.getOvertimeHours() : java.math.BigDecimal.ZERO);
+        ps.setString(8, r.getAttendanceStatus().getDbValue());
+        ps.setString(9, r.getVerificationStatus() == null
+                ? VerificationStatus.Pending.name() : r.getVerificationStatus().name());
+        if (r.getVerifiedBy() != null) ps.setInt(10, r.getVerifiedBy());
+        else                           ps.setNull(10, Types.INTEGER);
+        if (r.getVerifiedAt() != null) ps.setTimestamp(11, Timestamp.valueOf(r.getVerifiedAt()));
+        else                           ps.setNull(11, Types.TIMESTAMP);
+        ps.setString(12, r.getNote());
+    }
+
     public boolean existsByEmployeeAndDate(int employeeId, LocalDate workDate) throws SQLException {
         String sql = "SELECT 1 FROM attendance_records WHERE employee_id = ? AND work_date = ?";
         Connection conn = null;
