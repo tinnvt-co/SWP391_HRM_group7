@@ -69,7 +69,7 @@
                         <i class="bi bi-calendar2-month text-primary"></i>
                     </div>
                     <div>
-                        <div class="text-muted small">Total Monthly Salary</div>
+                        <div class="text-muted small">Company-paid Monthly Salary</div>
                         <div class="fw-bold fs-5">
                             <fmt:formatNumber value="${monthlySalaryTotal}" type="number" maxFractionDigits="0"/>
                         </div>
@@ -87,7 +87,7 @@
                         <i class="bi bi-cash-stack text-success"></i>
                     </div>
                     <div>
-                        <div class="text-muted small">Total Yearly Salary</div>
+                        <div class="text-muted small">Company-paid Yearly Salary</div>
                         <div class="fw-bold fs-5">
                             <fmt:formatNumber value="${yearlySalaryTotal}" type="number" maxFractionDigits="0"/>
                         </div>
@@ -278,7 +278,7 @@
                                 <td class="text-end"><fmt:formatNumber value="${p.overtimeSalary}" type="number" maxFractionDigits="0"/></td>
                                 <td class="text-end"><fmt:formatNumber value="${p.grossSalary}" type="number" maxFractionDigits="0"/></td>
                                 <td class="text-end text-danger"><fmt:formatNumber value="${p.totalDeduction}" type="number" maxFractionDigits="0"/></td>
-                                <td class="text-end fw-bold"><fmt:formatNumber value="${p.netSalary}" type="number" maxFractionDigits="0"/></td>
+                                <td class="text-end fw-bold"><fmt:formatNumber value="${p.totalReceived}" type="number" maxFractionDigits="0"/></td>
                                 <td class="text-center">
                                     <button type="button" class="btn btn-sm btn-outline-primary"
                                             data-bs-toggle="modal" data-bs-target="#payrollDetail${p.payrollId}">
@@ -416,13 +416,19 @@
                 <div class="border-top mt-3 pt-2">
                     <div class="d-flex justify-content-between py-1"><span class="text-muted">Maternity leave days</span><span>${p.maternityLeaveDays}</span></div>
                     <div class="d-flex justify-content-between py-1"><span class="text-muted">Maternity benefit</span><span><fmt:formatNumber value="${p.socialInsuranceBenefit}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
-                    <div class="text-muted small">Paid by social insurance, not included in company net salary.</div>
+                    <div class="text-muted small">Paid by social insurance; included in Net Salary shown below, but excluded from company-paid salary totals.</div>
                 </div>
             </div>
         </div>
         <div class="text-center border rounded mt-3 p-3" style="background:#eef7ff;">
             <div class="text-muted small text-uppercase fw-semibold">Net Salary</div>
-            <div class="fs-3 fw-bold text-success"><fmt:formatNumber value="${p.netSalary}" type="number" maxFractionDigits="0"/> &#8363;</div>
+            <div class="fs-3 fw-bold text-success"><fmt:formatNumber value="${p.totalReceived}" type="number" maxFractionDigits="0"/> &#8363;</div>
+            <c:if test="${p.socialInsuranceBenefit > 0}">
+                <div class="small text-muted">
+                    <fmt:formatNumber value="${p.netSalary}" type="number" maxFractionDigits="0"/> &#8363; company-paid
+                    + <fmt:formatNumber value="${p.socialInsuranceBenefit}" type="number" maxFractionDigits="0"/> &#8363; social insurance benefit
+                </div>
+            </c:if>
         </div>
       </div>
       <div class="modal-footer">

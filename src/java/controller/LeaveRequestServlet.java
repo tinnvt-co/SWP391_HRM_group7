@@ -35,6 +35,8 @@ import java.util.Set;
 @WebServlet(name = "LeaveRequestServlet", urlPatterns = {"/leave-requests"})
 public class LeaveRequestServlet extends HttpServlet {
 
+    private static final int ATTENDANCE_LEAVE_PAGE_SIZE = 10;
+
     private final LeaveRequestDAO leaveDAO   = new LeaveRequestDAO();
     private final EmployeeDAO     employeeDAO = new EmployeeDAO();
     private final DepartmentDAO   departmentDAO = new DepartmentDAO();
@@ -277,6 +279,18 @@ public class LeaveRequestServlet extends HttpServlet {
                 monthStart, monthEnd, departmentId, employeeId);
         List<AttendanceLeaveDay> leaveDays = expandLeaveDays(requests, monthStart, monthEnd);
 
+        int totalLeaveDays = leaveDays.size();
+        int totalPages = Math.max(1,
+                (int) Math.ceil(totalLeaveDays / (double) ATTENDANCE_LEAVE_PAGE_SIZE));
+        int currentPage = parseIntOr(request.getParameter("page"), 1);
+        if (currentPage < 1) currentPage = 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+
+        int fromIndex = (currentPage - 1) * ATTENDANCE_LEAVE_PAGE_SIZE;
+        int toIndex = Math.min(fromIndex + ATTENDANCE_LEAVE_PAGE_SIZE, totalLeaveDays);
+        List<AttendanceLeaveDay> pagedLeaveDays = new ArrayList<>(
+                leaveDays.subList(fromIndex, toIndex));
+
         int paidLeaveDays = 0;
         int unpaidLeaveDays = 0;
         int maternityLeaveDays = 0;
@@ -295,18 +309,21 @@ public class LeaveRequestServlet extends HttpServlet {
         request.setAttribute("departments", departments);
         request.setAttribute("employees", employees);
         request.setAttribute("leaveRequests", requests);
-        request.setAttribute("leaveDays", leaveDays);
+        request.setAttribute("leaveDays", pagedLeaveDays);
         request.setAttribute("selectedYear", year);
         request.setAttribute("selectedMonth", month);
         request.setAttribute("selectedDeptId", departmentId);
         request.setAttribute("selectedEmployeeId", employeeId);
         request.setAttribute("monthLabel", selectedMonth.getMonth()
                 .getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + year);
-        request.setAttribute("totalLeaveDays", leaveDays.size());
+        request.setAttribute("totalLeaveDays", totalLeaveDays);
         request.setAttribute("totalEmployeesOnLeave", employeeIds.size());
         request.setAttribute("paidLeaveDays", paidLeaveDays);
         request.setAttribute("unpaidLeaveDays", unpaidLeaveDays);
         request.setAttribute("maternityLeaveDays", maternityLeaveDays);
+        request.setAttribute("currentPage", currentPage);
+        request.setAttribute("totalPages", totalPages);
+        request.setAttribute("pageSize", ATTENDANCE_LEAVE_PAGE_SIZE);
         request.getRequestDispatcher("/views/leave/attendance-leave-calendar.jsp")
                .forward(request, response);
     }

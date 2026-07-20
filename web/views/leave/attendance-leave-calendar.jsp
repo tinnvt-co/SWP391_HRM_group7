@@ -198,7 +198,7 @@
                     <tbody>
                         <c:forEach var="day" items="${leaveDays}" varStatus="s">
                             <tr>
-                                <td class="ps-4 text-muted">${s.index + 1}</td>
+                                <td class="ps-4 text-muted">${(currentPage - 1) * pageSize + s.index + 1}</td>
                                 <td class="fw-medium">${day.leaveDate}</td>
                                 <td>
                                     <div class="fw-medium">${day.employeeFullName}</div>
@@ -239,6 +239,40 @@
                     </tbody>
                 </table>
             </div>
+            <c:if test="${totalPages > 1}">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-3 border-top">
+                    <div class="small text-muted">
+                        Page ${currentPage} of ${totalPages} &middot; ${totalLeaveDays} leave day(s)
+                    </div>
+                    <nav aria-label="Leave calendar pagination">
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}">
+                                <a class="page-link"
+                                   href="?action=attendance&amp;deptId=${selectedDeptId}&amp;employeeId=${selectedEmployeeId}&amp;month=${selectedMonth}&amp;year=${selectedYear}&amp;page=${currentPage - 1}">
+                                    Previous
+                                </a>
+                            </li>
+                            <c:forEach var="p" begin="1" end="${totalPages}">
+                                <c:if test="${p == 1 || p == totalPages || (p >= currentPage - 2 && p <= currentPage + 2)}">
+                                    <li class="page-item ${p == currentPage ? 'active' : ''}">
+                                        <a class="page-link"
+                                           href="?action=attendance&amp;deptId=${selectedDeptId}&amp;employeeId=${selectedEmployeeId}&amp;month=${selectedMonth}&amp;year=${selectedYear}&amp;page=${p}">${p}</a>
+                                    </li>
+                                </c:if>
+                                <c:if test="${(p == currentPage - 3 && p > 1) || (p == currentPage + 3 && p < totalPages)}">
+                                    <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                                </c:if>
+                            </c:forEach>
+                            <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}">
+                                <a class="page-link"
+                                   href="?action=attendance&amp;deptId=${selectedDeptId}&amp;employeeId=${selectedEmployeeId}&amp;month=${selectedMonth}&amp;year=${selectedYear}&amp;page=${currentPage + 1}">
+                                    Next
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </c:if>
         </div>
     </div>
 </div>

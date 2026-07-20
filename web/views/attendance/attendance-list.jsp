@@ -55,7 +55,7 @@
             <h5 class="fw-bold text-dark mb-0">Attendance Records</h5>
             <small class="text-muted">
                 <c:choose>
-                    <c:when test="${managerScope}">Review and confirm attendance of your team &mdash; ${importMonthLabel}</c:when>
+                    <c:when test="${managerScope}">Review and confirm your department attendance, including your own &mdash; ${importMonthLabel}</c:when>
                     <c:when test="${hrScope}">Attendance across the organization &mdash; ${importMonthLabel}</c:when>
                     <c:otherwise>Your attendance records</c:otherwise>
                 </c:choose>
@@ -107,13 +107,13 @@
                 <form method="post"
                       action="${pageContext.request.contextPath}/attendance?action=confirmToHr"
                       class="d-inline"
-                      onsubmit="return confirm('Confirm attendance for ${pendingCount} pending record(s)? HR Staff can submit confirmed reports to HR Manager after this.');">
+                      onsubmit="return confirm('Confirm ${pendingCount} pending attendance record(s) for your department, including your own attendance?');">
                     <input type="hidden" name="month" value="${selectedMonth}">
                     <input type="hidden" name="year" value="${selectedYear}">
                     <button type="submit" class="btn btn-success btn-sm px-3 fw-medium"
                             ${pendingCount > 0 ? '' : 'disabled'}
-                            title="${pendingCount > 0 ? 'Verify attendance so HR Staff can submit reports to HR Manager' : 'No pending records to confirm'}">
-                        <i class="bi bi-check2-all me-2"></i>Confirm Attendance
+                            title="${pendingCount > 0 ? 'Confirm all attendance in your department' : 'No pending records to confirm'}">
+                        <i class="bi bi-check2-all me-2"></i>Confirm Department Attendance
                         <c:if test="${pendingCount > 0}">
                             <span class="badge bg-light text-success ms-1">${pendingCount}</span>
                         </c:if>
@@ -172,12 +172,12 @@
     <%-- Flash messages --%>
     <c:if test="${not empty importMessage}">
         <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
-            <i class="bi bi-check-circle-fill"></i><span>${importMessage}</span>
+            <i class="bi bi-check-circle-fill"></i><span><c:out value="${importMessage}"/></span>
         </div>
     </c:if>
     <c:if test="${not empty importError}">
         <div class="alert alert-danger d-flex align-items-start gap-2 py-2 mb-3">
-            <i class="bi bi-exclamation-octagon-fill mt-1"></i><span>${importError}</span>
+            <i class="bi bi-exclamation-octagon-fill mt-1"></i><span><c:out value="${importError}"/></span>
         </div>
     </c:if>
 
@@ -330,12 +330,15 @@
           </div>
 
           <div class="border rounded p-2 bg-light small text-muted">
-            <strong>Accepted formats:</strong>
-            old monthly template, or the machine-detail workbook containing
-            <strong>Ma Cham Cong / Ma Nhan Vien / Gio</strong>.
-            <br>Detail import uses 07:30 as check-in, 17:30 as check-out,
-            calculates late penalties, links approved leave requests, and skips Sundays without punches.
-            <br>Existing records will not be overwritten.
+            <strong>Accepted workbook:</strong>
+            the file must include a sheet named <strong>Attendance Detail</strong>.
+            Import reads only these columns:
+            <strong>No. / Attendance Code / Employee Code / Timestamp</strong>.
+            <br>The sheet title and every timestamp must match the selected month
+            (<strong>${importMonthLabel}</strong>).
+            <br>Missing punch days are resolved by approved leave requests, official holidays,
+            Sundays, or absences. Existing records will not be overwritten.
+            <br>Maximum file size: <strong>10 MB</strong>.
           </div>
         </div>
         <div class="modal-footer">

@@ -69,14 +69,15 @@
         <c:if test="${canSubmitToHrManager}">
             <form method="post"
                   action="${pageContext.request.contextPath}/attendance-report?action=submitToHrManager"
-                  onsubmit="return confirm('Submit all ready attendance reports to HR Manager?');">
+                  onsubmit="return confirm('Submit all ready attendance reports in the selected department to HR Manager?');">
                 <input type="hidden" name="month" value="${selectedMonth}">
                 <input type="hidden" name="year" value="${selectedYear}">
+                <input type="hidden" name="deptId" value="${selectedDeptId}">
                 <button type="submit" class="btn btn-primary btn-sm px-3 fw-medium"
                         style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;"
-                        ${readyToSubmitCount > 0 ? '' : 'disabled'}
-                        title="${readyToSubmitCount > 0 ? 'Submit all ready manager-confirmed reports to HR Manager' : 'No reports are ready to submit'}">
-                    <i class="bi bi-send me-2"></i>Submit to HR Manager
+                        ${canSubmitSelectedDepartment ? '' : 'disabled'}
+                        title="${canSubmitSelectedDepartment ? 'Submit all ready reports in the selected department' : 'All attendance records must be confirmed before submission'}">
+                    <i class="bi bi-send me-2"></i>Submit Department
                     <c:if test="${readyToSubmitCount > 0}">
                         <span class="badge bg-light text-primary ms-1">${readyToSubmitCount}</span>
                     </c:if>
@@ -86,13 +87,14 @@
         <c:if test="${canApproveAttendanceReport}">
             <form method="post"
                   action="${pageContext.request.contextPath}/attendance-report?action=approveAll"
-                  onsubmit="return confirm('Approve all pending attendance reports for this month?');">
+                  onsubmit="return confirm('Approve all pending attendance reports in the selected department?');">
                 <input type="hidden" name="month" value="${selectedMonth}">
                 <input type="hidden" name="year" value="${selectedYear}">
+                <input type="hidden" name="deptId" value="${selectedDeptId}">
                 <button type="submit" class="btn btn-success btn-sm px-3 fw-medium"
                         ${pendingHrManagerApprovalCount > 0 ? '' : 'disabled'}
-                        title="${pendingHrManagerApprovalCount > 0 ? 'Approve all pending attendance reports in this month' : 'No pending reports to approve'}">
-                    <i class="bi bi-check2-all me-2"></i>Approve All
+                        title="${pendingHrManagerApprovalCount > 0 ? 'Approve all pending reports in the selected department' : 'No pending reports in this department'}">
+                    <i class="bi bi-check2-all me-2"></i>Approve Department
                     <c:if test="${pendingHrManagerApprovalCount > 0}">
                         <span class="badge bg-light text-success ms-1">${pendingHrManagerApprovalCount}</span>
                     </c:if>
@@ -101,6 +103,20 @@
         </c:if>
     </div>
 
+    <c:if test="${not empty attendanceTask}">
+        <c:url var="attendanceWorkflowTaskUrl" value="/attendance-report">
+            <c:param name="deptId" value="${attendanceTask.departmentId}"/>
+            <c:param name="month" value="${attendanceTask.month}"/>
+            <c:param name="year" value="${attendanceTask.year}"/>
+        </c:url>
+    </c:if>
+    <c:if test="${not empty hrDepartmentConfirmationTask}">
+        <c:url var="hrDepartmentConfirmationTaskUrl" value="/attendance-report">
+            <c:param name="deptId" value="${hrDepartmentConfirmationTask.departmentId}"/>
+            <c:param name="month" value="${hrDepartmentConfirmationTask.month}"/>
+            <c:param name="year" value="${hrDepartmentConfirmationTask.year}"/>
+        </c:url>
+    </c:if>
     <c:if test="${not empty payrollTaskSummary and payrollTaskSummary.actionable}">
         <c:url var="attendancePayrollTaskUrl" value="/payroll">
             <c:if test="${payrollTaskApproval}">
@@ -113,8 +129,64 @@
             </c:if>
         </c:url>
     </c:if>
-    <c:if test="${not empty payrollTaskSummary}">
+    <c:if test="${hrStaffScope or hrManagerScope}">
         <div class="row g-3 mb-3">
+            <div class="col-lg-4 col-md-6">
+                <a class="task-card-link ${empty attendanceTask ? 'pe-none' : ''}"
+                   href="${not empty attendanceTask ? attendanceWorkflowTaskUrl : '#'}"
+                   aria-disabled="${empty attendanceTask ? 'true' : 'false'}">
+                    <div class="task-card card p-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="task-icon" style="background:#e3f0fb;">
+                                <i class="bi bi-calendar2-check text-primary"></i>
+                            </div>
+                            <div>
+                                <div class="text-muted small">Attendance Tasks to Process</div>
+                                <div class="fw-bold fs-5">${empty attendanceTask ? 0 : attendanceTask.count}</div>
+                                <div class="text-muted" style="font-size:0.78rem;">
+                                    <c:choose>
+                                        <c:when test="${not empty attendanceTask}">
+                                            ${attendanceTask.actionLabel} &middot;
+                                            <c:out value="${attendanceTask.departmentName}"/> &middot;
+                                            Month ${attendanceTask.month}/${attendanceTask.year}
+                                        </c:when>
+                                        <c:otherwise>No pending attendance report tasks</c:otherwise>
+                                    </c:choose>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <c:if test="${hrManagerScope}">
+                <div class="col-lg-4 col-md-6">
+                    <a class="task-card-link ${empty hrDepartmentConfirmationTask ? 'pe-none' : ''}"
+                       href="${not empty hrDepartmentConfirmationTask ? hrDepartmentConfirmationTaskUrl : '#'}"
+                       aria-disabled="${empty hrDepartmentConfirmationTask ? 'true' : 'false'}">
+                        <div class="task-card card p-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="task-icon" style="background:#e6f9f0;">
+                                    <i class="bi bi-person-check text-success"></i>
+                                </div>
+                                <div>
+                                    <div class="text-muted small">HR Department Attendance</div>
+                                    <div class="fw-bold fs-5">${empty hrDepartmentConfirmationTask ? 0 : hrDepartmentConfirmationTask.count}</div>
+                                    <div class="text-muted" style="font-size:0.78rem;">
+                                        <c:choose>
+                                            <c:when test="${not empty hrDepartmentConfirmationTask}">
+                                                Confirm Department &middot;
+                                                <c:out value="${hrDepartmentConfirmationTask.departmentName}"/> &middot;
+                                                Month ${hrDepartmentConfirmationTask.month}/${hrDepartmentConfirmationTask.year}
+                                            </c:when>
+                                            <c:otherwise>No HR department attendance awaiting confirmation</c:otherwise>
+                                        </c:choose>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </c:if>
             <div class="col-lg-4 col-md-6">
                 <a class="task-card-link ${payrollTaskSummary.actionable ? '' : 'pe-none'}"
                    href="${payrollTaskSummary.actionable ? attendancePayrollTaskUrl : '#'}"
@@ -125,7 +197,7 @@
                                 <i class="bi bi-list-task text-warning"></i>
                             </div>
                             <div>
-                                <div class="text-muted small">Tasks to Process</div>
+                                <div class="text-muted small">Payroll Tasks to Process</div>
                                 <div class="fw-bold fs-5">${payrollTaskSummary.count}</div>
                                 <div class="text-muted" style="font-size:0.78rem;">
                                     <c:choose>
@@ -150,6 +222,19 @@
     <div class="card border-0 shadow-sm rounded-3 mb-3">
         <div class="card-body">
             <form method="get" class="row g-2 align-items-end">
+                <c:if test="${departmentScope}">
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">Department</label>
+                        <select name="deptId" class="form-select form-select-sm">
+                            <c:forEach var="dept" items="${departments}">
+                                <option value="${dept.departmentId}"
+                                        ${dept.departmentId == selectedDeptId ? 'selected' : ''}>
+                                    <c:out value="${dept.departmentName}"/>
+                                </option>
+                            </c:forEach>
+                        </select>
+                    </div>
+                </c:if>
                 <div class="col-md-3">
                     <label class="form-label small text-muted mb-1">Month</label>
                     <select name="month" class="form-select form-select-sm">
@@ -182,18 +267,54 @@
 
     <c:if test="${not empty attendanceReportMessage}">
         <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
-            <i class="bi bi-check-circle-fill"></i><span>${attendanceReportMessage}</span>
+            <i class="bi bi-check-circle-fill"></i><span><c:out value="${attendanceReportMessage}"/></span>
         </div>
     </c:if>
     <c:if test="${not empty attendanceReportError}">
         <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-3">
-            <i class="bi bi-exclamation-circle-fill"></i><span>${attendanceReportError}</span>
+            <i class="bi bi-exclamation-circle-fill"></i><span><c:out value="${attendanceReportError}"/></span>
         </div>
     </c:if>
-    <c:if test="${hrStaffScope and pendingManagerConfirmationCount > 0}">
+
+    <c:if test="${canConfirmHrDepartmentAttendance}">
+        <div class="card border-0 shadow-sm mb-3" style="border-left:4px solid #198754 !important;">
+            <div class="card-body d-flex align-items-center justify-content-between gap-3 flex-wrap">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="task-icon" style="background:#e6f9f0;">
+                        <i class="bi bi-people text-success"></i>
+                    </div>
+                    <div>
+                        <div class="fw-semibold text-dark">Human Resources Attendance Confirmation</div>
+                        <div class="small text-muted">
+                            Confirm HR Staff and HR Manager attendance for ${monthLabel} before HR Staff submits this department.
+                        </div>
+                    </div>
+                </div>
+                <form method="post"
+                      action="${pageContext.request.contextPath}/attendance-report?action=confirmHrDepartmentAttendance"
+                      onsubmit="return confirm('Confirm all pending attendance records in the Human Resources department?');">
+                    <input type="hidden" name="month" value="${selectedMonth}">
+                    <input type="hidden" name="year" value="${selectedYear}">
+                    <input type="hidden" name="deptId" value="${selectedDeptId}">
+                    <button type="submit" class="btn btn-success btn-sm px-3 fw-medium"
+                            ${pendingDepartmentConfirmationCount > 0 ? '' : 'disabled'}
+                            title="${pendingDepartmentConfirmationCount > 0 ? 'Confirm Human Resources department attendance' : 'No pending attendance in Human Resources'}">
+                        <i class="bi bi-check2-all me-2"></i>Confirm HR Department Attendance
+                        <c:if test="${pendingDepartmentConfirmationCount > 0}">
+                            <span class="badge bg-light text-success ms-1">${pendingDepartmentConfirmationCount}</span>
+                        </c:if>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </c:if>
+
+    <c:if test="${hrStaffScope and pendingDepartmentConfirmationCount > 0}">
         <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
             <i class="bi bi-hourglass-split"></i>
-            <span>${pendingManagerConfirmationCount} attendance record(s) are still waiting for Manager confirmation. Ready reports can still be submitted to HR Manager.</span>
+            <span>${pendingDepartmentConfirmationCount} attendance record(s) in
+                <strong><c:out value="${selectedDeptName}"/></strong> are still waiting for department confirmation.
+                This department cannot be submitted yet.</span>
         </div>
     </c:if>
 
@@ -202,6 +323,9 @@
             <div class="p-3 border-bottom d-flex align-items-center gap-2">
                 <i class="bi bi-calendar-check text-muted"></i>
                 <span class="fw-medium">${monthLabel}</span>
+                <c:if test="${departmentScope and not empty selectedDeptName}">
+                    <span class="text-muted">&middot; <c:out value="${selectedDeptName}"/></span>
+                </c:if>
                 <span class="text-muted">&middot; ${totalReports} report(s)</span>
             </div>
 
@@ -284,6 +408,7 @@
                                                         <input type="hidden" name="reportId" value="${r.attendanceReportId}">
                                                         <input type="hidden" name="month" value="${selectedMonth}">
                                                         <input type="hidden" name="year" value="${selectedYear}">
+                                                        <input type="hidden" name="deptId" value="${selectedDeptId}">
                                                         <button type="submit" class="btn btn-sm btn-outline-success" title="Approve">
                                                             <i class="bi bi-check2"></i>
                                                         </button>
@@ -293,6 +418,7 @@
                                                         <input type="hidden" name="reportId" value="${r.attendanceReportId}">
                                                         <input type="hidden" name="month" value="${selectedMonth}">
                                                         <input type="hidden" name="year" value="${selectedYear}">
+                                                        <input type="hidden" name="deptId" value="${selectedDeptId}">
                                                         <input type="hidden" name="note" value="">
                                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Reject">
                                                             <i class="bi bi-x-lg"></i>
@@ -313,6 +439,9 @@
                                 <td colspan="${canApproveAttendanceReport ? 12 : 11}" class="text-center text-muted py-5">
                                     <i class="bi bi-inbox fs-2 d-block mb-2 opacity-25"></i>
                                     No attendance reports submitted for ${monthLabel}.
+                                    <c:if test="${departmentScope and not empty selectedDeptName}">
+                                        <span><c:out value="${selectedDeptName}"/>.</span>
+                                    </c:if>
                                 </td>
                             </tr>
                         </c:if>
@@ -329,17 +458,17 @@
                     <ul class="pagination pagination-sm mb-0">
                         <li class="page-item ${currentPage == 1 ? 'disabled' : ''}">
                             <a class="page-link"
-                               href="?month=${selectedMonth}&year=${selectedYear}&page=${currentPage - 1}">Previous</a>
+                               href="?month=${selectedMonth}&year=${selectedYear}&deptId=${selectedDeptId}&page=${currentPage - 1}">Previous</a>
                         </li>
                         <c:forEach var="p" begin="1" end="${totalPages}">
                             <li class="page-item ${p == currentPage ? 'active' : ''}">
                                 <a class="page-link"
-                                   href="?month=${selectedMonth}&year=${selectedYear}&page=${p}">${p}</a>
+                                   href="?month=${selectedMonth}&year=${selectedYear}&deptId=${selectedDeptId}&page=${p}">${p}</a>
                             </li>
                         </c:forEach>
                         <li class="page-item ${currentPage == totalPages ? 'disabled' : ''}">
                             <a class="page-link"
-                               href="?month=${selectedMonth}&year=${selectedYear}&page=${currentPage + 1}">Next</a>
+                               href="?month=${selectedMonth}&year=${selectedYear}&deptId=${selectedDeptId}&page=${currentPage + 1}">Next</a>
                         </li>
                     </ul>
                 </nav>

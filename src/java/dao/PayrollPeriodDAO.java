@@ -52,6 +52,22 @@ public class PayrollPeriodDAO {
         return findOne("WHERE pp.payroll_period_id=?", id);
     }
 
+    public boolean deleteIfEmpty(int periodId) throws SQLException {
+        String sql = "DELETE pp FROM payroll_periods pp "
+                   + "LEFT JOIN payrolls p ON p.payroll_period_id = pp.payroll_period_id "
+                   + "WHERE pp.payroll_period_id=? AND p.payroll_id IS NULL";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, periodId);
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
     public List<PayrollPeriod> findByMonthAndStatuses(int year, int month,
                                                       Status... statuses) throws SQLException {
         List<PayrollPeriod> list = new ArrayList<>();
@@ -201,12 +217,14 @@ public class PayrollPeriodDAO {
                    + "  UNION "
                    + "  SELECT ar.department_id, ar.report_year AS task_year, ar.report_month AS task_month "
                    + "  FROM attendance_reports ar "
+                   + "  LEFT JOIN payrolls p ON p.attendance_report_id = ar.attendance_report_id "
                    + "  LEFT JOIN payroll_periods pp "
                    + "    ON pp.department_id = ar.department_id "
                    + "   AND pp.payroll_year = ar.report_year "
                    + "   AND pp.payroll_month = ar.report_month "
                    + "  WHERE ar.status = 'Approved By HR Manager' "
-                   + "    AND pp.payroll_period_id IS NULL "
+                   + "    AND p.payroll_id IS NULL "
+                   + "    AND (pp.payroll_period_id IS NULL OR pp.status IN ('Draft', 'Rejected')) "
                    + "  GROUP BY ar.department_id, ar.report_year, ar.report_month"
                    + ") pending_periods";
         try (PreparedStatement ps = conn.prepareStatement(sql);
@@ -263,7 +281,7 @@ public class PayrollPeriodDAO {
                    + "           WHEN 'Approved' THEN 'Confirm Payment' "
                    + "           ELSE pp.status "
                    + "         END AS task_label, "
-                   + "         CASE pp.status WHEN 'Approved' THEN 0 WHEN 'Rejected' THEN 1 ELSE 2 END AS task_priority, "
+                   + "         CASE pp.status WHEN 'Approved' THEN 1 WHEN 'Rejected' THEN 2 ELSE 3 END AS task_priority, "
                    + "         COALESCE(pp.updated_at, pp.created_at) AS task_time "
                    + "  FROM payroll_periods pp "
                    + "  JOIN departments d ON pp.department_id = d.department_id "
@@ -272,16 +290,18 @@ public class PayrollPeriodDAO {
                    + "  SELECT ar.department_id, d.department_name, "
                    + "         ar.report_year AS task_year, ar.report_month AS task_month, "
                    + "         'Process Payroll' AS task_label, "
-                   + "         3 AS task_priority, "
+                   + "         0 AS task_priority, "
                    + "         MAX(COALESCE(ar.updated_at, ar.submitted_at, ar.created_at)) AS task_time "
                    + "  FROM attendance_reports ar "
                    + "  JOIN departments d ON ar.department_id = d.department_id "
+                   + "  LEFT JOIN payrolls p ON p.attendance_report_id = ar.attendance_report_id "
                    + "  LEFT JOIN payroll_periods pp "
                    + "    ON pp.department_id = ar.department_id "
                    + "   AND pp.payroll_year = ar.report_year "
                    + "   AND pp.payroll_month = ar.report_month "
                    + "  WHERE ar.status = 'Approved By HR Manager' "
-                   + "    AND pp.payroll_period_id IS NULL "
+                   + "    AND p.payroll_id IS NULL "
+                   + "    AND (pp.payroll_period_id IS NULL OR pp.status IN ('Draft', 'Rejected')) "
                    + "  GROUP BY ar.department_id, d.department_name, ar.report_year, ar.report_month"
                    + ") pending_periods "
                    + "ORDER BY pending_periods.task_year DESC, pending_periods.task_month DESC, "

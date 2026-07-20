@@ -68,7 +68,7 @@
                         <i class="bi bi-calendar2-month text-primary"></i>
                     </div>
                     <div>
-                        <div class="text-muted small">Total Monthly Salary</div>
+                        <div class="text-muted small">Company-paid Monthly Salary</div>
                         <div class="fw-bold fs-5">
                             <fmt:formatNumber value="${monthlySalaryTotal}" type="number" maxFractionDigits="0"/>
                         </div>
@@ -86,7 +86,7 @@
                         <i class="bi bi-cash-stack text-success"></i>
                     </div>
                     <div>
-                        <div class="text-muted small">Total Yearly Salary</div>
+                        <div class="text-muted small">Company-paid Yearly Salary</div>
                         <div class="fw-bold fs-5">
                             <fmt:formatNumber value="${yearlySalaryTotal}" type="number" maxFractionDigits="0"/>
                         </div>
@@ -135,7 +135,33 @@
     </c:if>
     <c:if test="${not empty payrollError}">
         <div class="alert alert-danger d-flex align-items-start gap-2 py-2 mb-3">
-            <i class="bi bi-exclamation-octagon-fill mt-1"></i><span>${payrollError}</span>
+            <i class="bi bi-exclamation-octagon-fill mt-1"></i><span><c:out value="${payrollError}"/></span>
+        </div>
+    </c:if>
+
+    <c:if test="${rejectedPeriod}">
+        <div class="alert alert-danger border-danger-subtle mb-3" role="alert">
+            <div class="d-flex align-items-start gap-2">
+                <i class="bi bi-arrow-counterclockwise fs-5"></i>
+                <div>
+                    <div class="fw-semibold">Payroll Returned for Revision</div>
+                    <div class="small mt-1">
+                        <span class="fw-medium">Reason:</span>
+                        <c:choose>
+                            <c:when test="${not empty period.rejectReason}">
+                                <c:out value="${period.rejectReason}"/>
+                            </c:when>
+                            <c:otherwise>No rejection reason was provided.</c:otherwise>
+                        </c:choose>
+                    </div>
+                    <div class="small text-muted mt-1">
+                        <c:if test="${not empty period.approvedByName}">
+                            Rejected by <c:out value="${period.approvedByName}"/>.
+                        </c:if>
+                        Review the payroll, make the required corrections, then submit it again.
+                    </div>
+                </div>
+            </div>
         </div>
     </c:if>
 
@@ -202,15 +228,10 @@
                         <span class="text-muted ms-2">${period.payrollCount} employee(s)</span>
                     </c:otherwise>
                 </c:choose>
-                <c:if test="${not empty period and period.status == 'Rejected' and not empty period.rejectReason}">
-                    <div class="text-danger small mt-1">
-                        <i class="bi bi-x-octagon me-1"></i>Rejected: ${period.rejectReason}
-                    </div>
-                </c:if>
             </div>
             <div class="d-flex gap-2">
-                <%-- Generate: no period yet + reports exist --%>
-                <c:if test="${empty period and hasReports}">
+                <%-- Generate or append missing payroll lines from approved attendance reports. --%>
+                <c:if test="${hasReports}">
                     <form method="post" action="${pageContext.request.contextPath}/payroll?action=generate">
                         <input type="hidden" name="year" value="${selectedYear}">
                         <input type="hidden" name="month" value="${selectedMonth}">
@@ -218,7 +239,10 @@
                         <button type="submit" class="btn btn-sm btn-primary"
                                 style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;">
                             <i class="bi bi-calculator me-1"></i>
-                            Calculate Payroll
+                            <c:choose>
+                                <c:when test="${empty period}">Calculate Payroll</c:when>
+                                <c:otherwise>Add Missing Payroll</c:otherwise>
+                            </c:choose>
                         </button>
                     </form>
                 </c:if>
@@ -311,7 +335,7 @@
                                 <td class="text-end"><fmt:formatNumber value="${p.overtimeSalary}" type="number" maxFractionDigits="0"/></td>
                                 <td class="text-end"><fmt:formatNumber value="${p.grossSalary}" type="number" maxFractionDigits="0"/></td>
                                 <td class="text-end text-danger"><fmt:formatNumber value="${p.totalDeduction}" type="number" maxFractionDigits="0"/></td>
-                                <td class="text-end fw-bold"><fmt:formatNumber value="${p.netSalary}" type="number" maxFractionDigits="0"/></td>
+                                <td class="text-end fw-bold"><fmt:formatNumber value="${p.totalReceived}" type="number" maxFractionDigits="0"/></td>
                                 <td class="text-center">
                                     <button type="button" class="btn btn-sm btn-outline-primary"
                                             data-bs-toggle="modal" data-bs-target="#payrollDetail${p.payrollId}">
@@ -414,13 +438,19 @@
                 <div class="border-top mt-3 pt-2">
                     <div class="d-flex justify-content-between py-1"><span class="text-muted">Maternity leave days</span><span>${p.maternityLeaveDays}</span></div>
                     <div class="d-flex justify-content-between py-1"><span class="text-muted">Maternity benefit</span><span><fmt:formatNumber value="${p.socialInsuranceBenefit}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
-                    <div class="text-muted small">Paid by social insurance, not included in company net salary.</div>
+                    <div class="text-muted small">Paid by social insurance; included in Net Salary shown below, but excluded from company-paid salary totals.</div>
                 </div>
             </div>
         </div>
         <div class="text-center border rounded mt-3 p-3" style="background:#eef7ff;">
             <div class="text-muted small text-uppercase fw-semibold">Net Salary</div>
-            <div class="fs-3 fw-bold text-success"><fmt:formatNumber value="${p.netSalary}" type="number" maxFractionDigits="0"/> &#8363;</div>
+            <div class="fs-3 fw-bold text-success"><fmt:formatNumber value="${p.totalReceived}" type="number" maxFractionDigits="0"/> &#8363;</div>
+            <c:if test="${p.socialInsuranceBenefit > 0}">
+                <div class="small text-muted">
+                    <fmt:formatNumber value="${p.netSalary}" type="number" maxFractionDigits="0"/> &#8363; company-paid
+                    + <fmt:formatNumber value="${p.socialInsuranceBenefit}" type="number" maxFractionDigits="0"/> &#8363; social insurance benefit
+                </div>
+            </c:if>
         </div>
       </div>
       <div class="modal-footer">
