@@ -165,7 +165,7 @@
                                         <span>${payslip.maternityLeaveDays}</span></div>
                                     <div class="row-line py-1"><span class="lbl">Maternity benefit</span>
                                         <span><fmt:formatNumber value="${payslip.socialInsuranceBenefit}" type="number" maxFractionDigits="0"/> &#8363;</span></div>
-                                    <div class="text-muted small">This benefit is paid by social insurance and is not included in company net salary.</div>
+                                    <div class="text-muted small">Paid by social insurance; included in Net Salary shown below, but excluded from company-paid salary totals.</div>
                                 </div>
                             </div>
                         </div>
@@ -173,8 +173,18 @@
 
                     <div class="net-box mt-4 text-center">
                         <div class="text-muted small text-uppercase fw-semibold">Net Salary</div>
-                        <div class="net-value"><fmt:formatNumber value="${payslip.netSalary}" type="number" maxFractionDigits="0"/> &#8363;</div>
-                        <div class="small text-muted">Company-paid salary for ${monthLabel}</div>
+                        <div class="net-value"><fmt:formatNumber value="${payslip.totalReceived}" type="number" maxFractionDigits="0"/> &#8363;</div>
+                        <c:choose>
+                            <c:when test="${payslip.socialInsuranceBenefit > 0}">
+                                <div class="small text-muted">
+                                    <fmt:formatNumber value="${payslip.netSalary}" type="number" maxFractionDigits="0"/> &#8363; company-paid
+                                    + <fmt:formatNumber value="${payslip.socialInsuranceBenefit}" type="number" maxFractionDigits="0"/> &#8363; social insurance benefit
+                                </div>
+                            </c:when>
+                            <c:otherwise>
+                                <div class="small text-muted">Company-paid salary for ${monthLabel}</div>
+                            </c:otherwise>
+                        </c:choose>
                     </div>
 
                     <c:if test="${not empty payslip.note}">

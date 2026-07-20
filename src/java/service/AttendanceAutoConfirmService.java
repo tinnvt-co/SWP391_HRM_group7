@@ -22,13 +22,13 @@ public class AttendanceAutoConfirmService {
         int updatedRecords = 0;
         for (AttendanceRecordDAO.AutoConfirmBatch batch : batches) {
             int updated = attendanceDAO.autoVerifyPendingByManagerMonth(
-                    batch.managerUserId, batch.year, batch.month);
+                    batch.managerUserId, batch.departmentId, batch.year, batch.month);
             if (updated <= 0) continue;
             updatedRecords += updated;
 
             List<AttendanceRecordDAO.MonthlySummary> summaries =
-                    attendanceDAO.aggregateMonthByManager(
-                            batch.managerUserId, batch.year, batch.month);
+                    attendanceDAO.aggregateMonthByDepartment(
+                            batch.year, batch.month, batch.departmentId);
             for (AttendanceRecordDAO.MonthlySummary s : summaries) {
                 AttendanceReport report = new AttendanceReport();
                 report.setEmployeeId(s.employeeId);

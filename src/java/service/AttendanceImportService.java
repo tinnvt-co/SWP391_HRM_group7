@@ -28,7 +28,6 @@ import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -40,14 +39,15 @@ import java.util.regex.Pattern;
 /**
  * Imports monthly attendance into attendance_records.
  *
- * Supported workbook formats:
- *   1. The original monthly template, where each day is a column.
- *   2. A machine-detail sheet with columns "Attendance Code", "Employee Code", "Timestamp".
- *
- * When a detail sheet is present, it is treated as the source of truth and the
- * original template/summary sheets in the workbook are kept only as reference.
+ * Supported workbook format:
+ *   A workbook with an "Attendance Detail" sheet using exactly these source
+ *   columns: No., Attendance Code, Employee Code, Timestamp.
+ * Reference/summary sheets may remain in the workbook, but imported punch data
+ * always comes from "Attendance Detail".
  */
 public class AttendanceImportService {
+
+    private static final String REQUIRED_DETAIL_SHEET_NAME = "ATTENDANCE DETAIL";
 
     /** 0-based column index of the first day cell ("E") in the old template. */
     private static final int FIRST_DAY_COL = 4;
@@ -105,38 +105,23 @@ public class AttendanceImportService {
     /**
      * Import all sheets from a multi-tab .xlsx file.
      *
-     * If the workbook contains a machine-detail attendance sheet, import only
-     * that sheet and ignore the old template/summary sheets. Otherwise, keep the
-     * original multi-sheet template import behavior.
+     * Only the "Attendance Detail" sheet is accepted as the source of punch data.
+     * Other sheets remain as human-readable reference only.
      */
     public Result importAllSheets(List<XlsxReader.Sheet> sheets, List<Employee> allEmps,
                                   YearMonth month, int importerUid, boolean overwrite)
             throws SQLException {
+        Result result = new Result();
         XlsxReader.Sheet detailSheet = findDetailSheet(sheets);
-        if (detailSheet != null) {
-            Set<String> referenceEmployeeCodes = findReferenceEmployeeCodes(sheets, detailSheet);
-            return importDetailSheet(detailSheet, allEmps, referenceEmployeeCodes,
-                    month, importerUid, overwrite);
+        if (detailSheet == null) {
+            result.errors.add("Workbook must contain a sheet named 'Attendance Detail'. "
+                    + "Old day-column attendance templates are no longer accepted.");
+            return result;
         }
 
-        Result merged = new Result();
-        for (int i = 0; i < sheets.size(); i++) {
-            YearMonth sheetMonth = detectSheetMonth(sheets.get(i));
-            if (sheetMonth == null) {
-                merged.errors.add("Sheet " + (i + 1)
-                        + ": could not detect the attendance month/year in the file title.");
-            } else if (!sheetMonth.equals(month)) {
-                merged.errors.add("Sheet " + (i + 1) + ": file is for " + sheetMonth
-                        + ", but the selected import month is " + month + ".");
-            }
-        }
-        if (merged.hasErrors()) return merged;
-
-        for (int i = 0; i < sheets.size(); i++) {
-            Result r = importSheet(sheets.get(i), allEmps, month, importerUid, overwrite);
-            merged.merge(r);
-        }
-        return merged;
+        Set<String> referenceEmployeeCodes = findReferenceEmployeeCodes(sheets, detailSheet);
+        return importDetailSheet(detailSheet, allEmps, referenceEmployeeCodes,
+                month, importerUid, overwrite);
     }
 
     /**
@@ -172,8 +157,11 @@ public class AttendanceImportService {
             if (code.isEmpty()) continue;
 
             String first = sheet.get(r, 0).trim();
-            if (first.toUpperCase(Locale.ROOT).startsWith("TONG")
-                    || first.toUpperCase(Locale.ROOT).startsWith("DEPARTMENT TOTAL")) break;
+            String normalizedFirst = first.toUpperCase(Locale.ROOT);
+            if (normalizedFirst.startsWith("TONG")
+                    || normalizedFirst.startsWith("TOTAL")
+                    || normalizedFirst.startsWith("COMPANY TOTAL")
+                    || normalizedFirst.startsWith("DEPARTMENT TOTAL")) break;
 
             Employee emp = byCode.get(normalizeEmployeeCode(code));
             if (emp == null) {
@@ -214,14 +202,25 @@ public class AttendanceImportService {
         Result result = new Result();
         DetailHeader header = findDetailHeader(sheet);
         if (header == null) {
-            result.errors.add("Could not find the detail attendance columns: Attendance Code, Employee Code, Timestamp.");
+            result.errors.add("Attendance Detail must contain exactly these header columns: "
+                    + "No., Attendance Code, Employee Code, Timestamp.");
+            return result;
+        }
+
+        YearMonth titleMonth = detectSheetMonthBeforeRow(sheet, header.row);
+        if (titleMonth == null) {
+            result.errors.add("Attendance Detail title must include the attendance month/year.");
+            return result;
+        }
+        if (!titleMonth.equals(month)) {
+            result.errors.add("Attendance Detail is for " + titleMonth
+                    + ", but the selected import month is " + month + ".");
             return result;
         }
 
         Map<String, Employee> byCode = buildEmployeeLookup(allEmps);
 
         Map<Integer, Map<LocalDate, List<LocalTime>>> punchesByEmployee = new HashMap<>();
-        Set<YearMonth> punchMonths = new HashSet<>();
         int punchRows = 0;
 
         for (int r = header.row + 1; r < sheet.rowCount(); r++) {
@@ -251,7 +250,6 @@ public class AttendanceImportService {
             }
 
             YearMonth punchMonth = YearMonth.from(punch);
-            punchMonths.add(punchMonth);
             if (!punchMonth.equals(month)) {
                 result.errors.add("Row " + (r + 1) + ": punch time " + punch
                         + " is for " + punchMonth + ", but the selected import month is " + month + ".");
@@ -269,12 +267,6 @@ public class AttendanceImportService {
             result.errors.add("The detail attendance sheet has no valid punch rows for " + month + ".");
         }
         if (result.hasErrors()) return result;
-
-        YearMonth titleMonth = detectSheetMonthBeforeRow(sheet, header.row);
-        if (titleMonth != null && !titleMonth.equals(month)) {
-            result.warnings.add("Detail sheet title says " + titleMonth
-                    + ", but punch timestamps are for " + punchMonths + ". Imported by timestamp month.");
-        }
 
         List<Employee> importEmployees = scopedEmployees(allEmps, referenceEmployeeCodes,
                 punchesByEmployee.keySet(), result);
@@ -469,7 +461,9 @@ public class AttendanceImportService {
 
     private XlsxReader.Sheet findDetailSheet(List<XlsxReader.Sheet> sheets) {
         for (XlsxReader.Sheet sheet : sheets) {
-            if (findDetailHeader(sheet) != null) return sheet;
+            if (normalizeLabel(sheet.getName()).equals(REQUIRED_DETAIL_SHEET_NAME)) {
+                return sheet;
+            }
         }
         return null;
     }
@@ -487,7 +481,10 @@ public class AttendanceImportService {
 
             for (int r = headerRow + 1; r < sheet.rowCount(); r++) {
                 String first = normalizeLabel(sheet.get(r, 0));
-                if (first.startsWith("TONG") || first.startsWith("DEPARTMENT TOTAL")) break;
+                if (first.startsWith("TONG")
+                        || first.startsWith("TOTAL")
+                        || first.startsWith("COMPANY TOTAL")
+                        || first.startsWith("DEPARTMENT TOTAL")) break;
 
                 String code = sheet.get(r, codeCol).trim();
                 if (code.isBlank()) continue;
@@ -565,21 +562,27 @@ public class AttendanceImportService {
     private DetailHeader findDetailHeader(XlsxReader.Sheet sheet) {
         int rows = Math.min(sheet.rowCount(), 15);
         for (int r = 0; r < rows; r++) {
-            int attendanceCodeCol = -1;
-            int employeeCodeCol = -1;
-            int timestampCol = -1;
-            int cols = Math.max(sheet.colCount(r), 8);
-            for (int c = 0; c < cols; c++) {
-                String label = normalizeLabel(sheet.get(r, c));
-                if (isAttendanceCodeLabel(label)) attendanceCodeCol = c;
-                if (isEmployeeCodeLabel(label)) employeeCodeCol = c;
-                if (isTimestampLabel(label)) timestampCol = c;
-            }
-            if (employeeCodeCol >= 0 && timestampCol >= 0) {
-                return new DetailHeader(r, attendanceCodeCol, employeeCodeCol, timestampCol);
+            String noLabel = normalizeLabel(sheet.get(r, 0));
+            String attendanceCodeLabel = normalizeLabel(sheet.get(r, 1));
+            String employeeCodeLabel = normalizeLabel(sheet.get(r, 2));
+            String timestampLabel = normalizeLabel(sheet.get(r, 3));
+            if (noLabel.equals("NO")
+                    && attendanceCodeLabel.equals("ATTENDANCE CODE")
+                    && employeeCodeLabel.equals("EMPLOYEE CODE")
+                    && timestampLabel.equals("TIMESTAMP")
+                    && hasNoExtraDetailHeaderColumns(sheet, r)) {
+                return new DetailHeader(r, 1, 2, 3);
             }
         }
         return null;
+    }
+
+    private boolean hasNoExtraDetailHeaderColumns(XlsxReader.Sheet sheet, int headerRow) {
+        int cols = sheet.colCount(headerRow);
+        for (int c = 4; c < cols; c++) {
+            if (!sheet.get(headerRow, c).trim().isEmpty()) return false;
+        }
+        return true;
     }
 
     private YearMonth detectSheetMonth(XlsxReader.Sheet sheet) {
@@ -606,13 +609,6 @@ public class AttendanceImportService {
         return null;
     }
 
-    private boolean isAttendanceCodeLabel(String label) {
-        return label.equals("ATTENDANCE CODE")
-                || label.equals("CLOCK CODE")
-                || label.equals("TIMEKEEPING CODE")
-                || label.equals("MA CHAM CONG");
-    }
-
     private boolean isEmployeeCodeLabel(String label) {
         return label.equals("EMPLOYEE CODE")
                 || label.equals("EMPLOYEE ID")
@@ -627,14 +623,6 @@ public class AttendanceImportService {
                 || label.equals("NAME")
                 || label.equals("HO VA TEN")
                 || label.equals("HO TEN");
-    }
-
-    private boolean isTimestampLabel(String label) {
-        return label.equals("TIMESTAMP")
-                || label.equals("PUNCH TIME")
-                || label.equals("TIME")
-                || label.equals("GIO")
-                || label.equals("THOI GIAN");
     }
 
     private YearMonth parseMonthYear(String text) {

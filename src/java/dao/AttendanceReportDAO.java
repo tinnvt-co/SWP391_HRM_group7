@@ -397,13 +397,40 @@ public class AttendanceReportDAO {
     }
 
     public boolean hasHrManagerApprovedMonth(int year, int month) throws SQLException {
-        String sql =
+        return hasHrManagerApprovedMonth(year, month, null);
+    }
+
+    public boolean hasHrManagerApprovedMonth(int year, int month,
+                                             Integer departmentId) throws SQLException {
+        StringBuilder sql = new StringBuilder(
             "SELECT 1 "
           + "FROM attendance_reports "
           + "WHERE report_year=? AND report_month=? "
-          + "  AND status='Approved By HR Manager' "
-          + "LIMIT 1";
+          + "  AND status='Approved By HR Manager' ");
+        if (departmentId != null) sql.append("AND department_id=? ");
+        sql.append("LIMIT 1");
 
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            ps.setInt(1, year);
+            ps.setInt(2, month);
+            if (departmentId != null) ps.setInt(3, departmentId);
+            rs = ps.executeQuery();
+            return rs.next();
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public boolean hasHrManagerApprovedMonthForManager(int year, int month,
+                                                        int managerUserId) throws SQLException {
+        String sql = "SELECT 1 FROM attendance_reports "
+                   + "WHERE report_year=? AND report_month=? "
+                   + "AND manager_id=? AND status='Approved By HR Manager' LIMIT 1";
         Connection conn = null;
         PreparedStatement ps = null;
         ResultSet rs = null;
@@ -412,6 +439,7 @@ public class AttendanceReportDAO {
             ps = conn.prepareStatement(sql);
             ps.setInt(1, year);
             ps.setInt(2, month);
+            ps.setInt(3, managerUserId);
             rs = ps.executeQuery();
             return rs.next();
         } finally {

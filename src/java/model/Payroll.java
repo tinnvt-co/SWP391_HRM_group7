@@ -164,6 +164,13 @@ public class Payroll {
     public BigDecimal getNetSalary()                { return netSalary; }
     public void setNetSalary(BigDecimal v)          { this.netSalary = v; }
 
+    public BigDecimal getTotalReceived() {
+        BigDecimal companyPaid = netSalary == null ? BigDecimal.ZERO : netSalary;
+        BigDecimal insurancePaid = socialInsuranceBenefit == null
+                ? BigDecimal.ZERO : socialInsuranceBenefit;
+        return companyPaid.add(insurancePaid);
+    }
+
     public BigDecimal getMaternityLeaveDays()       { return maternityLeaveDays; }
     public void setMaternityLeaveDays(BigDecimal v) { this.maternityLeaveDays = v; }
 

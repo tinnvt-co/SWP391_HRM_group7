@@ -184,7 +184,7 @@ public class AttendanceServlet extends HttpServlet {
         attachPayrollTaskSummary(request, roleName);
 
         if (managerScope) {
-            // Manager: show employee cards of their team
+            // Manager: show their department, including the manager's own attendance.
             List<AttendanceRecordDAO.EmployeeAttSummary> cards =
                     attendanceDAO.summaryByManager(currentUser.getUserId(), monthStart, monthEnd);
             request.setAttribute("employeeCards", cards);
@@ -287,90 +287,156 @@ public class AttendanceServlet extends HttpServlet {
     }
 
     /**
-     * Import a monthly attendance sheet (.xlsx) uploaded by HR Staff.
-     * HR Staff imports the ALL-department sheet; every employee code found in
-     * the system is accepted. Records start as Pending.
+     * Import a monthly attendance workbook uploaded by HR Staff.
+     * Only the "Attendance Detail" sheet is used; reference/summary sheets are ignored.
+     * Records start as Pending Manager Confirmation.
      */
     private void handleImport(HttpServletRequest request, HttpServletResponse response)
-            throws SQLException, ServletException, IOException {
+            throws IOException {
 
         User currentUser = getCurrentUser(request);
         HttpSession session = request.getSession(true);
         String ctx = request.getContextPath();
 
-        YearMonth target = parseYearMonth(request.getParameter("year"), request.getParameter("month"));
-        if (target == null) target = YearMonth.now();
+        YearMonth target = YearMonth.now();
 
-        Part filePart = request.getPart("sheet");
-        if (filePart == null || filePart.getSize() == 0) {
-            session.setAttribute("importError", "Please choose a file to import.");
-            response.sendRedirect(ctx + "/attendance");
-            return;
-        }
-        String fileName = filePart.getSubmittedFileName();
-        if (fileName == null || !fileName.toLowerCase().endsWith(".xlsx")) {
-            session.setAttribute("importError", "Only .xlsx files are accepted.");
-            response.sendRedirect(ctx + "/attendance");
-            return;
-        }
+        try {
+            YearMonth requestedTarget = parseYearMonth(
+                    request.getParameter("year"), request.getParameter("month"));
+            if (requestedTarget != null) target = requestedTarget;
 
-        if (reportDAO.isMonthLockedForImport(target.getYear(), target.getMonthValue())) {
-            session.setAttribute("importError",
-                    "Attendance for " + monthLabel(target)
-                            + " has already been submitted for approval and is locked. "
-                            + "You cannot import this period again.");
-            response.sendRedirect(ctx + "/attendance?year=" + target.getYear()
-                    + "&month=" + target.getMonthValue());
-            return;
-        }
+            if (currentUser == null) {
+                handleImportFailure(session, response, ctx, target,
+                        "Your session has expired. Please sign in and import again.");
+                return;
+            }
 
-        // HR Staff can import for active attendance employees. IT is excluded from payroll attendance.
-        List<Employee> allEmps = employeeDAO.findAttendanceActive();
-        if (allEmps.isEmpty()) {
-            session.setAttribute("importError",
-                    "No active employees found in the system.");
-            response.sendRedirect(ctx + "/attendance");
-            return;
-        }
+            Part filePart = request.getPart("sheet");
+            if (filePart == null || filePart.getSize() == 0) {
+                handleImportFailure(session, response, ctx, target,
+                        "Please choose a .xlsx attendance file.");
+                return;
+            }
+            String fileName = filePart.getSubmittedFileName();
+            if (fileName == null || !fileName.toLowerCase().endsWith(".xlsx")) {
+                handleImportFailure(session, response, ctx, target,
+                        "Only .xlsx files are accepted.");
+                return;
+            }
 
-        AttendanceImportService.Result result;
-        try (InputStream in = filePart.getInputStream()) {
-            java.util.List<XlsxReader.Sheet> sheets = XlsxReader.readAllSheets(in);
-            AttendanceImportService importer = new AttendanceImportService();
-            result = importer.importAllSheets(sheets, allEmps, target,
-                    currentUser.getUserId(), /*overwrite*/ false);
+            if (reportDAO.isMonthLockedForImport(target.getYear(), target.getMonthValue())) {
+                handleImportFailure(session, response, ctx, target,
+                        "Attendance for " + monthLabel(target)
+                                + " has already been submitted for approval and is locked. "
+                                + "You cannot import this period again.");
+                return;
+            }
+
+            List<Employee> allEmps = employeeDAO.findAttendanceActive();
+            if (allEmps.isEmpty()) {
+                handleImportFailure(session, response, ctx, target,
+                        "No active attendance employees were found in the system.");
+                return;
+            }
+
+            AttendanceImportService.Result result;
+            try (InputStream in = filePart.getInputStream()) {
+                java.util.List<XlsxReader.Sheet> sheets = XlsxReader.readAllSheets(in);
+                AttendanceImportService importer = new AttendanceImportService();
+                result = importer.importAllSheets(sheets, allEmps, target,
+                        currentUser.getUserId(), /*overwrite*/ false);
+            }
+
+            if (result.hasErrors()) {
+                handleImportFailure(session, response, ctx, target,
+                        importValidationMessage(result));
+                return;
+            }
+
+            session.setAttribute("importMessage", importSuccessMessage(target, result));
+            response.sendRedirect(importRedirect(ctx, target));
+        } catch (IllegalStateException ex) {
+            handleImportException(session, response, ctx, target,
+                    "The uploaded file is too large. Please use a .xlsx file under 10 MB.", ex);
+        } catch (ServletException ex) {
+            handleImportException(session, response, ctx, target,
+                    "The uploaded form could not be parsed.", ex);
         } catch (IOException ex) {
-            session.setAttribute("importError",
-                    "Could not read the Excel file: " + ex.getMessage());
-            response.sendRedirect(ctx + "/attendance");
-            return;
+            handleImportException(session, response, ctx, target,
+                    "The Excel file could not be read.", ex);
+        } catch (SQLException ex) {
+            handleImportException(session, response, ctx, target,
+                    "The attendance data could not be saved to the database.", ex);
+        } catch (RuntimeException ex) {
+            handleImportException(session, response, ctx, target,
+                    "An unexpected import error occurred.", ex);
         }
+    }
 
+    private String importSuccessMessage(YearMonth target, AttendanceImportService.Result result) {
         StringBuilder msg = new StringBuilder();
         msg.append("Import ").append(target.getMonthValue()).append("/").append(target.getYear())
            .append(": added ").append(result.inserted).append(" record(s)");
-        if (result.skippedExisting > 0)
+        if (result.skippedExisting > 0) {
             msg.append(", skipped ").append(result.skippedExisting).append(" existing record(s)");
+        }
         msg.append(".");
+        appendWarnings(msg, result);
+        return msg.toString();
+    }
+
+    private String importValidationMessage(AttendanceImportService.Result result) {
+        StringBuilder msg = new StringBuilder("Validation failed: ");
+        appendLimitedMessages(msg, result.errors, 5);
+        appendWarnings(msg, result);
+        return msg.toString();
+    }
+
+    private void appendWarnings(StringBuilder msg, AttendanceImportService.Result result) {
         if (!result.warnings.isEmpty()) {
             msg.append(" Warnings: ");
-            int showWarnings = Math.min(3, result.warnings.size());
-            for (int i = 0; i < showWarnings; i++) msg.append(result.warnings.get(i)).append(" ");
-            if (result.warnings.size() > showWarnings)
-                msg.append("(+").append(result.warnings.size() - showWarnings).append(" more)");
+            appendLimitedMessages(msg, result.warnings, 3);
         }
+    }
 
-        if (result.hasErrors()) {
-            StringBuilder err = new StringBuilder(msg).append(" Errors: ");
-            int show = Math.min(5, result.errors.size());
-            for (int i = 0; i < show; i++) err.append(result.errors.get(i)).append(" ");
-            if (result.errors.size() > show)
-                err.append("(+").append(result.errors.size() - show).append(" more)");
-            session.setAttribute("importError", err.toString());
-        } else {
-            session.setAttribute("importMessage", msg.toString());
+    private void appendLimitedMessages(StringBuilder msg, List<String> messages, int limit) {
+        int show = Math.min(limit, messages.size());
+        for (int i = 0; i < show; i++) {
+            if (i > 0) msg.append(" ");
+            msg.append(messages.get(i));
         }
-        response.sendRedirect(ctx + "/attendance");
+        if (messages.size() > show) {
+            msg.append(" (+").append(messages.size() - show).append(" more)");
+        }
+    }
+
+    private void handleImportException(HttpSession session, HttpServletResponse response,
+                                       String ctx, YearMonth target, String userMessage,
+                                       Exception ex) throws IOException {
+        log("Attendance import failed for " + target + ": " + userMessage, ex);
+        String detail = rootCauseMessage(ex);
+        handleImportFailure(session, response, ctx, target,
+                detail.isBlank() ? userMessage : userMessage + " Reason: " + detail);
+    }
+
+    private void handleImportFailure(HttpSession session, HttpServletResponse response,
+                                     String ctx, YearMonth target, String reason)
+            throws IOException {
+        session.setAttribute("importError", "Import failed for "
+                + monthLabel(target) + ". " + reason);
+        response.sendRedirect(importRedirect(ctx, target));
+    }
+
+    private String importRedirect(String ctx, YearMonth target) {
+        return ctx + "/attendance?year=" + target.getYear()
+                + "&month=" + target.getMonthValue();
+    }
+
+    private String rootCauseMessage(Throwable ex) {
+        Throwable cur = ex;
+        while (cur.getCause() != null) cur = cur.getCause();
+        String msg = cur.getMessage();
+        return msg == null ? cur.getClass().getSimpleName() : msg.trim();
     }
 
     private void handleEditForm(HttpServletRequest request, HttpServletResponse response)
@@ -504,9 +570,8 @@ public class AttendanceServlet extends HttpServlet {
     }
 
     /**
-     * "Confirm Attendance": a manager bulk-verifies every Pending record of
-     * their team for the selected month, then builds one monthly report per
-     * employee for HR Staff review. HR Staff submits those reports to HR Manager.
+     * A manager confirms every Pending employee record in their department,
+     * including their own attendance, and prepares monthly reports for HR Staff.
      */
     private void handleConfirmToHr(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, IOException {
@@ -517,7 +582,7 @@ public class AttendanceServlet extends HttpServlet {
 
         String roleName = currentUser.getRole() != null ? currentUser.getRole().getRoleName() : "";
         if (!"MANAGER".equalsIgnoreCase(roleName)) {
-            session.setAttribute("importError", "Only managers can send attendance to HR Staff.");
+            session.setAttribute("importError", "Only department managers can confirm this attendance.");
             response.sendRedirect(ctx + "/attendance");
             return;
         }
@@ -527,16 +592,17 @@ public class AttendanceServlet extends HttpServlet {
         LocalDate monthStart = month.atDay(1);
         LocalDate monthEnd = month.atEndOfMonth();
 
-        if (reportDAO.hasHrManagerApprovedMonth(month.getYear(), month.getMonthValue())) {
+        int mgrId = currentUser.getUserId();
+        if (reportDAO.hasHrManagerApprovedMonthForManager(
+                month.getYear(), month.getMonthValue(), mgrId)) {
             session.setAttribute("importError",
                     "Attendance for " + monthLabel(month)
-                            + " has already been approved by HR Manager and is closed.");
+                            + " for your department has already been approved by HR Manager and is closed.");
             response.sendRedirect(ctx + "/attendance?year=" + month.getYear()
                     + "&month=" + month.getMonthValue());
             return;
         }
 
-        int mgrId = currentUser.getUserId();
         int pending = attendanceDAO.countPendingByManager(mgrId, monthStart, monthEnd);
         if (pending <= 0) {
             session.setAttribute("importError",
@@ -549,7 +615,7 @@ public class AttendanceServlet extends HttpServlet {
         // 1) Verify any still-pending records for the selected month.
         attendanceDAO.verifyAllPendingByManager(mgrId, mgrId, monthStart, monthEnd);
 
-        // 2) Aggregate the selected month and submit one report per employee.
+        // 2) Aggregate the selected month for employees and the manager.
         List<AttendanceRecordDAO.MonthlySummary> summaries =
                 attendanceDAO.aggregateMonthByManager(mgrId, month.getYear(), month.getMonthValue());
 
@@ -578,7 +644,7 @@ public class AttendanceServlet extends HttpServlet {
         }
 
         session.setAttribute("importMessage",
-                "Manager confirmed " + reports + " attendance report(s) for "
+                "Manager confirmed " + reports + " department attendance report(s) for "
                         + monthLabel(month) + ". HR Staff can now submit them to HR Manager.");
         response.sendRedirect(ctx + "/attendance");
     }
@@ -609,8 +675,11 @@ public class AttendanceServlet extends HttpServlet {
         User currentUser = getCurrentUser(request);
         boolean ownsThis = existing.getEmployeeManagerUserId() != null
                 && existing.getEmployeeManagerUserId() == currentUser.getUserId();
+        Employee attendanceEmployee = employeeDAO.findById(existing.getEmployeeId());
+        boolean isOwnAttendance = attendanceEmployee != null
+                && attendanceEmployee.getUserId() == currentUser.getUserId();
 
-        if (!ownsThis) {
+        if (!ownsThis && !isOwnAttendance) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN);
             return null;
         }

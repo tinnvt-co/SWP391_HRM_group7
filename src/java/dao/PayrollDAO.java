@@ -190,6 +190,22 @@ public class PayrollDAO {
         }
     }
 
+    public boolean existsByAttendanceReportId(int attendanceReportId) throws SQLException {
+        String sql = "SELECT 1 FROM payrolls WHERE attendance_report_id=? LIMIT 1";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, attendanceReportId);
+            rs = ps.executeQuery();
+            return rs.next();
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
     public BigDecimal sumNetSalaryByDepartmentMonth(int departmentId, int year, int month)
             throws SQLException {
         String sql = "SELECT COALESCE(SUM(p.net_salary), 0) "

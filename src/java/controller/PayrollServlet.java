@@ -25,6 +25,8 @@ import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.YearMonth;
 import java.time.format.TextStyle;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -63,13 +65,11 @@ public class PayrollServlet extends HttpServlet {
         try {
             switch (action) {
                 case "approval" -> {
-                    if (!hasRole(request, "HR_MANAGER")
-                            || !hasPerm(request, "APPROVE_REJECT_PAYROLL")) { forbid(response); return; }
+                    if (!hasPerm(request, "APPROVE_REJECT_PAYROLL")) { forbid(response); return; }
                     handleApprovalList(request, response);
                 }
                 default -> {
-                    if (!hasRole(request, "HR_STAFF")
-                            || !hasPerm(request, "VIEW_PAYROLL")) { forbid(response); return; }
+                    if (!hasPerm(request, "VIEW_PAYROLL")) { forbid(response); return; }
                     handleList(request, response);
                 }
             }
@@ -86,28 +86,23 @@ public class PayrollServlet extends HttpServlet {
         try {
             switch (action) {
                 case "generate" -> {
-                    if (!hasRole(request, "HR_STAFF")
-                            || !hasPerm(request, "GENERATE_PAYROLL")) { forbid(response); return; }
+                    if (!hasPerm(request, "GENERATE_PAYROLL")) { forbid(response); return; }
                     handleGenerate(request, response);
                 }
                 case "submit" -> {
-                    if (!hasRole(request, "HR_STAFF")
-                            || !hasPerm(request, "SUBMIT_PAYROLL_FOR_APPROVAL")) { forbid(response); return; }
+                    if (!hasPerm(request, "SUBMIT_PAYROLL_FOR_APPROVAL")) { forbid(response); return; }
                     handleSubmit(request, response);
                 }
                 case "approve" -> {
-                    if (!hasRole(request, "HR_MANAGER")
-                            || !hasPerm(request, "APPROVE_REJECT_PAYROLL")) { forbid(response); return; }
+                    if (!hasPerm(request, "APPROVE_REJECT_PAYROLL")) { forbid(response); return; }
                     handleApprove(request, response);
                 }
                 case "reject" -> {
-                    if (!hasRole(request, "HR_MANAGER")
-                            || !hasPerm(request, "APPROVE_REJECT_PAYROLL")) { forbid(response); return; }
+                    if (!hasPerm(request, "APPROVE_REJECT_PAYROLL")) { forbid(response); return; }
                     handleReject(request, response);
                 }
                 case "confirmPayment" -> {
-                    if (!hasRole(request, "HR_STAFF")
-                            || !hasPerm(request, "GENERATE_PAYROLL")) { forbid(response); return; }
+                    if (!hasPerm(request, "GENERATE_PAYROLL")) { forbid(response); return; }
                     handleConfirmPayment(request, response);
                 }
                 default -> response.sendRedirect(request.getContextPath() + "/payroll");
@@ -128,30 +123,50 @@ public class PayrollServlet extends HttpServlet {
         int month = parseIntOr(request.getParameter("month"), now.getMonthValue());
         if (month < 1 || month > 12) month = now.getMonthValue();
         List<Department> departments = departmentDAO.findAttendanceDepartments();
-        PayrollPeriod period = null;
+        Department selectedDept = resolveDepartment(departments, parseIntOrNull(request.getParameter("deptId")));
+        Integer selectedDeptId = selectedDept == null ? null : selectedDept.getDepartmentId();
+        PayrollPeriod period = selectedDeptId == null
+                ? null
+                : periodDAO.findByMonthAndDepartment(year, month, selectedDeptId);
 
-        int totalPayrolls = payrollDAO.countByMonth(year, month);
+        int totalPayrolls = period == null
+                ? 0
+                : payrollDAO.countByDepartmentMonth(selectedDeptId, year, month);
         int totalPages = Math.max(1, (int) Math.ceil(totalPayrolls / (double) PAGE_SIZE));
         int page = parsePageParam(request.getParameter("page"), totalPages);
         int offset = (page - 1) * PAGE_SIZE;
-        List<Payroll> payrolls = payrollDAO.findByMonthPage(year, month, offset, PAGE_SIZE);
-        BigDecimal monthlySalaryTotal = payrollDAO.sumNetSalaryByMonth(year, month);
-        BigDecimal yearlySalaryTotal = payrollDAO.sumNetSalaryByYear(year);
+        List<Payroll> payrolls = period == null
+                ? Collections.emptyList()
+                : payrollDAO.findByDepartmentMonthPage(selectedDeptId, year, month, offset, PAGE_SIZE);
+        BigDecimal monthlySalaryTotal = selectedDeptId == null
+                ? BigDecimal.ZERO
+                : payrollDAO.sumNetSalaryByDepartmentMonth(selectedDeptId, year, month);
+        BigDecimal yearlySalaryTotal = selectedDeptId == null
+                ? BigDecimal.ZERO
+                : payrollDAO.sumNetSalaryByDepartmentYear(selectedDeptId, year);
         PayrollTaskSummary payrollTaskSummary = periodDAO.findHrStaffTaskSummary();
 
-        boolean hasReports = hasReadyPayrollReports(year, month, departments);
-        int submittablePayrollBatchCount = periodDAO.findByMonthAndStatuses(year, month,
-                PayrollPeriod.Status.Draft, PayrollPeriod.Status.Rejected).size();
-        int payablePayrollBatchCount = periodDAO.findByMonthAndStatuses(year, month,
-                PayrollPeriod.Status.Approved).size();
+        boolean hasReports = selectedDeptId != null
+                && hasGeneratablePayrollReports(year, month, selectedDeptId, period);
+        int submittablePayrollBatchCount = period != null
+                && (period.getStatus() == PayrollPeriod.Status.Draft
+                    || period.getStatus() == PayrollPeriod.Status.Rejected) ? 1 : 0;
+        int payablePayrollBatchCount = period != null
+                && period.getStatus() == PayrollPeriod.Status.Approved ? 1 : 0;
+        boolean rejectedPeriod = period != null
+                && period.getStatus() == PayrollPeriod.Status.Rejected;
 
         request.setAttribute("period", period);
         request.setAttribute("payrolls", payrolls);
-        request.setAttribute("selectedDeptName", "All departments");
-        request.setAttribute("allDepartmentsScope", true);
+        request.setAttribute("departments", departments);
+        request.setAttribute("selectedDeptId", selectedDeptId);
+        request.setAttribute("selectedDeptName",
+                selectedDept == null ? null : selectedDept.getDepartmentName());
+        request.setAttribute("allDepartmentsScope", false);
         request.setAttribute("hasReports", hasReports);
         request.setAttribute("submittablePayrollBatchCount", submittablePayrollBatchCount);
         request.setAttribute("payablePayrollBatchCount", payablePayrollBatchCount);
+        request.setAttribute("rejectedPeriod", rejectedPeriod);
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalPayrolls", totalPayrolls);
@@ -178,104 +193,89 @@ public class PayrollServlet extends HttpServlet {
         int year  = parseIntOr(request.getParameter("year"),  now.getYear());
         int month = parseIntOr(request.getParameter("month"), now.getMonthValue());
         List<Department> departments = departmentDAO.findAttendanceDepartments();
+        Department dept = resolveDepartment(departments, parseIntOrNull(request.getParameter("deptId")));
         StringBuilder skipped = new StringBuilder();
 
-        int employeesGenerated = 0;
-        int periodsGenerated = 0;
-        for (Department dept : departments) {
-            int deptId = dept.getDepartmentId();
-            List<AttendanceReport> reports =
-                    reportDAO.findApprovedForPayrollByMonth(year, month, deptId);
-            if (reports.isEmpty()) {
-                continue;
-            }
-            PayrollPeriod existing = periodDAO.findByMonthAndDepartment(year, month, deptId);
-            int created = syncPayrollForDepartment(user, year, month, dept, existing, reports, skipped);
-            if (created > 0) {
-                employeesGenerated += created;
-                periodsGenerated++;
-            }
+        if (dept == null) {
+            flashError(session, "Please select a department before calculating payroll.");
+            response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month);
+            return;
+        }
+
+        int deptId = dept.getDepartmentId();
+        PayrollPeriod existingPeriod = periodDAO.findByMonthAndDepartment(year, month, deptId);
+        if (existingPeriod != null && !canAppendPayroll(existingPeriod)) {
+            flashError(session, "Payroll for this department and month has already been submitted, approved, or paid.");
+            response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month + "&deptId=" + deptId);
+            return;
+        }
+
+        List<AttendanceReport> reports = findReportsWithoutPayroll(year, month, deptId);
+        if (reports.isEmpty()) {
+            flashError(session,
+                    "No HR Manager-approved attendance reports are waiting for payroll generation.");
+            response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month + "&deptId=" + deptId);
+            return;
+        }
+
+        int employeesGenerated = existingPeriod == null
+                ? createPayrollForDepartment(user, year, month, dept, reports, skipped)
+                : appendPayrollLines(existingPeriod.getPayrollPeriodId(), reports, skipped);
+        if (existingPeriod != null && existingPeriod.getStatus() == PayrollPeriod.Status.Rejected) {
+            payrollDAO.updateStatusByPeriod(existingPeriod.getPayrollPeriodId(), Payroll.Status.Rejected);
         }
         if (employeesGenerated > 0) {
-            String msg = "Generated payroll for " + monthLabel(year, month) + ": "
-                    + employeesGenerated + " employee(s), " + periodsGenerated + " department(s).";
+            String actionLabel = existingPeriod == null ? "Generated payroll" : "Added payroll";
+            String msg = actionLabel + " for " + dept.getDepartmentName() + " - "
+                    + monthLabel(year, month) + ": " + employeesGenerated + " employee(s).";
             if (skipped.length() > 0) msg += " Skipped: " + skipped;
             flashMessage(session, msg);
         } else {
-            flashError(session,
-                    "No HR Manager-approved attendance reports are waiting for payroll generation.");
+            String msg = "No payroll was generated.";
+            if (skipped.length() > 0) msg += " Skipped: " + skipped;
+            flashError(session, msg);
         }
-        response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month);
+        response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month + "&deptId=" + deptId);
     }
 
-    private int syncPayrollForDepartment(User user, int year, int month, Department dept,
-                                         PayrollPeriod existingPeriod,
-                                         List<AttendanceReport> reports, StringBuilder skipped)
+    private int createPayrollForDepartment(User user, int year, int month, Department dept,
+                                           List<AttendanceReport> reports, StringBuilder skipped)
             throws SQLException {
-        int periodId;
-        Payroll.Status lineStatus = Payroll.Status.Draft;
-        if (existingPeriod == null) {
-            PayrollPeriod p = new PayrollPeriod();
-            p.setPeriodName("Payroll " + monthLabel(year, month) + " - " + dept.getDepartmentName());
-            p.setPayrollMonth(month);
-            p.setPayrollYear(year);
-            p.setDepartmentId(dept.getDepartmentId());
-            p.setCreatedBy(user.getUserId());
-            periodId = periodDAO.createDraft(p);
-            if (periodId < 0) {
-                return -1;
-            }
-        } else {
-            if (existingPeriod.getStatus() == PayrollPeriod.Status.Cancelled) {
-                return 0;
-            }
-            periodId = existingPeriod.getPayrollPeriodId();
-            lineStatus = payrollStatusFor(existingPeriod.getStatus());
+        PayrollPeriod p = new PayrollPeriod();
+        p.setPeriodName("Payroll " + monthLabel(year, month) + " - " + dept.getDepartmentName());
+        p.setPayrollMonth(month);
+        p.setPayrollYear(year);
+        p.setDepartmentId(dept.getDepartmentId());
+        p.setCreatedBy(user.getUserId());
+        int periodId = periodDAO.createDraft(p);
+        if (periodId < 0) {
+            return -1;
         }
 
+        int created = appendPayrollLines(periodId, reports, skipped);
+        if (created == 0) {
+            periodDAO.deleteIfEmpty(periodId);
+        }
+        return created;
+    }
+
+    private int appendPayrollLines(int periodId, List<AttendanceReport> reports, StringBuilder skipped)
+            throws SQLException {
         int created = 0;
         for (AttendanceReport r : reports) {
-            if (payrollDAO.existsByPeriodAndEmployee(periodId, r.getEmployeeId())) {
+            if (r.getAttendanceReportId() > 0
+                    && payrollDAO.existsByAttendanceReportId(r.getAttendanceReportId())) {
                 continue;
             }
             PayrollCalculationService.BuildResult res = calc.build(periodId, r);
             if (res.payroll != null) {
-                int payrollId = payrollDAO.insert(res.payroll);
-                if (payrollId > 0 && lineStatus != Payroll.Status.Draft) {
-                    payrollDAO.updateStatusById(payrollId, lineStatus);
-                }
+                payrollDAO.insert(res.payroll);
                 created++;
             } else {
                 skipped.append(res.skipReason).append("; ");
             }
         }
         return created;
-    }
-
-    private int syncMissingPayrollLines(User user, int year, int month,
-                                        List<PayrollPeriod> periods, StringBuilder skipped)
-            throws SQLException {
-        int created = 0;
-        for (PayrollPeriod period : periods) {
-            Department dept = departmentDAO.findById(period.getDepartmentId());
-            if (dept == null) continue;
-            List<AttendanceReport> reports = reportDAO.findApprovedForPayrollByMonth(
-                    year, month, period.getDepartmentId());
-            created += syncPayrollForDepartment(user, year, month, dept, period, reports, skipped);
-        }
-        return created;
-    }
-
-    private Payroll.Status payrollStatusFor(PayrollPeriod.Status status) {
-        if (status == null) return Payroll.Status.Draft;
-        return switch (status) {
-            case PendingApproval -> Payroll.Status.PendingApproval;
-            case Approved -> Payroll.Status.Approved;
-            case Rejected -> Payroll.Status.Rejected;
-            case Paid -> Payroll.Status.Paid;
-            case Cancelled -> Payroll.Status.Cancelled;
-            default -> Payroll.Status.Draft;
-        };
     }
 
     // ---------- HR Staff: submit / confirm payment ----------
@@ -288,16 +288,22 @@ public class PayrollServlet extends HttpServlet {
         if (periodId <= 0) {
             int year = parseIntOr(request.getParameter("year"), YearMonth.now().getYear());
             int month = parseIntOr(request.getParameter("month"), YearMonth.now().getMonthValue());
-            List<PayrollPeriod> submittablePeriods = periodDAO.findByMonthAndStatuses(year, month,
-                    PayrollPeriod.Status.Draft, PayrollPeriod.Status.Rejected);
-            int updated = updatePayrollPeriods(submittablePeriods, PayrollPeriod.Status.PendingApproval,
-                    Payroll.Status.PendingApproval, null, null);
-            if (updated > 0) {
+            Integer deptId = parseIntOrNull(request.getParameter("deptId"));
+            PayrollPeriod selected = deptId == null
+                    ? null
+                    : periodDAO.findByMonthAndDepartment(year, month, deptId);
+            if (selected != null
+                    && (selected.getStatus() == PayrollPeriod.Status.Draft
+                        || selected.getStatus() == PayrollPeriod.Status.Rejected)) {
+                periodDAO.updateStatus(selected.getPayrollPeriodId(),
+                        PayrollPeriod.Status.PendingApproval, null, null);
+                payrollDAO.updateStatusByPeriod(selected.getPayrollPeriodId(), Payroll.Status.PendingApproval);
                 flashMessage(session, "Payroll submitted to HR Manager for approval.");
             } else {
-                flashError(session, "No Draft or Rejected payroll is ready to submit.");
+                flashError(session, "No Draft or Rejected payroll is ready to submit for this department.");
             }
-            response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month);
+            response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month
+                    + (deptId == null ? "" : "&deptId=" + deptId));
             return;
         }
 
@@ -326,17 +332,20 @@ public class PayrollServlet extends HttpServlet {
         if (periodId <= 0) {
             int year = parseIntOr(request.getParameter("year"), YearMonth.now().getYear());
             int month = parseIntOr(request.getParameter("month"), YearMonth.now().getMonthValue());
-            List<PayrollPeriod> payablePeriods = periodDAO.findByMonthAndStatuses(year, month,
-                    PayrollPeriod.Status.Approved);
-            syncMissingPayrollLines(user, year, month, payablePeriods, new StringBuilder());
-            int updated = updatePayrollPeriods(payablePeriods, PayrollPeriod.Status.Paid,
-                    Payroll.Status.Paid, user.getUserId(), null);
-            if (updated > 0) {
+            Integer deptId = parseIntOrNull(request.getParameter("deptId"));
+            PayrollPeriod selected = deptId == null
+                    ? null
+                    : periodDAO.findByMonthAndDepartment(year, month, deptId);
+            if (selected != null && selected.getStatus() == PayrollPeriod.Status.Approved) {
+                periodDAO.updateStatus(selected.getPayrollPeriodId(),
+                        PayrollPeriod.Status.Paid, user.getUserId(), null);
+                payrollDAO.updateStatusByPeriod(selected.getPayrollPeriodId(), Payroll.Status.Paid);
                 flashMessage(session, "Payment confirmed for payroll.");
             } else {
-                flashError(session, "No Approved payroll is ready for payment confirmation.");
+                flashError(session, "No Approved payroll is ready for payment confirmation in this department.");
             }
-            response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month);
+            response.sendRedirect(ctx + "/payroll?year=" + year + "&month=" + month
+                    + (deptId == null ? "" : "&deptId=" + deptId));
             return;
         }
 
@@ -348,8 +357,6 @@ public class PayrollServlet extends HttpServlet {
             response.sendRedirect(redirectTo(ctx, period));
             return;
         }
-        syncMissingPayrollLines(user, period.getPayrollYear(), period.getPayrollMonth(),
-                java.util.List.of(period), new StringBuilder());
         periodDAO.updateStatus(period.getPayrollPeriodId(),
                 PayrollPeriod.Status.Paid, user.getUserId(), null);
         payrollDAO.updateStatusByPeriod(period.getPayrollPeriodId(), Payroll.Status.Paid);
@@ -365,27 +372,39 @@ public class PayrollServlet extends HttpServlet {
         int year  = parseIntOr(request.getParameter("year"),  now.getYear());
         int month = parseIntOr(request.getParameter("month"), now.getMonthValue());
         if (month < 1 || month > 12) month = now.getMonthValue();
-        PayrollPeriod period = null;
+        List<Department> departments = departmentDAO.findAttendanceDepartments();
+        Department selectedDept = resolveDepartment(departments, parseIntOrNull(request.getParameter("deptId")));
+        Integer selectedDeptId = selectedDept == null ? null : selectedDept.getDepartmentId();
+        PayrollPeriod period = selectedDeptId == null
+                ? null
+                : periodDAO.findByMonthAndDepartment(year, month, selectedDeptId);
 
-        int totalPayrolls = payrollDAO.countByMonthAndStatuses(year, month, Payroll.Status.PendingApproval);
+        int totalPayrolls = period == null
+                ? 0
+                : payrollDAO.countByDepartmentMonth(selectedDeptId, year, month);
         int totalPages = Math.max(1, (int) Math.ceil(totalPayrolls / (double) PAGE_SIZE));
         int page = parsePageParam(request.getParameter("page"), totalPages);
         int offset = (page - 1) * PAGE_SIZE;
-        List<Payroll> payrolls = payrollDAO.findByMonthPageAndStatuses(year, month, offset, PAGE_SIZE,
-                Payroll.Status.PendingApproval);
-        BigDecimal monthlySalaryTotal = payrollDAO.sumNetSalaryByMonthAndStatuses(year, month,
-                Payroll.Status.PendingApproval);
-        BigDecimal yearlySalaryTotal = payrollDAO.sumNetSalaryByYearAndStatuses(year,
-                Payroll.Status.PendingApproval);
+        List<Payroll> payrolls = period == null
+                ? Collections.emptyList()
+                : payrollDAO.findByDepartmentMonthPage(selectedDeptId, year, month, offset, PAGE_SIZE);
+        BigDecimal monthlySalaryTotal = selectedDeptId == null
+                ? BigDecimal.ZERO
+                : payrollDAO.sumNetSalaryByDepartmentMonth(selectedDeptId, year, month);
+        BigDecimal yearlySalaryTotal = selectedDeptId == null
+                ? BigDecimal.ZERO
+                : payrollDAO.sumNetSalaryByDepartmentYear(selectedDeptId, year);
         PayrollTaskSummary payrollTaskSummary = periodDAO.findHrManagerTaskSummary();
-        int pendingApprovalBatchCount = periodDAO
-                .findByMonthAndStatuses(year, month, PayrollPeriod.Status.PendingApproval)
-                .size();
+        int pendingApprovalBatchCount = period != null
+                && period.getStatus() == PayrollPeriod.Status.PendingApproval ? 1 : 0;
 
         request.setAttribute("period", period);
         request.setAttribute("payrolls", payrolls);
-        request.setAttribute("selectedDeptName", "All departments");
-        request.setAttribute("allDepartmentsScope", true);
+        request.setAttribute("departments", departments);
+        request.setAttribute("selectedDeptId", selectedDeptId);
+        request.setAttribute("selectedDeptName",
+                selectedDept == null ? null : selectedDept.getDepartmentName());
+        request.setAttribute("allDepartmentsScope", false);
         request.setAttribute("pendingApprovalBatchCount", pendingApprovalBatchCount);
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
@@ -410,16 +429,20 @@ public class PayrollServlet extends HttpServlet {
         if (periodId <= 0) {
             int year = parseIntOr(request.getParameter("year"), YearMonth.now().getYear());
             int month = parseIntOr(request.getParameter("month"), YearMonth.now().getMonthValue());
-            List<PayrollPeriod> pendingPeriods = periodDAO.findByMonthAndStatuses(year, month,
-                    PayrollPeriod.Status.PendingApproval);
-            int updated = updatePayrollPeriods(pendingPeriods, PayrollPeriod.Status.Approved,
-                    Payroll.Status.Approved, user.getUserId(), null);
-            if (updated > 0) {
+            Integer deptId = parseIntOrNull(request.getParameter("deptId"));
+            PayrollPeriod selected = deptId == null
+                    ? null
+                    : periodDAO.findByMonthAndDepartment(year, month, deptId);
+            if (selected != null && selected.getStatus() == PayrollPeriod.Status.PendingApproval) {
+                periodDAO.updateStatus(selected.getPayrollPeriodId(),
+                        PayrollPeriod.Status.Approved, user.getUserId(), null);
+                payrollDAO.updateStatusByPeriod(selected.getPayrollPeriodId(), Payroll.Status.Approved);
                 flashMessage(session, "Payroll approved.");
             } else {
-                flashError(session, "No Pending Approval payroll is ready to approve.");
+                flashError(session, "No Pending Approval payroll is ready to approve in this department.");
             }
-            response.sendRedirect(ctx + "/payroll?action=approval&year=" + year + "&month=" + month);
+            response.sendRedirect(ctx + "/payroll?action=approval&year=" + year + "&month=" + month
+                    + (deptId == null ? "" : "&deptId=" + deptId));
             return;
         }
 
@@ -445,25 +468,30 @@ public class PayrollServlet extends HttpServlet {
         String ctx = request.getContextPath();
         int year = parseIntOr(request.getParameter("year"), YearMonth.now().getYear());
         int month = parseIntOr(request.getParameter("month"), YearMonth.now().getMonthValue());
+        Integer deptId = parseIntOrNull(request.getParameter("deptId"));
         String reason = trim(request.getParameter("rejectReason"));
         if (reason.isEmpty()) {
             flashError(session, "A reject reason is required.");
-            response.sendRedirect(ctx + "/payroll?action=approval&year=" + year + "&month=" + month);
+            response.sendRedirect(ctx + "/payroll?action=approval&year=" + year + "&month=" + month
+                    + (deptId == null ? "" : "&deptId=" + deptId));
             return;
         }
 
         int periodId = parseIntOr(request.getParameter("periodId"), -1);
         if (periodId <= 0) {
-            List<PayrollPeriod> pendingPeriods = periodDAO.findByMonthAndStatuses(year, month,
-                    PayrollPeriod.Status.PendingApproval);
-            int updated = updatePayrollPeriods(pendingPeriods, PayrollPeriod.Status.Rejected,
-                    Payroll.Status.Rejected, user.getUserId(), reason);
-            if (updated > 0) {
+            PayrollPeriod selected = deptId == null
+                    ? null
+                    : periodDAO.findByMonthAndDepartment(year, month, deptId);
+            if (selected != null && selected.getStatus() == PayrollPeriod.Status.PendingApproval) {
+                periodDAO.updateStatus(selected.getPayrollPeriodId(),
+                        PayrollPeriod.Status.Rejected, user.getUserId(), reason);
+                payrollDAO.updateStatusByPeriod(selected.getPayrollPeriodId(), Payroll.Status.Rejected);
                 flashMessage(session, "Payroll rejected and sent back to HR Staff.");
             } else {
-                flashError(session, "No Pending Approval payroll is ready to reject.");
+                flashError(session, "No Pending Approval payroll is ready to reject in this department.");
             }
-            response.sendRedirect(ctx + "/payroll?action=approval&year=" + year + "&month=" + month);
+            response.sendRedirect(ctx + "/payroll?action=approval&year=" + year + "&month=" + month
+                    + (deptId == null ? "" : "&deptId=" + deptId));
             return;
         }
 
@@ -507,11 +535,25 @@ public class PayrollServlet extends HttpServlet {
 
     private String redirectTo(String ctx, PayrollPeriod p) {
         return ctx + "/payroll?year=" + p.getPayrollYear()
-                + "&month=" + p.getPayrollMonth();
+                + "&month=" + p.getPayrollMonth()
+                + "&deptId=" + p.getDepartmentId();
     }
     private String redirectApproval(String ctx, PayrollPeriod p) {
         return ctx + "/payroll?action=approval&year=" + p.getPayrollYear()
-                + "&month=" + p.getPayrollMonth();
+                + "&month=" + p.getPayrollMonth()
+                + "&deptId=" + p.getDepartmentId();
+    }
+
+    private Department resolveDepartment(List<Department> departments, Integer requestedDepartmentId) {
+        if (departments == null || departments.isEmpty()) return null;
+        if (requestedDepartmentId != null) {
+            for (Department dept : departments) {
+                if (dept.getDepartmentId() == requestedDepartmentId) {
+                    return dept;
+                }
+            }
+        }
+        return departments.get(0);
     }
 
     private boolean hasReadyPayrollReports(int year, int month, List<Department> departments)
@@ -519,12 +561,39 @@ public class PayrollServlet extends HttpServlet {
         if (departments == null) return false;
         for (Department dept : departments) {
             int deptId = dept.getDepartmentId();
-            if (periodDAO.findByMonthAndDepartment(year, month, deptId) == null
-                    && !reportDAO.findApprovedForPayrollByMonth(year, month, deptId).isEmpty()) {
+            PayrollPeriod period = periodDAO.findByMonthAndDepartment(year, month, deptId);
+            if (hasGeneratablePayrollReports(year, month, deptId, period)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private boolean hasGeneratablePayrollReports(int year, int month, int deptId,
+                                                 PayrollPeriod period) throws SQLException {
+        if (period != null && !canAppendPayroll(period)) {
+            return false;
+        }
+        return !findReportsWithoutPayroll(year, month, deptId).isEmpty();
+    }
+
+    private boolean canAppendPayroll(PayrollPeriod period) {
+        return period == null
+                || period.getStatus() == PayrollPeriod.Status.Draft
+                || period.getStatus() == PayrollPeriod.Status.Rejected;
+    }
+
+    private List<AttendanceReport> findReportsWithoutPayroll(int year, int month, int deptId)
+            throws SQLException {
+        List<AttendanceReport> reports = reportDAO.findApprovedForPayrollByMonth(year, month, deptId);
+        List<AttendanceReport> pending = new ArrayList<>();
+        for (AttendanceReport report : reports) {
+            if (report.getAttendanceReportId() <= 0
+                    || !payrollDAO.existsByAttendanceReportId(report.getAttendanceReportId())) {
+                pending.add(report);
+            }
+        }
+        return pending;
     }
 
     private String monthLabel(int year, int month) {
@@ -542,13 +611,6 @@ public class PayrollServlet extends HttpServlet {
         if (s == null) return false;
         List<?> perms = (List<?>) s.getAttribute("permissions");
         return perms != null && perms.contains(code);
-    }
-
-    private boolean hasRole(HttpServletRequest request, String roleName) {
-        User user = currentUser(request);
-        return user != null
-                && user.getRole() != null
-                && roleName.equalsIgnoreCase(user.getRole().getRoleName());
     }
 
     private void forbid(HttpServletResponse response) throws IOException {
@@ -577,6 +639,11 @@ public class PayrollServlet extends HttpServlet {
         if (page < 1) page = 1;
         if (page > totalPages) page = totalPages;
         return page;
+    }
+
+    private Integer parseIntOrNull(String s) {
+        if (s == null || s.isBlank()) return null;
+        try { return Integer.parseInt(s.trim()); } catch (NumberFormatException ex) { return null; }
     }
 
     private String trim(String s) { return s == null ? "" : s.trim(); }
