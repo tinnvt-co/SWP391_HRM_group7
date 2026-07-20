@@ -57,6 +57,75 @@ public class AttendanceRecordDAO {
         return -1;
     }
 
+    public boolean insertIfAbsent(AttendanceRecord r) throws SQLException {
+        String sql = "INSERT IGNORE INTO attendance_records (employee_id, work_date, "
+                   + "check_in_time, check_out_time, late_minutes, late_penalty_amount, "
+                   + "overtime_hours, attendance_status, verification_status, "
+                   + "verified_by, verified_at, note) "
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            bindAttendanceValues(ps, r);
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
+    public boolean upsertImported(AttendanceRecord r) throws SQLException {
+        String sql = "INSERT INTO attendance_records (employee_id, work_date, "
+                   + "check_in_time, check_out_time, late_minutes, late_penalty_amount, "
+                   + "overtime_hours, attendance_status, verification_status, "
+                   + "verified_by, verified_at, note) "
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                   + "ON DUPLICATE KEY UPDATE "
+                   + "check_in_time=VALUES(check_in_time), "
+                   + "check_out_time=VALUES(check_out_time), "
+                   + "late_minutes=VALUES(late_minutes), "
+                   + "late_penalty_amount=VALUES(late_penalty_amount), "
+                   + "overtime_hours=VALUES(overtime_hours), "
+                   + "attendance_status=VALUES(attendance_status), "
+                   + "verification_status=VALUES(verification_status), "
+                   + "verified_by=NULL, verified_at=NULL, "
+                   + "note=VALUES(note), updated_at=NOW()";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            bindAttendanceValues(ps, r);
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
+    private void bindAttendanceValues(PreparedStatement ps, AttendanceRecord r)
+            throws SQLException {
+        ps.setInt(1, r.getEmployeeId());
+        ps.setDate(2, Date.valueOf(r.getWorkDate()));
+        if (r.getCheckInTime() != null) ps.setTime(3, Time.valueOf(r.getCheckInTime()));
+        else                            ps.setNull(3, Types.TIME);
+        if (r.getCheckOutTime() != null) ps.setTime(4, Time.valueOf(r.getCheckOutTime()));
+        else                             ps.setNull(4, Types.TIME);
+        ps.setInt(5, r.getLateMinutes());
+        ps.setBigDecimal(6, r.getLatePenaltyAmount() != null
+                ? r.getLatePenaltyAmount() : java.math.BigDecimal.ZERO);
+        ps.setBigDecimal(7, r.getOvertimeHours() != null
+                ? r.getOvertimeHours() : java.math.BigDecimal.ZERO);
+        ps.setString(8, r.getAttendanceStatus().getDbValue());
+        ps.setString(9, r.getVerificationStatus() == null
+                ? VerificationStatus.Pending.name() : r.getVerificationStatus().name());
+        if (r.getVerifiedBy() != null) ps.setInt(10, r.getVerifiedBy());
+        else                           ps.setNull(10, Types.INTEGER);
+        if (r.getVerifiedAt() != null) ps.setTimestamp(11, Timestamp.valueOf(r.getVerifiedAt()));
+        else                           ps.setNull(11, Types.TIMESTAMP);
+        ps.setString(12, r.getNote());
+    }
+
     public boolean existsByEmployeeAndDate(int employeeId, LocalDate workDate) throws SQLException {
         String sql = "SELECT 1 FROM attendance_records WHERE employee_id = ? AND work_date = ?";
         Connection conn = null;
@@ -286,6 +355,7 @@ public class AttendanceRecordDAO {
     /** Monthly attendance aggregate for one employee (used to build a report). */
     public static final class MonthlySummary {
         public int employeeId;
+        public int userId;
         public int departmentId;
         public int actualWorkingDays;   // Present + Late + paid Leave
         public int paidLeaveDays;       // Leave
@@ -498,7 +568,7 @@ public class AttendanceRecordDAO {
     public List<MonthlySummary> aggregateMonthByManager(int managerUserId,
                                                         int year, int month) throws SQLException {
         String sql =
-            "SELECT ar.employee_id, e.department_id, "
+            "SELECT ar.employee_id, u.user_id, e.department_id, "
           + "  SUM(CASE WHEN ar.attendance_status IN ('Present','Late','Leave') "
           + "           OR (ar.attendance_status='Holiday' AND hd.holiday_date IS NOT NULL) "
           + "      THEN 1 ELSE 0 END) AS work_days, "
@@ -517,7 +587,7 @@ public class AttendanceRecordDAO {
           + "  AND ro.role_name = 'EMPLOYEE' "
           + "  AND d.department_code <> 'IT' "
           + "  AND YEAR(ar.work_date)=? AND MONTH(ar.work_date)=? "
-          + "GROUP BY ar.employee_id, e.department_id";
+          + "GROUP BY ar.employee_id, u.user_id, e.department_id";
         List<MonthlySummary> list = new ArrayList<>();
         Connection conn = null;
         PreparedStatement ps = null;
@@ -532,6 +602,7 @@ public class AttendanceRecordDAO {
             while (rs.next()) {
                 MonthlySummary s = new MonthlySummary();
                 s.employeeId      = rs.getInt("employee_id");
+                s.userId          = rs.getInt("user_id");
                 s.departmentId    = rs.getInt("department_id");
                 s.actualWorkingDays = rs.getInt("work_days");
                 s.paidLeaveDays   = rs.getInt("paid_leave");
@@ -659,7 +730,7 @@ public class AttendanceRecordDAO {
                                                                Integer departmentId)
             throws SQLException {
         String sql =
-            "SELECT ar.employee_id, e.department_id, "
+            "SELECT ar.employee_id, u.user_id, e.department_id, "
           + "  SUM(CASE WHEN ar.attendance_status IN ('Present','Late','Leave') "
           + "           OR (ar.attendance_status='Holiday' AND hd.holiday_date IS NOT NULL) "
           + "      THEN 1 ELSE 0 END) AS work_days, "
@@ -679,7 +750,7 @@ public class AttendanceRecordDAO {
           + "  AND d.department_code <> 'IT' "
           + "  AND YEAR(ar.work_date)=? AND MONTH(ar.work_date)=? "
           + (departmentId != null ? "  AND e.department_id=? " : "")
-          + "GROUP BY ar.employee_id, e.department_id";
+          + "GROUP BY ar.employee_id, u.user_id, e.department_id";
         List<MonthlySummary> list = new ArrayList<>();
         Connection conn = null;
         PreparedStatement ps = null;
@@ -694,6 +765,7 @@ public class AttendanceRecordDAO {
             while (rs.next()) {
                 MonthlySummary s = new MonthlySummary();
                 s.employeeId      = rs.getInt("employee_id");
+                s.userId          = rs.getInt("user_id");
                 s.departmentId    = rs.getInt("department_id");
                 s.actualWorkingDays = rs.getInt("work_days");
                 s.paidLeaveDays   = rs.getInt("paid_leave");

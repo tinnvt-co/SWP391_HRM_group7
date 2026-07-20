@@ -121,6 +121,7 @@ public class AttendanceReportDAO {
           + "FROM attendance_reports ar "
           + "WHERE ar.report_year=? AND ar.report_month=? "
           + "  AND ar.status <> 'Draft' ");
+        sql.append(managerConfirmedPredicate("ar"));
         if (departmentId != null) sql.append("AND ar.department_id=? ");
         if (managerUserId != null) sql.append("AND ar.manager_id=? ");
 
@@ -159,6 +160,7 @@ public class AttendanceReportDAO {
           + "      'Approved By HR Manager', "
           + "      'Rejected By HR Manager'"
           + "  ) ");
+        sql.append(managerConfirmedPredicate("ar"));
         if (departmentId != null) sql.append("AND ar.department_id=? ");
 
         Connection conn = null;
@@ -197,6 +199,7 @@ public class AttendanceReportDAO {
           + "      'Approved By HR Manager', "
           + "      'Rejected By HR Manager'"
           + "  ) ");
+        sql.append(managerConfirmedPredicate("ar"));
         if (departmentId != null) sql.append("AND ar.department_id=? ");
         sql.append("ORDER BY d.department_name, eu.full_name LIMIT ? OFFSET ?");
 
@@ -225,10 +228,11 @@ public class AttendanceReportDAO {
                                             Integer departmentId) throws SQLException {
         StringBuilder sql = new StringBuilder(
             "SELECT COUNT(*) "
-          + "FROM attendance_reports "
+          + "FROM attendance_reports ar "
           + "WHERE report_year=? AND report_month=? "
           + "  AND status='Pending HR Manager Approval' ");
-        if (departmentId != null) sql.append("AND department_id=? ");
+        sql.append(managerConfirmedPredicate("ar"));
+        if (departmentId != null) sql.append("AND ar.department_id=? ");
 
         Connection conn = null;
         PreparedStatement ps = null;
@@ -256,6 +260,7 @@ public class AttendanceReportDAO {
           + "    hr_note=NULL, updated_at=NOW() "
           + "WHERE report_year=? AND report_month=? "
           + "  AND status='Pending HR Manager Approval' ");
+        sql.append(managerConfirmedPredicate("attendance_reports"));
         if (departmentId != null) sql.append("AND department_id=? ");
 
         Connection conn = null;
@@ -287,6 +292,7 @@ public class AttendanceReportDAO {
           + "JOIN users mu      ON ar.manager_id    = mu.user_id "
           + "WHERE ar.report_year=? AND ar.report_month=? "
           + "  AND ar.status = 'Approved By HR Manager' ");
+        sql.append(managerConfirmedPredicate("ar"));
         if (departmentId != null) sql.append("AND ar.department_id=? ");
         sql.append("ORDER BY d.department_name, eu.full_name");
 
@@ -313,10 +319,11 @@ public class AttendanceReportDAO {
                                                 Integer departmentId) throws SQLException {
         StringBuilder sql = new StringBuilder(
             "SELECT COUNT(*) "
-          + "FROM attendance_reports "
+          + "FROM attendance_reports ar "
           + "WHERE report_year=? AND report_month=? "
           + "  AND status IN ('Submitted To HR Staff', 'Rejected By HR Manager') ");
-        if (departmentId != null) sql.append("AND department_id=? ");
+        sql.append(managerConfirmedPredicate("ar"));
+        if (departmentId != null) sql.append("AND ar.department_id=? ");
 
         Connection conn = null;
         PreparedStatement ps = null;
@@ -343,6 +350,7 @@ public class AttendanceReportDAO {
           + "    reviewed_by=NULL, reviewed_at=NULL, hr_note=NULL, updated_at=NOW() "
           + "WHERE report_year=? AND report_month=? "
           + "  AND status IN ('Submitted To HR Staff', 'Rejected By HR Manager') ");
+        sql.append(managerConfirmedPredicate("attendance_reports"));
         if (departmentId != null) sql.append("AND department_id=? ");
 
         Connection conn = null;
@@ -443,7 +451,8 @@ public class AttendanceReportDAO {
         }
         String sql = "UPDATE attendance_reports "
                    + "SET status=?, reviewed_by=?, reviewed_at=NOW(), hr_note=?, updated_at=NOW() "
-                   + "WHERE attendance_report_id=? AND status='Pending HR Manager Approval'";
+                   + "WHERE attendance_report_id=? AND status='Pending HR Manager Approval'"
+                   + managerConfirmedPredicate("attendance_reports");
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -473,6 +482,7 @@ public class AttendanceReportDAO {
           + "JOIN users mu      ON ar.manager_id    = mu.user_id "
           + "WHERE ar.report_year=? AND ar.report_month=? "
           + "  AND ar.status <> 'Draft' ");
+        sql.append(managerConfirmedPredicate("ar"));
         if (departmentId != null) sql.append("AND ar.department_id=? ");
         if (managerUserId != null) sql.append("AND ar.manager_id=? ");
         sql.append("ORDER BY d.department_name, eu.full_name");
@@ -498,6 +508,41 @@ public class AttendanceReportDAO {
             close(conn, ps, rs);
         }
         return list;
+    }
+
+    private String managerConfirmedPredicate(String reportAlias) {
+        return " AND ("
+             + roleExemptFromManagerConfirmation(reportAlias)
+             + " OR ("
+             + "  EXISTS ("
+             + "    SELECT 1 "
+             + "    FROM users mgr "
+             + "    JOIN roles mgr_role ON mgr.role_id = mgr_role.role_id "
+             + "    WHERE mgr.user_id = " + reportAlias + ".manager_id "
+             + "      AND mgr_role.role_name = 'MANAGER'"
+             + "  ) "
+             + "  AND EXISTS ("
+             + "    SELECT 1 "
+             + "    FROM attendance_records verified_ar "
+             + "    WHERE verified_ar.employee_id = " + reportAlias + ".employee_id "
+             + "      AND verified_ar.verification_status = 'Verified' "
+             + "      AND verified_ar.verified_by = " + reportAlias + ".manager_id "
+             + "      AND YEAR(verified_ar.work_date) = " + reportAlias + ".report_year "
+             + "      AND MONTH(verified_ar.work_date) = " + reportAlias + ".report_month"
+             + "  )"
+             + " )"
+             + ") ";
+    }
+
+    private String roleExemptFromManagerConfirmation(String reportAlias) {
+        return "EXISTS ("
+             + "  SELECT 1 "
+             + "  FROM employees exempt_emp "
+             + "  JOIN users exempt_user ON exempt_emp.user_id = exempt_user.user_id "
+             + "  JOIN roles exempt_role ON exempt_user.role_id = exempt_role.role_id "
+             + "  WHERE exempt_emp.employee_id = " + reportAlias + ".employee_id "
+             + "    AND exempt_role.role_name IN ('HR_STAFF', 'MANAGER', 'HR_MANAGER')"
+             + ")";
     }
 
     private AttendanceReport mapRow(ResultSet rs) throws SQLException {

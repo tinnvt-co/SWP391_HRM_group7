@@ -386,23 +386,17 @@ public class AttendanceImportService {
     }
 
     private void saveRecord(Result result, AttendanceRecord rec, boolean overwrite) throws SQLException {
-        boolean exists = attendanceDAO.existsByEmployeeAndDate(rec.getEmployeeId(), rec.getWorkDate());
-        if (exists && !overwrite) {
-            result.skippedExisting++;
+        if (overwrite) {
+            attendanceDAO.upsertImported(rec);
+            result.inserted++;
             return;
         }
-        if (exists) {
-            AttendanceRecord old = findExisting(rec.getEmployeeId(), rec.getWorkDate());
-            if (old != null) attendanceDAO.deleteById(old.getAttendanceId());
-        }
-        attendanceDAO.insert(rec);
-        result.inserted++;
-    }
 
-    private AttendanceRecord findExisting(int employeeId, LocalDate date) throws SQLException {
-        List<AttendanceRecord> list =
-                attendanceDAO.findByEmployeeId(employeeId, date, date);
-        return list.isEmpty() ? null : list.get(0);
+        if (attendanceDAO.insertIfAbsent(rec)) {
+            result.inserted++;
+        } else {
+            result.skippedExisting++;
+        }
     }
 
     private Map<Integer, Map<LocalDate, LeaveDay>> buildApprovedLeaveDays(

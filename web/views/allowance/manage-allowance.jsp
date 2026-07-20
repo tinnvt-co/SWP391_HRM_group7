@@ -41,7 +41,7 @@
     <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
         <div>
             <h5 class="fw-bold text-dark mb-0">Manage Allowance</h5>
-            <small class="text-muted">Global monthly allowance types used by payroll</small>
+            <small class="text-muted">Monthly allowance policies used by payroll</small>
         </div>
         <button type="button" class="btn btn-primary"
                 style="background:linear-gradient(135deg,#1a3c5e,#2d6a9f);border:none;"
@@ -62,33 +62,70 @@
     </c:if>
 
     <div class="row g-3 mb-3">
-        <div class="col-md-6 col-xl-4">
+        <div class="col-md-6 col-xl-3">
             <div class="metric-card card p-3">
                 <div class="d-flex align-items-center gap-3">
                     <div class="metric-icon" style="background:#e3f0fb;">
                         <i class="bi bi-wallet2 text-primary"></i>
                     </div>
                     <div>
-                        <div class="text-muted small">Total Active Allowance</div>
+                        <div class="text-muted small">Active Policy Amount</div>
                         <div class="fw-bold fs-5">
                             <fmt:formatNumber value="${totalActiveAllowance}" type="number" maxFractionDigits="0"/>
                             <span class="fs-6 fw-normal text-muted">&#8363;</span>
                         </div>
-                        <div class="text-muted" style="font-size:0.78rem;">Added to each payroll line</div>
+                        <div class="text-muted" style="font-size:0.78rem;">Before role rules</div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-6 col-xl-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="metric-card card p-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="metric-icon" style="background:#f1f5f9;">
+                        <i class="bi bi-people text-secondary"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Common Allowance</div>
+                        <div class="fw-bold fs-5">
+                            <fmt:formatNumber value="${commonActiveAllowance}" type="number" maxFractionDigits="0"/>
+                            <span class="fs-6 fw-normal text-muted">&#8363;</span>
+                        </div>
+                        <div class="text-muted" style="font-size:0.78rem;">All payroll employees</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
             <div class="metric-card card p-3">
                 <div class="d-flex align-items-center gap-3">
                     <div class="metric-icon" style="background:#e6f9f0;">
-                        <i class="bi bi-toggle2-on text-success"></i>
+                        <i class="bi bi-person-badge text-success"></i>
                     </div>
                     <div>
-                        <div class="text-muted small">Allowance Types</div>
-                        <div class="fw-bold fs-5">${fn:length(allowanceTypes)}</div>
-                        <div class="text-muted" style="font-size:0.78rem;">Active and inactive policies</div>
+                        <div class="text-muted small">HR Staff Allowance</div>
+                        <div class="fw-bold fs-5">
+                            <fmt:formatNumber value="${hrStaffAllowance}" type="number" maxFractionDigits="0"/>
+                            <span class="fs-6 fw-normal text-muted">&#8363;</span>
+                        </div>
+                        <div class="text-muted" style="font-size:0.78rem;">Common + responsibility</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="metric-card card p-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="metric-icon" style="background:#fff4e6;">
+                        <i class="bi bi-diagram-3 text-warning"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Manager Allowance</div>
+                        <div class="fw-bold fs-5">
+                            <fmt:formatNumber value="${managerAllowance}" type="number" maxFractionDigits="0"/>
+                            <span class="fs-6 fw-normal text-muted">&#8363;</span>
+                        </div>
+                        <div class="text-muted" style="font-size:0.78rem;">Common + responsibility</div>
                     </div>
                 </div>
             </div>
@@ -103,8 +140,9 @@
                     <th style="width: 16%;">Code</th>
                     <th>Name</th>
                     <th style="width: 18%;" class="text-end">Amount</th>
+                    <th style="width: 15%;">Applies To</th>
                     <th style="width: 12%;">Status</th>
-                    <th style="width: 22%;">Description</th>
+                    <th style="width: 20%;">Description</th>
                     <th style="width: 12%;" class="text-end">Actions</th>
                 </tr>
                 </thead>
@@ -112,7 +150,7 @@
                 <c:choose>
                     <c:when test="${empty allowanceTypes}">
                         <tr>
-                            <td colspan="6" class="text-center text-muted py-5">
+                            <td colspan="7" class="text-center text-muted py-5">
                                 <i class="bi bi-wallet2 d-block fs-3 mb-2"></i>
                                 No allowance types found.
                             </td>
@@ -127,6 +165,7 @@
                                     <fmt:formatNumber value="${a.amount}" type="number" maxFractionDigits="0"/>
                                     <span class="text-muted">&#8363;</span>
                                 </td>
+                                <td><span class="badge text-bg-light">${a.appliesToLabel}</span></td>
                                 <td>
                                     <c:choose>
                                         <c:when test="${a.active}">

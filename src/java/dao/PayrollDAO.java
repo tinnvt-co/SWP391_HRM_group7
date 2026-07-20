@@ -125,6 +125,50 @@ public class PayrollDAO {
         }
     }
 
+    public boolean existsByPeriodAndEmployee(int periodId, int employeeId) throws SQLException {
+        String sql = "SELECT 1 FROM payrolls WHERE payroll_period_id=? AND employee_id=?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, periodId);
+            ps.setInt(2, employeeId);
+            rs = ps.executeQuery();
+            return rs.next();
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public int countByMonthAndStatuses(int year, int month, Status... statuses) throws SQLException {
+        if (statuses == null || statuses.length == 0) return 0;
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) ")
+                .append("FROM payrolls p ")
+                .append("JOIN payroll_periods pp ON p.payroll_period_id = pp.payroll_period_id ")
+                .append("JOIN attendance_reports ar ON p.attendance_report_id = ar.attendance_report_id ")
+                .append("WHERE pp.payroll_year=? AND pp.payroll_month=? AND pp.status IN (");
+        appendPlaceholders(sql, statuses.length);
+        sql.append(") ").append(managerConfirmedReportPredicate("ar"));
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int idx = 1;
+            ps.setInt(idx++, year);
+            ps.setInt(idx++, month);
+            setStatusParams(ps, idx, statuses);
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getInt(1) : 0;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
     public int countByDepartmentMonth(int departmentId, int year, int month) throws SQLException {
         String sql = "SELECT COUNT(*) "
                    + "FROM payrolls p "
@@ -213,6 +257,36 @@ public class PayrollDAO {
         }
     }
 
+    public BigDecimal sumNetSalaryByMonthAndStatuses(int year, int month, Status... statuses)
+            throws SQLException {
+        if (statuses == null || statuses.length == 0) return BigDecimal.ZERO;
+        StringBuilder sql = new StringBuilder("SELECT COALESCE(SUM(p.net_salary), 0) ")
+                .append("FROM payrolls p ")
+                .append("JOIN payroll_periods pp ON p.payroll_period_id = pp.payroll_period_id ")
+                .append("JOIN attendance_reports ar ON p.attendance_report_id = ar.attendance_report_id ")
+                .append("WHERE pp.payroll_year = ? ")
+                .append("AND pp.payroll_month = ? ")
+                .append("AND pp.status IN (");
+        appendPlaceholders(sql, statuses.length);
+        sql.append(") ").append(managerConfirmedReportPredicate("ar"));
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int idx = 1;
+            ps.setInt(idx++, year);
+            ps.setInt(idx++, month);
+            setStatusParams(ps, idx, statuses);
+            rs = ps.executeQuery();
+            return rs.next() ? nz(rs.getBigDecimal(1)) : BigDecimal.ZERO;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
     public BigDecimal sumNetSalaryByYear(int year) throws SQLException {
         String sql = "SELECT COALESCE(SUM(p.net_salary), 0) "
                    + "FROM payrolls p "
@@ -225,6 +299,34 @@ public class PayrollDAO {
             conn = DBContext.getConnection();
             ps = conn.prepareStatement(sql);
             ps.setInt(1, year);
+            rs = ps.executeQuery();
+            return rs.next() ? nz(rs.getBigDecimal(1)) : BigDecimal.ZERO;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public BigDecimal sumNetSalaryByYearAndStatuses(int year, Status... statuses)
+            throws SQLException {
+        if (statuses == null || statuses.length == 0) return BigDecimal.ZERO;
+        StringBuilder sql = new StringBuilder("SELECT COALESCE(SUM(p.net_salary), 0) ")
+                .append("FROM payrolls p ")
+                .append("JOIN payroll_periods pp ON p.payroll_period_id = pp.payroll_period_id ")
+                .append("JOIN attendance_reports ar ON p.attendance_report_id = ar.attendance_report_id ")
+                .append("WHERE pp.payroll_year = ? ")
+                .append("AND pp.status IN (");
+        appendPlaceholders(sql, statuses.length);
+        sql.append(") ").append(managerConfirmedReportPredicate("ar"));
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int idx = 1;
+            ps.setInt(idx++, year);
+            setStatusParams(ps, idx, statuses);
             rs = ps.executeQuery();
             return rs.next() ? nz(rs.getBigDecimal(1)) : BigDecimal.ZERO;
         } finally {
@@ -279,6 +381,39 @@ public class PayrollDAO {
         return list;
     }
 
+    public List<Payroll> findByMonthPageAndStatuses(int year, int month, int offset, int limit,
+                                                    Status... statuses) throws SQLException {
+        List<Payroll> list = new ArrayList<>();
+        if (statuses == null || statuses.length == 0) return list;
+
+        StringBuilder sql = new StringBuilder(baseSelect())
+                .append("JOIN attendance_reports ar ON p.attendance_report_id = ar.attendance_report_id ")
+                .append("WHERE pp.payroll_year=? AND pp.payroll_month=? AND pp.status IN (");
+        appendPlaceholders(sql, statuses.length);
+        sql.append(") ")
+           .append(managerConfirmedReportPredicate("ar"))
+           .append("ORDER BY d.department_name, eu.full_name LIMIT ? OFFSET ?");
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int idx = 1;
+            ps.setInt(idx++, year);
+            ps.setInt(idx++, month);
+            idx = setStatusParams(ps, idx, statuses);
+            ps.setInt(idx++, limit);
+            ps.setInt(idx, offset);
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
     public List<Payroll> findByDepartmentMonthPage(int departmentId, int year, int month,
                                                    int offset, int limit) throws SQLException {
         String sql = baseSelect()
@@ -324,8 +459,10 @@ public class PayrollDAO {
     /** Released payslip for one employee in a given month (employee self-view). */
     public Payroll findPaidByEmployeeAndMonth(int employeeId, int year, int month) throws SQLException {
         String sql = baseSelect()
+                   + "JOIN attendance_reports ar ON p.attendance_report_id = ar.attendance_report_id "
                    + "WHERE p.employee_id=? AND pp.payroll_year=? AND pp.payroll_month=? "
-                   + "  AND p.status IN ('Approved', 'Paid')";
+                   + "  AND p.status = 'Paid' AND pp.status = 'Paid' "
+                   + managerConfirmedReportPredicate("ar");
         Connection conn = null;
         PreparedStatement ps = null;
         ResultSet rs = null;
@@ -363,6 +500,21 @@ public class PayrollDAO {
             ps.setString(1, newStatus.getDbValue());
             ps.setInt(2, periodId);
             return ps.executeUpdate();
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
+    public boolean updateStatusById(int payrollId, Status newStatus) throws SQLException {
+        String sql = "UPDATE payrolls SET status=?, updated_at=NOW() WHERE payroll_id=?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, newStatus.getDbValue());
+            ps.setInt(2, payrollId);
+            return ps.executeUpdate() > 0;
         } finally {
             close(conn, ps, null);
         }
@@ -429,6 +581,56 @@ public class PayrollDAO {
     }
 
     private static BigDecimal nz(BigDecimal v) { return v != null ? v : BigDecimal.ZERO; }
+
+    private void appendPlaceholders(StringBuilder sql, int count) {
+        for (int i = 0; i < count; i++) {
+            if (i > 0) sql.append(",");
+            sql.append("?");
+        }
+    }
+
+    private int setStatusParams(PreparedStatement ps, int start, Status... statuses) throws SQLException {
+        int idx = start;
+        for (Status status : statuses) {
+            ps.setString(idx++, status.getDbValue());
+        }
+        return idx;
+    }
+
+    private String managerConfirmedReportPredicate(String reportAlias) {
+        return " AND ("
+             + roleExemptFromManagerConfirmation(reportAlias)
+             + " OR ("
+             + "  EXISTS ("
+             + "    SELECT 1 "
+             + "    FROM users mgr "
+             + "    JOIN roles mgr_role ON mgr.role_id = mgr_role.role_id "
+             + "    WHERE mgr.user_id = " + reportAlias + ".manager_id "
+             + "      AND mgr_role.role_name = 'MANAGER'"
+             + "  ) "
+             + "  AND EXISTS ("
+             + "    SELECT 1 "
+             + "    FROM attendance_records verified_ar "
+             + "    WHERE verified_ar.employee_id = " + reportAlias + ".employee_id "
+             + "      AND verified_ar.verification_status = 'Verified' "
+             + "      AND verified_ar.verified_by = " + reportAlias + ".manager_id "
+             + "      AND YEAR(verified_ar.work_date) = " + reportAlias + ".report_year "
+             + "      AND MONTH(verified_ar.work_date) = " + reportAlias + ".report_month"
+             + "  )"
+             + " )"
+             + ") ";
+    }
+
+    private String roleExemptFromManagerConfirmation(String reportAlias) {
+        return "EXISTS ("
+             + "  SELECT 1 "
+             + "  FROM employees exempt_emp "
+             + "  JOIN users exempt_user ON exempt_emp.user_id = exempt_user.user_id "
+             + "  JOIN roles exempt_role ON exempt_user.role_id = exempt_role.role_id "
+             + "  WHERE exempt_emp.employee_id = " + reportAlias + ".employee_id "
+             + "    AND exempt_role.role_name IN ('HR_STAFF', 'MANAGER', 'HR_MANAGER')"
+             + ")";
+    }
 
     private void close(Connection c, PreparedStatement ps, ResultSet rs) {
         try { if (rs != null) rs.close(); } catch (SQLException ignored) {}

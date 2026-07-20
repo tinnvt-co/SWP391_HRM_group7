@@ -489,8 +489,12 @@ public class ContractServlet extends HttpServlet {
     }
 
     private void loadAllowanceAttributes(HttpServletRequest request) throws SQLException {
+        User currentUser = getCurrentUser(request);
+        allowanceDAO.ensureResponsibilityAllowances(
+                currentUser == null ? null : currentUser.getUserId());
         request.setAttribute("activeAllowanceTypes", allowanceDAO.findActive());
         request.setAttribute("totalActiveAllowance", allowanceDAO.sumActiveAllowances());
+        request.setAttribute("commonActiveAllowance", allowanceDAO.sumCommonActiveAllowances());
     }
 
     private BigDecimal parsePositiveMoney(String value) {

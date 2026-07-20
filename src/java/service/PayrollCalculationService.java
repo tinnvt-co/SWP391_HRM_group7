@@ -3,6 +3,7 @@ package service;
 import dao.AllowanceTypeDAO;
 import dao.AttendanceRecordDAO;
 import dao.ContractDAO;
+import dao.EmployeeDAO;
 import dao.HolidayDAO;
 import model.AttendanceRecord;
 import model.AttendanceReport;
@@ -55,6 +56,7 @@ public class PayrollCalculationService {
 
     private final ContractDAO contractDAO = new ContractDAO();
     private final AllowanceTypeDAO allowanceDAO = new AllowanceTypeDAO();
+    private final EmployeeDAO employeeDAO = new EmployeeDAO();
     private final AttendanceRecordDAO attendanceDAO = new AttendanceRecordDAO();
     private final HolidayDAO holidayDAO = new HolidayDAO();
 
@@ -109,7 +111,8 @@ public class PayrollCalculationService {
         BigDecimal allowance = fixedMonthly
                 ? nz(c.getFixedAllowanceAmount())
                 : (!fullMaternityMonth && actualDays.signum() > 0
-                    ? nz(allowanceDAO.sumActiveAllowances())
+                    ? nz(allowanceDAO.sumPayableAllowancesForRole(
+                            employeeDAO.findRoleNameByEmployeeId(report.getEmployeeId())))
                     : BigDecimal.ZERO);
         BigDecimal attendanceBonus = !fixedMonthly
                 && qualifiesForFullAttendanceBonus(actualDays, stdDays, fullMaternityMonth, overtime)

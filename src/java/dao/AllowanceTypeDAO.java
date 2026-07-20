@@ -10,6 +10,11 @@ import java.util.List;
 
 public class AllowanceTypeDAO {
 
+    private static final BigDecimal DEFAULT_HR_STAFF_RESPONSIBILITY =
+            new BigDecimal("2000000");
+    private static final BigDecimal DEFAULT_MANAGER_RESPONSIBILITY =
+            new BigDecimal("5000000");
+
     public List<AllowanceType> findAll() throws SQLException {
         String sql = "SELECT * FROM allowance_types "
                    + "ORDER BY is_active DESC, allowance_name ASC";
@@ -39,6 +44,37 @@ public class AllowanceTypeDAO {
         try {
             conn = DBContext.getConnection();
             ps = conn.prepareStatement(sql);
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
+    public List<AllowanceType> findActiveForRole(String roleName) throws SQLException {
+        ensureResponsibilityAllowances(null);
+        String roleAllowanceCode = responsibilityCodeForRole(roleName);
+        StringBuilder sql = new StringBuilder(
+                "SELECT * FROM allowance_types "
+              + "WHERE is_active = 1 "
+              + "AND (allowance_code NOT IN (?, ?) ");
+        if (roleAllowanceCode != null) {
+            sql.append("OR allowance_code = ? ");
+        }
+        sql.append(") ORDER BY allowance_name ASC");
+
+        List<AllowanceType> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int idx = bindResponsibilityExclusions(ps, 1);
+            if (roleAllowanceCode != null) {
+                ps.setString(idx, roleAllowanceCode);
+            }
             rs = ps.executeQuery();
             while (rs.next()) list.add(mapRow(rs));
         } finally {
@@ -162,6 +198,135 @@ public class AllowanceTypeDAO {
         } finally {
             close(conn, ps, rs);
         }
+    }
+
+    public BigDecimal sumCommonActiveAllowances() throws SQLException {
+        String sql = "SELECT COALESCE(SUM(amount), 0) "
+                   + "FROM allowance_types "
+                   + "WHERE is_active = 1 "
+                   + "AND allowance_code NOT IN (?, ?)";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            bindResponsibilityExclusions(ps, 1);
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getBigDecimal(1) : BigDecimal.ZERO;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public BigDecimal sumPayableAllowancesForRole(String roleName) throws SQLException {
+        ensureResponsibilityAllowances(null);
+        String roleAllowanceCode = responsibilityCodeForRole(roleName);
+        StringBuilder sql = new StringBuilder(
+                "SELECT COALESCE(SUM(amount), 0) "
+              + "FROM allowance_types "
+              + "WHERE is_active = 1 "
+              + "AND (allowance_code NOT IN (?, ?) ");
+        if (roleAllowanceCode != null) {
+            sql.append("OR allowance_code = ? ");
+        }
+        sql.append(")");
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            int idx = bindResponsibilityExclusions(ps, 1);
+            if (roleAllowanceCode != null) {
+                ps.setString(idx, roleAllowanceCode);
+            }
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getBigDecimal(1) : BigDecimal.ZERO;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public void ensureResponsibilityAllowances(Integer actorUserId) throws SQLException {
+        insertDefaultIfMissing(
+                AllowanceType.RESPONSIBILITY_HR_STAFF_CODE,
+                "Responsibility allowance - HR Staff",
+                DEFAULT_HR_STAFF_RESPONSIBILITY,
+                "Applies only to HR_STAFF payroll lines.",
+                actorUserId);
+        insertDefaultIfMissing(
+                AllowanceType.RESPONSIBILITY_MANAGER_CODE,
+                "Responsibility allowance - Manager",
+                DEFAULT_MANAGER_RESPONSIBILITY,
+                "Applies to MANAGER and HR_MANAGER payroll lines.",
+                actorUserId);
+    }
+
+    private void insertDefaultIfMissing(String code, String name, BigDecimal amount,
+                                        String description, Integer actorUserId)
+            throws SQLException {
+        if (existsByCode(code, null)) return;
+
+        AllowanceType allowance = new AllowanceType();
+        Integer seedActorUserId = resolveSeedActorUserId(actorUserId);
+        allowance.setAllowanceCode(code);
+        allowance.setAllowanceName(name);
+        allowance.setAmount(amount);
+        allowance.setDescription(description);
+        allowance.setActive(true);
+        allowance.setCreatedBy(seedActorUserId);
+        allowance.setUpdatedBy(seedActorUserId);
+        insert(allowance);
+    }
+
+    private Integer resolveSeedActorUserId(Integer actorUserId) throws SQLException {
+        if (actorUserId != null) return actorUserId;
+
+        String sql = "SELECT u.user_id "
+                   + "FROM users u "
+                   + "JOIN roles r ON u.role_id = r.role_id "
+                   + "WHERE u.is_active = 1 "
+                   + "ORDER BY CASE "
+                   + "  WHEN r.role_name = 'HR_MANAGER' THEN 1 "
+                   + "  WHEN r.role_name = 'ADMIN' THEN 2 "
+                   + "  ELSE 3 "
+                   + "END, u.user_id "
+                   + "LIMIT 1";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getInt("user_id") : null;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    private int bindResponsibilityExclusions(PreparedStatement ps, int startIndex)
+            throws SQLException {
+        ps.setString(startIndex++, AllowanceType.RESPONSIBILITY_HR_STAFF_CODE);
+        ps.setString(startIndex++, AllowanceType.RESPONSIBILITY_MANAGER_CODE);
+        return startIndex;
+    }
+
+    private String responsibilityCodeForRole(String roleName) {
+        if ("HR_STAFF".equalsIgnoreCase(nullToEmpty(roleName))) {
+            return AllowanceType.RESPONSIBILITY_HR_STAFF_CODE;
+        }
+        if ("MANAGER".equalsIgnoreCase(nullToEmpty(roleName))
+                || "HR_MANAGER".equalsIgnoreCase(nullToEmpty(roleName))) {
+            return AllowanceType.RESPONSIBILITY_MANAGER_CODE;
+        }
+        return null;
+    }
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private AllowanceType mapRow(ResultSet rs) throws SQLException {

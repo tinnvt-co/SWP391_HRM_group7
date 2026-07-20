@@ -63,7 +63,9 @@ public class PayrollPeriodDAO {
             if (i > 0) sql.append(",");
             sql.append("?");
         }
-        sql.append(") ORDER BY d.department_name");
+        sql.append(") ")
+           .append(managerConfirmedPayrollPeriodPredicate("pp"))
+           .append("ORDER BY d.department_name");
 
         Connection conn = null;
         PreparedStatement ps = null;
@@ -185,7 +187,8 @@ public class PayrollPeriodDAO {
 
     private int countHrStaffPeriodTasks(Connection conn) throws SQLException {
         String sql = "SELECT COUNT(*) FROM payroll_periods "
-                   + "WHERE status IN ('Draft', 'Rejected', 'Approved')";
+                   + "WHERE status IN ('Draft', 'Rejected', 'Approved') "
+                   + managerConfirmedPayrollPeriodPredicate("payroll_periods");
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             return rs.next() ? rs.getInt(1) : 0;
@@ -194,20 +197,22 @@ public class PayrollPeriodDAO {
 
     private int countHrStaffMissingPayrollTasks(Connection conn) throws SQLException {
         String sql = "SELECT COUNT(*) FROM ("
-                   + "  SELECT pp.department_id, pp.payroll_year AS task_year, pp.payroll_month AS task_month "
+                   + "  SELECT pp.payroll_year AS task_year, pp.payroll_month AS task_month "
                    + "  FROM payroll_periods pp "
                    + "  WHERE pp.status IN ('Draft', 'Rejected', 'Approved') "
-                   + "  GROUP BY pp.department_id, pp.payroll_year, pp.payroll_month "
+                   + managerConfirmedPayrollPeriodPredicate("pp")
+                   + "  GROUP BY pp.payroll_year, pp.payroll_month "
                    + "  UNION "
-                   + "  SELECT ar.department_id, ar.report_year AS task_year, ar.report_month AS task_month "
+                   + "  SELECT ar.report_year AS task_year, ar.report_month AS task_month "
                    + "  FROM attendance_reports ar "
                    + "  LEFT JOIN payroll_periods pp "
                    + "    ON pp.department_id = ar.department_id "
                    + "   AND pp.payroll_year = ar.report_year "
                    + "   AND pp.payroll_month = ar.report_month "
                    + "  WHERE ar.status = 'Approved By HR Manager' "
+                   + managerConfirmedReportPredicate("ar")
                    + "    AND pp.payroll_period_id IS NULL "
-                   + "  GROUP BY ar.department_id, ar.report_year, ar.report_month"
+                   + "  GROUP BY ar.report_year, ar.report_month"
                    + ") pending_periods";
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
@@ -217,10 +222,11 @@ public class PayrollPeriodDAO {
 
     private int countHrManagerApprovalTasks(Connection conn) throws SQLException {
         String sql = "SELECT COUNT(*) FROM ("
-                   + "  SELECT department_id, payroll_year, payroll_month "
-                   + "  FROM payroll_periods "
-                   + "  WHERE status = 'Pending Approval' "
-                   + "  GROUP BY department_id, payroll_year, payroll_month"
+                   + "  SELECT payroll_year, payroll_month "
+                   + "  FROM payroll_periods pp "
+                   + "  WHERE pp.status = 'Pending Approval' "
+                   + managerConfirmedPayrollPeriodPredicate("pp")
+                   + "  GROUP BY payroll_year, payroll_month"
                    + ") pending_periods";
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
@@ -240,6 +246,7 @@ public class PayrollPeriodDAO {
                    + "FROM payroll_periods pp "
                    + "JOIN departments d ON pp.department_id = d.department_id "
                    + "WHERE pp.status IN ('Draft', 'Rejected', 'Approved') "
+                   + managerConfirmedPayrollPeriodPredicate("pp")
                    + "ORDER BY pp.payroll_year DESC, pp.payroll_month DESC, "
                    + "  CASE pp.status WHEN 'Approved' THEN 0 WHEN 'Rejected' THEN 1 ELSE 2 END, "
                    + "  pp.updated_at DESC, pp.created_at DESC "
@@ -251,12 +258,13 @@ public class PayrollPeriodDAO {
     }
 
     private PayrollTaskSummary findLatestHrStaffMissingPayrollTask(Connection conn) throws SQLException {
-        String sql = "SELECT pending_periods.department_id, pending_periods.department_name, "
+        String sql = "SELECT NULL AS department_id, 'All departments' AS department_name, "
                    + "       pending_periods.task_month, pending_periods.task_year, "
-                   + "       pending_periods.task_label "
+                   + "       SUBSTRING_INDEX(GROUP_CONCAT(pending_periods.task_label "
+                   + "         ORDER BY pending_periods.task_priority, pending_periods.task_time DESC "
+                   + "         SEPARATOR ','), ',', 1) AS task_label "
                    + "FROM ("
-                   + "  SELECT pp.department_id, d.department_name, "
-                   + "         pp.payroll_year AS task_year, pp.payroll_month AS task_month, "
+                   + "  SELECT pp.payroll_year AS task_year, pp.payroll_month AS task_month, "
                    + "         CASE pp.status "
                    + "           WHEN 'Draft' THEN 'Submit for Approval' "
                    + "           WHEN 'Rejected' THEN 'Re-submit for Approval' "
@@ -266,26 +274,26 @@ public class PayrollPeriodDAO {
                    + "         CASE pp.status WHEN 'Approved' THEN 0 WHEN 'Rejected' THEN 1 ELSE 2 END AS task_priority, "
                    + "         COALESCE(pp.updated_at, pp.created_at) AS task_time "
                    + "  FROM payroll_periods pp "
-                   + "  JOIN departments d ON pp.department_id = d.department_id "
                    + "  WHERE pp.status IN ('Draft', 'Rejected', 'Approved') "
+                   + managerConfirmedPayrollPeriodPredicate("pp")
                    + "  UNION ALL "
-                   + "  SELECT ar.department_id, d.department_name, "
-                   + "         ar.report_year AS task_year, ar.report_month AS task_month, "
+                   + "  SELECT ar.report_year AS task_year, ar.report_month AS task_month, "
                    + "         'Process Payroll' AS task_label, "
                    + "         3 AS task_priority, "
                    + "         MAX(COALESCE(ar.updated_at, ar.submitted_at, ar.created_at)) AS task_time "
                    + "  FROM attendance_reports ar "
-                   + "  JOIN departments d ON ar.department_id = d.department_id "
                    + "  LEFT JOIN payroll_periods pp "
                    + "    ON pp.department_id = ar.department_id "
                    + "   AND pp.payroll_year = ar.report_year "
                    + "   AND pp.payroll_month = ar.report_month "
                    + "  WHERE ar.status = 'Approved By HR Manager' "
+                   + managerConfirmedReportPredicate("ar")
                    + "    AND pp.payroll_period_id IS NULL "
-                   + "  GROUP BY ar.department_id, d.department_name, ar.report_year, ar.report_month"
+                   + "  GROUP BY ar.report_year, ar.report_month"
                    + ") pending_periods "
+                   + "GROUP BY pending_periods.task_year, pending_periods.task_month "
                    + "ORDER BY pending_periods.task_year DESC, pending_periods.task_month DESC, "
-                   + "         pending_periods.task_priority, pending_periods.task_time DESC "
+                   + "         MIN(pending_periods.task_priority), MAX(pending_periods.task_time) DESC "
                    + "LIMIT 1";
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
@@ -294,14 +302,15 @@ public class PayrollPeriodDAO {
     }
 
     private PayrollTaskSummary findLatestHrManagerApprovalTask(Connection conn) throws SQLException {
-        String sql = "SELECT pp.department_id, d.department_name, "
+        String sql = "SELECT NULL AS department_id, 'All departments' AS department_name, "
                    + "       pp.payroll_month AS task_month, pp.payroll_year AS task_year, "
                    + "       'Approve Payroll' AS task_label "
                    + "FROM payroll_periods pp "
-                   + "JOIN departments d ON pp.department_id = d.department_id "
                    + "WHERE pp.status = 'Pending Approval' "
+                   + managerConfirmedPayrollPeriodPredicate("pp")
+                   + "GROUP BY pp.payroll_year, pp.payroll_month "
                    + "ORDER BY pp.payroll_year DESC, pp.payroll_month DESC, "
-                   + "  pp.updated_at DESC, pp.created_at DESC "
+                   + "  MAX(COALESCE(pp.updated_at, pp.created_at)) DESC "
                    + "LIMIT 1";
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
@@ -328,6 +337,66 @@ public class PayrollPeriodDAO {
         target.setMonth(source.getMonth());
         target.setYear(source.getYear());
         target.setTaskLabel(source.getTaskLabel());
+    }
+
+    private String managerConfirmedPayrollPeriodPredicate(String periodAlias) {
+        String validReport = managerConfirmedReportCondition("ar_valid");
+        String invalidReport = managerConfirmedReportCondition("ar_bad");
+        return " AND EXISTS ("
+             + "  SELECT 1 "
+             + "  FROM payrolls p_valid "
+             + "  JOIN attendance_reports ar_valid "
+             + "    ON p_valid.attendance_report_id = ar_valid.attendance_report_id "
+             + "  WHERE p_valid.payroll_period_id = " + periodAlias + ".payroll_period_id "
+             + "    AND " + validReport
+             + ") "
+             + "AND NOT EXISTS ("
+             + "  SELECT 1 "
+             + "  FROM payrolls p_bad "
+             + "  LEFT JOIN attendance_reports ar_bad "
+             + "    ON p_bad.attendance_report_id = ar_bad.attendance_report_id "
+             + "  WHERE p_bad.payroll_period_id = " + periodAlias + ".payroll_period_id "
+             + "    AND (ar_bad.attendance_report_id IS NULL OR NOT (" + invalidReport + "))"
+             + ") ";
+    }
+
+    private String managerConfirmedReportPredicate(String reportAlias) {
+        return " AND " + managerConfirmedReportCondition(reportAlias) + " ";
+    }
+
+    private String managerConfirmedReportCondition(String reportAlias) {
+        return "("
+             + roleExemptFromManagerConfirmation(reportAlias)
+             + " OR ("
+             + "  EXISTS ("
+             + "    SELECT 1 "
+             + "    FROM users mgr "
+             + "    JOIN roles mgr_role ON mgr.role_id = mgr_role.role_id "
+             + "    WHERE mgr.user_id = " + reportAlias + ".manager_id "
+             + "      AND mgr_role.role_name = 'MANAGER'"
+             + "  ) "
+             + "  AND EXISTS ("
+             + "    SELECT 1 "
+             + "    FROM attendance_records verified_ar "
+             + "    WHERE verified_ar.employee_id = " + reportAlias + ".employee_id "
+             + "      AND verified_ar.verification_status = 'Verified' "
+             + "      AND verified_ar.verified_by = " + reportAlias + ".manager_id "
+             + "      AND YEAR(verified_ar.work_date) = " + reportAlias + ".report_year "
+             + "      AND MONTH(verified_ar.work_date) = " + reportAlias + ".report_month"
+             + "  )"
+             + " )"
+             + ")";
+    }
+
+    private String roleExemptFromManagerConfirmation(String reportAlias) {
+        return "EXISTS ("
+             + "  SELECT 1 "
+             + "  FROM employees exempt_emp "
+             + "  JOIN users exempt_user ON exempt_emp.user_id = exempt_user.user_id "
+             + "  JOIN roles exempt_role ON exempt_user.role_id = exempt_role.role_id "
+             + "  WHERE exempt_emp.employee_id = " + reportAlias + ".employee_id "
+             + "    AND exempt_role.role_name IN ('HR_STAFF', 'MANAGER', 'HR_MANAGER')"
+             + ")";
     }
 
     private PayrollTaskSummary mapTaskSummary(ResultSet rs) throws SQLException {

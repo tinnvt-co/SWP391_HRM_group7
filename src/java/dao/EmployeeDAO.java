@@ -97,6 +97,26 @@ public class EmployeeDAO {
         return null;
     }
 
+    public String findRoleNameByEmployeeId(int employeeId) throws SQLException {
+        String sql = "SELECT ro.role_name "
+                   + "FROM employees e "
+                   + "JOIN users u  ON e.user_id = u.user_id "
+                   + "JOIN roles ro ON u.role_id = ro.role_id "
+                   + "WHERE e.employee_id = ?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, employeeId);
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getString("role_name") : null;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
     public List<Employee> findByManagerUserId(int managerUserId) throws SQLException {
         String sql = "SELECT e.*, u.full_name, d.department_name "
                    + "FROM employees e "

@@ -22,7 +22,7 @@ import java.util.Locale;
 
 /**
  * Employee self-service payslip. Shows the employee's own salary for a chosen
- * month, once the payroll has been approved or paid.
+ * month, once HR Staff has confirmed payment.
  */
 @WebServlet(name = "PayslipServlet", urlPatterns = {"/payslip"})
 public class PayslipServlet extends HttpServlet {

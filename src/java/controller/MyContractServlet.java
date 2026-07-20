@@ -35,6 +35,9 @@ public class MyContractServlet extends HttpServlet {
         }
 
         User currentUser = getCurrentUser(request);
+        String roleName = currentUser != null && currentUser.getRole() != null
+                ? currentUser.getRole().getRoleName()
+                : "";
 
         try {
             Employee employee = employeeDAO.findByUserId(currentUser.getUserId());
@@ -42,8 +45,9 @@ public class MyContractServlet extends HttpServlet {
                 request.setAttribute("error",
                         "Your account is not linked to an employee record. Please contact HR.");
                 request.setAttribute("contracts", java.util.Collections.emptyList());
-                request.setAttribute("activeAllowanceTypes", allowanceDAO.findActive());
-                request.setAttribute("totalActiveAllowance", allowanceDAO.sumActiveAllowances());
+                request.setAttribute("activeAllowanceTypes", allowanceDAO.findActiveForRole(roleName));
+                request.setAttribute("totalActiveAllowance",
+                        allowanceDAO.sumPayableAllowancesForRole(roleName));
                 request.getRequestDispatcher("/views/contract/my-contract.jsp").forward(request, response);
                 return;
             }
@@ -55,8 +59,9 @@ public class MyContractServlet extends HttpServlet {
             request.setAttribute("employee", employee);
             request.setAttribute("contracts", contracts);
             request.setAttribute("hasFixedMonthlyContract", hasFixedMonthlyContract);
-            request.setAttribute("activeAllowanceTypes", allowanceDAO.findActive());
-            request.setAttribute("totalActiveAllowance", allowanceDAO.sumActiveAllowances());
+            request.setAttribute("activeAllowanceTypes", allowanceDAO.findActiveForRole(roleName));
+            request.setAttribute("totalActiveAllowance",
+                    allowanceDAO.sumPayableAllowancesForRole(roleName));
             request.getRequestDispatcher("/views/contract/my-contract.jsp").forward(request, response);
         } catch (SQLException e) {
             throw new ServletException(e);

@@ -5,6 +5,9 @@ import java.time.LocalDateTime;
 
 public class AllowanceType {
 
+    public static final String RESPONSIBILITY_HR_STAFF_CODE = "RESPONSIBILITY_HR_STAFF";
+    public static final String RESPONSIBILITY_MANAGER_CODE = "RESPONSIBILITY_MANAGER";
+
     private int allowanceTypeId;
     private String allowanceCode;
     private String allowanceName;
@@ -94,5 +97,31 @@ public class AllowanceType {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public boolean isResponsibilityHrStaff() {
+        return RESPONSIBILITY_HR_STAFF_CODE.equalsIgnoreCase(nullToEmpty(allowanceCode));
+    }
+
+    public boolean isResponsibilityManager() {
+        return RESPONSIBILITY_MANAGER_CODE.equalsIgnoreCase(nullToEmpty(allowanceCode));
+    }
+
+    public boolean isRoleSpecific() {
+        return isResponsibilityHrStaff() || isResponsibilityManager();
+    }
+
+    public String getAppliesToLabel() {
+        if (isResponsibilityHrStaff()) {
+            return "HR Staff";
+        }
+        if (isResponsibilityManager()) {
+            return "Manager / HR Manager";
+        }
+        return "All payroll employees";
+    }
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 }

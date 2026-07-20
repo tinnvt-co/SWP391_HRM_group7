@@ -128,6 +128,7 @@
                                     <tr>
                                         <th>Active Allowance</th>
                                         <th class="text-end">Amount</th>
+                                        <th>Applies To</th>
                                         <th>Description</th>
                                     </tr>
                                     </thead>
@@ -135,7 +136,7 @@
                                     <c:choose>
                                         <c:when test="${empty activeAllowanceTypes}">
                                             <tr>
-                                                <td colspan="3" class="text-muted text-center py-3">
+                                                <td colspan="4" class="text-muted text-center py-3">
                                                     No active allowance policy is configured.
                                                 </td>
                                             </tr>
@@ -148,16 +149,17 @@
                                                         <fmt:formatNumber value="${allowance.amount}" type="number" maxFractionDigits="0"/>
                                                         &#8363;
                                                     </td>
+                                                    <td><span class="badge text-bg-light">${allowance.appliesToLabel}</span></td>
                                                     <td class="text-muted small">${not empty allowance.description ? allowance.description : '-'}</td>
                                                 </tr>
                                             </c:forEach>
                                             <tr class="table-light">
-                                                <td class="fw-semibold">Total Active Allowance</td>
+                                                <td class="fw-semibold">Common Allowance Total</td>
                                                 <td class="text-end fw-semibold">
-                                                    <fmt:formatNumber value="${totalActiveAllowance}" type="number" maxFractionDigits="0"/>
+                                                    <fmt:formatNumber value="${commonActiveAllowance}" type="number" maxFractionDigits="0"/>
                                                     &#8363;
                                                 </td>
-                                                <td></td>
+                                                <td colspan="2" class="text-muted small">Responsibility allowance is applied by role during payroll.</td>
                                             </tr>
                                         </c:otherwise>
                                     </c:choose>

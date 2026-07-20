@@ -86,7 +86,7 @@
                 <div class="card-body text-center text-muted py-5">
                     <i class="bi bi-receipt fs-2 d-block mb-2 opacity-25"></i>
                     No payslip available for ${monthLabel}.
-                    <div class="small mt-1">Your payslip appears here once payroll for the month is approved or paid.</div>
+                    <div class="small mt-1">Your payslip appears here once payroll payment for the month is confirmed.</div>
                 </div>
             </div>
         </c:when>

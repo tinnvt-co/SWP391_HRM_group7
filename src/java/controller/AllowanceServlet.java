@@ -178,8 +178,16 @@ public class AllowanceServlet extends HttpServlet {
     }
 
     private void loadListAttributes(HttpServletRequest request) throws SQLException {
+        User currentUser = currentUser(request);
+        allowanceDAO.ensureResponsibilityAllowances(
+                currentUser == null ? null : currentUser.getUserId());
         request.setAttribute("allowanceTypes", allowanceDAO.findAll());
         request.setAttribute("totalActiveAllowance", allowanceDAO.sumActiveAllowances());
+        request.setAttribute("commonActiveAllowance", allowanceDAO.sumCommonActiveAllowances());
+        request.setAttribute("hrStaffAllowance",
+                allowanceDAO.sumPayableAllowancesForRole("HR_STAFF"));
+        request.setAttribute("managerAllowance",
+                allowanceDAO.sumPayableAllowancesForRole("MANAGER"));
     }
 
     private BigDecimal parseMoney(String value) {

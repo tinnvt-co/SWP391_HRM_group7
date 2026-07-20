@@ -94,6 +94,7 @@
                                     <tr>
                                         <th>Allowance</th>
                                         <th class="text-end">Amount</th>
+                                        <th>Applies To</th>
                                         <th>Description</th>
                                     </tr>
                                     </thead>
@@ -105,6 +106,7 @@
                                                 <fmt:formatNumber value="${allowance.amount}" type="number" maxFractionDigits="0"/>
                                                 &#8363;
                                             </td>
+                                            <td><span class="badge text-bg-light">${allowance.appliesToLabel}</span></td>
                                             <td class="text-muted small">${not empty allowance.description ? allowance.description : '-'}</td>
                                         </tr>
                                     </c:forEach>

@@ -16,7 +16,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.YearMonth;
 import java.time.format.TextStyle;
@@ -69,7 +68,7 @@ public class AttendanceReportServlet extends HttpServlet {
             int totalReports = reportDAO.countSubmittedByMonth(year, month, null, managerUserId);
             int readyToSubmitCount = hrStaffScope
                     ? reportDAO.countReadyForHrManagerSubmission(year, month, null)
-                        + attendanceDAO.countPendingHrManagedByMonth(year, month)
+                        + attendanceDAO.countPendingHrManagedByMonth(year, month, null)
                     : 0;
             int pendingManagerConfirmationCount = hrStaffScope
                     ? attendanceDAO.countPendingManagerConfirmationByMonth(year, month)
@@ -174,13 +173,13 @@ public class AttendanceReportServlet extends HttpServlet {
         int year = parseIntOr(request.getParameter("year"), YearMonth.now().getYear());
         int month = parseIntOr(request.getParameter("month"), YearMonth.now().getMonthValue());
 
-        User currentUser = getCurrentUser(request);
         autoConfirmService.runDueAutoConfirm();
-        int prepared = prepareHrManagedReports(currentUser.getUserId(), year, month);
+        int preparedHrManaged = prepareHrManagedReports(year, month, getCurrentUser(request).getUserId());
         int submitted = reportDAO.submitReadyToHrManager(year, month, null);
-        if (submitted + prepared > 0) {
+        int totalSubmitted = submitted + preparedHrManaged;
+        if (totalSubmitted > 0) {
             session.setAttribute("attendanceReportMessage",
-                    "Submitted " + (submitted + prepared) + " attendance report(s) to HR Manager.");
+                    "Submitted " + totalSubmitted + " attendance report(s) to HR Manager.");
         } else {
             session.setAttribute("attendanceReportError",
                     "No attendance reports are ready to submit to HR Manager for this period.");
@@ -188,28 +187,29 @@ public class AttendanceReportServlet extends HttpServlet {
         response.sendRedirect(reportRedirect(ctx, year, month));
     }
 
-    private int prepareHrManagedReports(int hrStaffUserId, int year, int month) throws SQLException {
-        if (reportDAO.hasHrManagerApprovedMonth(year, month)) {
-            return 0;
-        }
-        attendanceDAO.verifyPendingHrManagedByMonth(hrStaffUserId, year, month);
+    private int prepareHrManagedReports(int year, int month, int verifierUserId)
+            throws SQLException {
+        attendanceDAO.verifyPendingHrManagedByMonth(verifierUserId, year, month, null);
         List<AttendanceRecordDAO.MonthlySummary> summaries =
-                attendanceDAO.aggregateMonthByHrManagedRoles(year, month);
+                attendanceDAO.aggregateMonthByHrManagedRoles(year, month, null);
+
         int prepared = 0;
         for (AttendanceRecordDAO.MonthlySummary s : summaries) {
             AttendanceReport report = new AttendanceReport();
             report.setEmployeeId(s.employeeId);
-            report.setManagerId(hrStaffUserId);
+            report.setManagerId(s.userId);
             report.setDepartmentId(s.departmentId);
             report.setReportMonth(month);
             report.setReportYear(year);
-            report.setActualWorkingDays(BigDecimal.valueOf(s.actualWorkingDays));
-            report.setPaidLeaveDays(BigDecimal.valueOf(s.paidLeaveDays));
-            report.setUnpaidLeaveDays(BigDecimal.valueOf(s.unpaidLeaveDays));
-            report.setMaternityLeaveDays(BigDecimal.valueOf(s.maternityLeaveDays));
+            report.setActualWorkingDays(java.math.BigDecimal.valueOf(s.actualWorkingDays));
+            report.setPaidLeaveDays(java.math.BigDecimal.valueOf(s.paidLeaveDays));
+            report.setUnpaidLeaveDays(java.math.BigDecimal.valueOf(s.unpaidLeaveDays));
+            report.setMaternityLeaveDays(java.math.BigDecimal.valueOf(s.maternityLeaveDays));
             report.setOvertimeHours(s.overtimeHours);
             report.setLatePenaltyAmount(s.latePenaltyAmount);
-            if (reportDAO.upsertPendingHrManager(report)) prepared++;
+            if (reportDAO.upsertPendingHrManager(report)) {
+                prepared++;
+            }
         }
         return prepared;
     }
