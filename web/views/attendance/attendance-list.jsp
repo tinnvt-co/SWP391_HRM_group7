@@ -56,6 +56,7 @@
             <small class="text-muted">
                 <c:choose>
                     <c:when test="${managerScope}">Review and confirm your department attendance, including your own &mdash; ${importMonthLabel}</c:when>
+                    <c:when test="${hrDepartmentReviewerScope}">Review and confirm Human Resources attendance &mdash; ${importMonthLabel}</c:when>
                     <c:when test="${hrScope}">Attendance across the organization &mdash; ${importMonthLabel}</c:when>
                     <c:otherwise>Your attendance records</c:otherwise>
                 </c:choose>
@@ -102,18 +103,21 @@
                     <i class="bi bi-upload me-2"></i>Import Attendance
                 </button>
             </c:if>
-            <%-- Confirm button: Manager only --%>
-            <c:if test="${managerScope}">
+            <c:if test="${departmentReviewerScope}">
                 <form method="post"
-                      action="${pageContext.request.contextPath}/attendance?action=confirmToHr"
+                      action="${pageContext.request.contextPath}/attendance?action=${confirmAttendanceAction}"
                       class="d-inline"
                       onsubmit="return confirm('Confirm ${pendingCount} pending attendance record(s) for your department, including your own attendance?');">
                     <input type="hidden" name="month" value="${selectedMonth}">
                     <input type="hidden" name="year" value="${selectedYear}">
+                    <c:if test="${not empty selectedDeptId}">
+                        <input type="hidden" name="deptId" value="${selectedDeptId}">
+                    </c:if>
                     <button type="submit" class="btn btn-success btn-sm px-3 fw-medium"
-                            ${pendingCount > 0 ? '' : 'disabled'}
-                            title="${pendingCount > 0 ? 'Confirm all attendance in your department' : 'No pending records to confirm'}">
-                        <i class="bi bi-check2-all me-2"></i>Confirm Department Attendance
+                            ${confirmAttendanceEnabled ? '' : 'disabled'}
+                            title="${confirmAttendanceEnabled ? 'Confirm all attendance in your department' : 'No attendance is available to confirm'}">
+                        <i class="bi bi-check2-all me-2"></i>
+                        ${hrDepartmentReviewerScope ? 'Confirm HR Attendance' : 'Confirm Department Attendance'}
                         <c:if test="${pendingCount > 0}">
                             <span class="badge bg-light text-success ms-1">${pendingCount}</span>
                         </c:if>

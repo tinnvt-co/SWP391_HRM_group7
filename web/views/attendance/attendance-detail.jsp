@@ -128,7 +128,7 @@
                                     <th>Verification</th>
                                     <th>Verified By</th>
                                     <th>Note</th>
-                                    <c:if test="${managerScope}">
+                                    <c:if test="${canManageAttendance}">
                                         <th class="text-center" style="width:100px;">Actions</th>
                                     </c:if>
                                 </tr>
@@ -248,7 +248,7 @@
                                                 </c:otherwise>
                                             </c:choose>
                                         </td>
-                                        <c:if test="${managerScope}">
+                                        <c:if test="${canManageAttendance}">
                                             <td class="text-center">
                                                 <c:if test="${r.verificationStatus != 'Verified'}">
                                                     <div class="d-flex justify-content-center gap-1">

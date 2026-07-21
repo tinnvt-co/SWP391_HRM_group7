@@ -11,6 +11,9 @@ import javax.crypto.spec.PBEKeySpec;
 
 public final class PasswordUtil {
 
+    public static final String PASSWORD_REQUIREMENTS =
+            "Password must be at least 8 characters and include at least one number and one special character.";
+
     private static final String HASH_PREFIX = "pbkdf2_sha256";
     private static final String PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256";
     private static final int ITERATIONS = 120_000;
@@ -19,6 +22,16 @@ public final class PasswordUtil {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private PasswordUtil() {
+    }
+
+    public static boolean meetsRequirements(String password) {
+        if (password == null || password.codePointCount(0, password.length()) < 8) {
+            return false;
+        }
+        boolean hasNumber = password.codePoints().anyMatch(Character::isDigit);
+        boolean hasSpecialCharacter = password.codePoints()
+                .anyMatch(c -> !Character.isLetterOrDigit(c) && !Character.isWhitespace(c));
+        return hasNumber && hasSpecialCharacter;
     }
 
     public static String hash(String password) {

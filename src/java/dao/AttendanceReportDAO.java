@@ -251,6 +251,54 @@ public class AttendanceReportDAO {
         }
     }
 
+    public boolean upsertApprovedByHrManager(AttendanceReport r, Integer reviewedBy,
+                                              String reviewNote) throws SQLException {
+        String sql =
+            "INSERT INTO attendance_reports "
+          + "(employee_id, manager_id, department_id, report_month, report_year, "
+          + " standard_working_days, actual_working_days, paid_leave_days, "
+          + " unpaid_leave_days, maternity_leave_days, overtime_hours, late_penalty_amount, "
+          + " status, submitted_at, reviewed_by, reviewed_at, hr_note) "
+          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+          + "        'Approved By HR Manager', NOW(), ?, NOW(), ?) "
+          + "ON DUPLICATE KEY UPDATE "
+          + " manager_id=VALUES(manager_id), department_id=VALUES(department_id), "
+          + " standard_working_days=VALUES(standard_working_days), "
+          + " actual_working_days=VALUES(actual_working_days), "
+          + " paid_leave_days=VALUES(paid_leave_days), "
+          + " unpaid_leave_days=VALUES(unpaid_leave_days), "
+          + " maternity_leave_days=VALUES(maternity_leave_days), "
+          + " overtime_hours=VALUES(overtime_hours), "
+          + " late_penalty_amount=VALUES(late_penalty_amount), "
+          + " status='Approved By HR Manager', submitted_at=NOW(), "
+          + " reviewed_by=VALUES(reviewed_by), reviewed_at=NOW(), "
+          + " hr_note=VALUES(hr_note), updated_at=NOW()";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, r.getEmployeeId());
+            ps.setInt(2, r.getManagerId());
+            ps.setInt(3, r.getDepartmentId());
+            ps.setInt(4, r.getReportMonth());
+            ps.setInt(5, r.getReportYear());
+            ps.setBigDecimal(6, nz(r.getStandardWorkingDays(), new BigDecimal("26")));
+            ps.setBigDecimal(7, nz(r.getActualWorkingDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(8, nz(r.getPaidLeaveDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(9, nz(r.getUnpaidLeaveDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(10, nz(r.getMaternityLeaveDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(11, nz(r.getOvertimeHours(), BigDecimal.ZERO));
+            ps.setBigDecimal(12, nz(r.getLatePenaltyAmount(), BigDecimal.ZERO));
+            if (reviewedBy == null) ps.setNull(13, Types.INTEGER);
+            else ps.setInt(13, reviewedBy);
+            ps.setString(14, reviewNote);
+            return ps.executeUpdate() > 0;
+        } finally {
+            close(conn, ps, null);
+        }
+    }
+
     public List<DepartmentWorkflowTask> findReadyDepartmentTasksForHrStaff()
             throws SQLException {
         return findDepartmentWorkflowTasks(false);

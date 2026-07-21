@@ -69,46 +69,52 @@
             <div class="card-body">
                 <h6 class="fw-bold mb-3"><i class="bi bi-person-plus me-2"></i>New Contract & Account Request</h6>
                 <form method="post" action="${pageContext.request.contextPath}/employee-account-requests?action=createRequest"
-                      enctype="multipart/form-data" class="row g-3">
+                      enctype="multipart/form-data" class="row g-3" novalidate>
                     <div class="col-md-4">
                         <label class="form-label small text-muted mb-1">Full Name</label>
-                        <input type="text" name="fullName" class="form-control" maxlength="100"
+                        <input type="text" name="fullName" class="form-control ${not empty accountRequestFieldErrors.fullName ? 'is-invalid' : ''}" maxlength="100"
                                value="${accountRequestForm.fullName}" required>
+                        <div class="invalid-feedback">${accountRequestFieldErrors.fullName}</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small text-muted mb-1">Email</label>
-                        <input type="email" name="email" class="form-control" maxlength="100"
+                        <input type="email" name="email" class="form-control ${not empty accountRequestFieldErrors.email ? 'is-invalid' : ''}" maxlength="100"
                                value="${accountRequestForm.email}" required>
+                        <div class="invalid-feedback">${accountRequestFieldErrors.email}</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small text-muted mb-1">Phone</label>
-                        <input type="text" name="phone" class="form-control" maxlength="15"
+                        <input type="text" name="phone" class="form-control ${not empty accountRequestFieldErrors.phone ? 'is-invalid' : ''}" maxlength="10"
                                value="${accountRequestForm.phone}"
-                               pattern="[0-9]{10,15}" inputmode="numeric" required>
+                               pattern="[0-9]{10}" inputmode="numeric" required>
+                        <div class="invalid-feedback">${accountRequestFieldErrors.phone}</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Gender</label>
-                        <select name="gender" class="form-select" required>
+                        <select name="gender" class="form-select ${not empty accountRequestFieldErrors.gender ? 'is-invalid' : ''}" required>
+                            <option value="">Select gender</option>
                             <c:forEach var="g" items="${genders}">
                                 <option value="${g}" ${accountRequestForm.gender == g ? 'selected' : ''}>${g}</option>
                             </c:forEach>
                         </select>
+                        <div class="invalid-feedback">${accountRequestFieldErrors.gender}</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Date of Birth</label>
-                        <input id="dateOfBirth" type="date" name="dateOfBirth" class="form-control"
+                        <input id="dateOfBirth" type="date" name="dateOfBirth" class="form-control ${not empty accountRequestFieldErrors.dateOfBirth ? 'is-invalid' : ''}"
                                value="${accountRequestForm.dateOfBirth}" required>
-                        <div class="invalid-feedback">Chua du 18 tuoi.</div>
+                        <div class="invalid-feedback">${not empty accountRequestFieldErrors.dateOfBirth ? accountRequestFieldErrors.dateOfBirth : 'Employee must be at least 18 years old.'}</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Hire Date</label>
-                        <input type="date" name="hireDate" class="form-control"
-                               value="${not empty accountRequestForm.hireDate ? accountRequestForm.hireDate : today}" required>
+                        <input type="date" name="hireDate" class="form-control ${not empty accountRequestFieldErrors.hireDate ? 'is-invalid' : ''}"
+                               value="${accountRequestForm ne null ? accountRequestForm.hireDate : today}" required>
+                        <div class="invalid-feedback">${accountRequestFieldErrors.hireDate}</div>
                     </div>
                     <c:if test="${hrManagerRequestScope}">
                         <div class="col-md-3">
                             <label class="form-label small text-muted mb-1">Requested Role</label>
-                            <select id="requestedRoleId" name="requestedRoleId" class="form-select" required>
+                            <select id="requestedRoleId" name="requestedRoleId" class="form-select ${not empty accountRequestFieldErrors.requestedRoleId ? 'is-invalid' : ''}" required>
                                 <option value="">Select role</option>
                                 <c:forEach var="role" items="${requestRoles}">
                                     <option value="${role.roleId}" data-role="${fn:trim(role.roleName)}"
@@ -117,11 +123,12 @@
                                     </option>
                                 </c:forEach>
                             </select>
+                            <div class="invalid-feedback">${accountRequestFieldErrors.requestedRoleId}</div>
                         </div>
                     </c:if>
                     <div class="col-md-4">
                         <label class="form-label small text-muted mb-1">Department</label>
-                        <select id="departmentId" name="departmentId" class="form-select" required>
+                        <select id="departmentId" name="departmentId" class="form-select ${not empty accountRequestFieldErrors.departmentId ? 'is-invalid' : ''}" required>
                             <option value="">Select department</option>
                             <c:forEach var="d" items="${departments}">
                                 <option value="${d.departmentId}" data-code="${fn:trim(d.departmentCode)}"
@@ -130,41 +137,48 @@
                                 </option>
                             </c:forEach>
                         </select>
+                        <div class="invalid-feedback">${accountRequestFieldErrors.departmentId}</div>
                     </div>
                     <div class="col-md-5">
                         <label class="form-label small text-muted mb-1">Address</label>
-                        <input type="text" name="address" class="form-control" maxlength="255"
+                        <input type="text" name="address" class="form-control ${not empty accountRequestFieldErrors.address ? 'is-invalid' : ''}" maxlength="255"
                                value="${accountRequestForm.address}" required>
+                        <div class="invalid-feedback">${accountRequestFieldErrors.address}</div>
                     </div>
                     <div class="col-12"><hr class="my-1"></div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Contract Type</label>
-                        <select name="contractType" class="form-select" required>
+                        <select name="contractType" class="form-select ${not empty accountRequestFieldErrors.contractType ? 'is-invalid' : ''}" required>
+                            <option value="">Select contract type</option>
                             <c:forEach var="ct" items="${contractTypes}">
                                 <option value="${ct}" ${accountRequestForm.contractType == ct ? 'selected' : ''}>${ct.dbValue}</option>
                             </c:forEach>
                         </select>
+                        <div class="invalid-feedback">${accountRequestFieldErrors.contractType}</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Contract Start</label>
-                        <input id="contractStartDate" type="date" name="contractStartDate" class="form-control"
-                               value="${not empty accountRequestForm.contractStartDate ? accountRequestForm.contractStartDate : today}" required>
+                        <input id="contractStartDate" type="date" name="contractStartDate" class="form-control ${not empty accountRequestFieldErrors.contractStartDate ? 'is-invalid' : ''}"
+                               value="${accountRequestForm ne null ? accountRequestForm.contractStartDate : today}" required>
+                        <div class="invalid-feedback">${accountRequestFieldErrors.contractStartDate}</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Contract End</label>
-                        <input id="contractEndDate" type="date" name="contractEndDate" class="form-control"
+                        <input id="contractEndDate" type="date" name="contractEndDate" class="form-control ${not empty accountRequestFieldErrors.contractEndDate ? 'is-invalid' : ''}"
                                value="${accountRequestForm.contractEndDate}">
-                        <div class="invalid-feedback">Contract end must be at least 1 month after contract start.</div>
+                        <div class="invalid-feedback">${not empty accountRequestFieldErrors.contractEndDate ? accountRequestFieldErrors.contractEndDate : 'Contract end must be at least 1 month after contract start.'}</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Basic Salary</label>
-                        <input type="number" name="basicSalary" class="form-control" min="0" step="1000"
+                        <input type="number" name="basicSalary" class="form-control ${not empty accountRequestFieldErrors.basicSalary ? 'is-invalid' : ''}" min="0" step="1000"
                                value="${accountRequestForm.basicSalary}" required>
+                        <div class="invalid-feedback">${accountRequestFieldErrors.basicSalary}</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Standard Working Days</label>
-                        <input type="number" name="standardWorkingDays" class="form-control" min="1" max="31" step="0.5"
-                               value="${not empty accountRequestForm.standardWorkingDays ? accountRequestForm.standardWorkingDays : '26'}" required>
+                        <input type="number" name="standardWorkingDays" class="form-control ${not empty accountRequestFieldErrors.standardWorkingDays ? 'is-invalid' : ''}" min="1" max="31" step="0.5"
+                               value="${accountRequestForm ne null ? accountRequestForm.standardWorkingDays : '26'}" required>
+                        <div class="invalid-feedback">${accountRequestFieldErrors.standardWorkingDays}</div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small text-muted mb-1">Contract Note (Optional)</label>
@@ -173,8 +187,9 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small text-muted mb-1">Signed Contract Document</label>
-                        <input type="file" name="contractDocument" class="form-control"
+                        <input type="file" name="contractDocument" class="form-control ${not empty accountRequestFieldErrors.contractDocument ? 'is-invalid' : ''}"
                                accept="application/pdf,image/png,image/jpeg" required>
+                        <div class="invalid-feedback">${accountRequestFieldErrors.contractDocument}</div>
                         <div class="form-text">PDF, JPG, or PNG. Maximum 10 MB.</div>
                         <c:if test="${not empty accountRequestForm}">
                             <div class="form-text text-warning">Please re-select the contract document before submitting again.</div>
@@ -356,7 +371,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!dobInput) return;
         if (!dobInput.value) {
             dobInput.setCustomValidity('');
-            dobInput.classList.remove('is-invalid');
             return;
         }
         const today = new Date();
@@ -364,7 +378,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const minimumDob = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
         const dob = new Date(dobInput.value + 'T00:00:00');
         const invalid = dob > minimumDob;
-        dobInput.setCustomValidity(invalid ? 'Chua du 18 tuoi.' : '');
+        dobInput.setCustomValidity(invalid ? 'Employee must be at least 18 years old.' : '');
         dobInput.classList.toggle('is-invalid', invalid);
     }
 

@@ -81,11 +81,16 @@
                         <div class="input-group">
                             <span class="input-group-text"><i class="bi bi-lock-fill text-secondary"></i></span>
                             <input type="password" id="newPassword" name="newPassword"
-                                   class="form-control" placeholder="Enter new password (min. 6 characters)"
-                                   minlength="6" required oninput="checkStrength(this.value)">
+                                   class="form-control" placeholder="Enter a strong new password"
+                                   minlength="8" pattern="(?=.*\p{N})(?=.*[^\p{L}\p{N}\s]).{8,}"
+                                   title="Use at least 8 characters, including one number and one special character."
+                                   aria-describedby="passwordRequirements" required oninput="checkStrength(this.value)">
                             <button class="btn btn-outline-secondary" type="button" onclick="toggle('newPassword','eye1')">
                                 <i class="bi bi-eye" id="eye1"></i>
                             </button>
+                        </div>
+                        <div id="passwordRequirements" class="form-text">
+                            At least 8 characters, including one number and one special character.
                         </div>
                         <div class="mt-2">
                             <div class="d-flex gap-1">
@@ -135,10 +140,10 @@
 
     function checkStrength(val) {
         let score = 0;
-        if (val.length >= 6)  score++;
-        if (val.length >= 10) score++;
-        if (/[A-Z]/.test(val) && /[0-9]/.test(val)) score++;
-        if (/[^A-Za-z0-9]/.test(val)) score++;
+        if (val.length >= 8) score++;
+        if (/\p{N}/u.test(val)) score++;
+        if (/[^\p{L}\p{N}\s]/u.test(val)) score++;
+        if (val.length >= 12 && /[A-Z]/.test(val)) score++;
 
         const colors = ['', 'danger', 'warning', 'info', 'success'];
         const labels = ['', 'Weak', 'Fair', 'Good', 'Strong'];

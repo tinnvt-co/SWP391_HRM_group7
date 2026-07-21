@@ -88,12 +88,10 @@
                     <span>This contract is <strong>${contract.status}</strong> and is read-only.</span>
                 </div>
             </c:if>
-            <c:if test="${systemContract}">
+            <c:if test="${systemContract && canEditSystemContract}">
                 <div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-3">
                     <i class="bi bi-lock-fill"></i>
-                    <span>
-                        ${canEditSystemContract ? 'This is a system-seeded contract. HR Manager can edit it.' : 'This is a system-seeded contract and cannot be edited from the UI.'}
-                    </span>
+                    <span>This is a system-seeded contract. HR Manager can edit it.</span>
                 </div>
             </c:if>
 

@@ -127,6 +127,13 @@ public class AttendanceServlet extends HttpServlet {
                     }
                     handleConfirmToHr(request, response);
                 }
+                case "confirmHrDepartment" -> {
+                    if (!hasPermission(request, "VERIFY_STAFF_ATTENDANCE")) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                    handleConfirmHrDepartment(request, response);
+                }
                 default -> response.sendRedirect(request.getContextPath() + "/attendance");
             }
         } catch (SQLException e) {
@@ -140,9 +147,9 @@ public class AttendanceServlet extends HttpServlet {
         User currentUser = getCurrentUser(request);
         String roleName  = currentUser.getRole() != null ? currentUser.getRole().getRoleName() : "";
 
-        boolean managerScope = "MANAGER".equalsIgnoreCase(roleName);
+        boolean managerScope = "MANAGER".equalsIgnoreCase(roleName)
+                || "HR_MANAGER".equalsIgnoreCase(roleName);
         boolean hrScope      = "HR_STAFF".equalsIgnoreCase(roleName)
-                            || "HR_MANAGER".equalsIgnoreCase(roleName)
                             || "ADMIN".equalsIgnoreCase(roleName);
 
         if (managerScope || hrScope) {
@@ -151,12 +158,19 @@ public class AttendanceServlet extends HttpServlet {
 
         Integer deptId = parseIntOrNull(request.getParameter("deptId"));
         List<Department> attendanceDepartments = null;
+        Department selectedDepartment = null;
+        Department managedDepartment = managerScope
+                ? findAttendanceDepartmentManagedBy(currentUser.getUserId()) : null;
         if (hrScope) {
             attendanceDepartments = departmentDAO.findAttendanceDepartments();
             if (!containsDepartment(attendanceDepartments, deptId)) {
                 deptId = attendanceDepartments.isEmpty() ? null : attendanceDepartments.get(0).getDepartmentId();
             }
+            selectedDepartment = findDepartment(attendanceDepartments, deptId);
         }
+        boolean hrDepartmentReviewerScope = "HR_MANAGER".equalsIgnoreCase(roleName)
+                && managedDepartment != null
+                && "HR".equalsIgnoreCase(managedDepartment.getDepartmentCode());
 
         YearMonth selectedMonth = parseYearMonth(request.getParameter("year"), request.getParameter("month"));
         if (selectedMonth == null) {
@@ -174,6 +188,10 @@ public class AttendanceServlet extends HttpServlet {
 
         request.setAttribute("managerScope", managerScope);
         request.setAttribute("hrScope", hrScope);
+        request.setAttribute("departmentReviewerScope", managerScope || hrDepartmentReviewerScope);
+        request.setAttribute("hrDepartmentReviewerScope", hrDepartmentReviewerScope);
+        request.setAttribute("confirmAttendanceAction",
+                hrDepartmentReviewerScope ? "confirmHrDepartment" : "confirmToHr");
         request.setAttribute("selectedYear", selectedMonth.getYear());
         request.setAttribute("selectedMonth", selectedMonth.getMonthValue());
         request.setAttribute("yearOptions", buildYearOptions(selectedMonth.getYear()));
@@ -190,6 +208,16 @@ public class AttendanceServlet extends HttpServlet {
             request.setAttribute("employeeCards", cards);
             request.setAttribute("pendingCount",
                     attendanceDAO.countPendingByManager(currentUser.getUserId(), monthStart, monthEnd));
+            boolean confirmEnabled = hrDepartmentReviewerScope
+                    ? !cards.isEmpty() && !reportDAO.hasHrManagerApprovedMonth(
+                            selectedMonth.getYear(), selectedMonth.getMonthValue(),
+                            managedDepartment.getDepartmentId())
+                    : attendanceDAO.countPendingByManager(
+                            currentUser.getUserId(), monthStart, monthEnd) > 0;
+            request.setAttribute("confirmAttendanceEnabled", confirmEnabled);
+            if (managedDepartment != null) {
+                request.setAttribute("selectedDeptId", managedDepartment.getDepartmentId());
+            }
 
         } else if (hrScope) {
             // HR Staff / HR Manager: show department list first, then cards if dept selected
@@ -200,6 +228,14 @@ public class AttendanceServlet extends HttpServlet {
                         attendanceDAO.summaryByDepartment(deptId, monthStart, monthEnd);
                 request.setAttribute("employeeCards", cards);
                 request.setAttribute("selectedDeptId", deptId);
+                if (hrDepartmentReviewerScope) {
+                    int pendingCount = attendanceDAO.countPendingByDepartmentMonth(
+                            selectedMonth.getYear(), selectedMonth.getMonthValue(), deptId);
+                    request.setAttribute("pendingCount", pendingCount);
+                    request.setAttribute("confirmAttendanceEnabled",
+                            !cards.isEmpty() && !reportDAO.hasHrManagerApprovedMonth(
+                                    selectedMonth.getYear(), selectedMonth.getMonthValue(), deptId));
+                }
             }
 
         } else {
@@ -242,10 +278,17 @@ public class AttendanceServlet extends HttpServlet {
         }
 
         // Regular employee can only see their own records.
-        boolean managerScope = "MANAGER".equalsIgnoreCase(roleName);
+        boolean managerScope = "MANAGER".equalsIgnoreCase(roleName)
+                || "HR_MANAGER".equalsIgnoreCase(roleName);
         boolean hrScope      = "HR_STAFF".equalsIgnoreCase(roleName)
-                            || "HR_MANAGER".equalsIgnoreCase(roleName)
                             || "ADMIN".equalsIgnoreCase(roleName);
+        Employee emp = employeeDAO.findById(employeeId);
+        boolean managesEmployee = managerScope && emp != null
+                && managesAttendanceDepartment(currentUser.getUserId(), emp.getDepartmentId());
+        if (managerScope && !managesEmployee) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+            return;
+        }
         if (!managerScope && !hrScope) {
             Employee me = employeeDAO.findByUserId(currentUser.getUserId());
             if (me == null || me.getEmployeeId() != employeeId) {
@@ -269,7 +312,7 @@ public class AttendanceServlet extends HttpServlet {
         List<AttendanceRecord> records = attendanceDAO.findByEmployeeId(
                 employeeId, fromDate, toDate, (page - 1) * PAGE_SIZE, PAGE_SIZE);
 
-        Employee emp = employeeDAO.findById(employeeId);
+        boolean canManageAttendance = managesEmployee;
 
         request.setAttribute("records", records);
         request.setAttribute("detailEmployee", emp);
@@ -281,6 +324,7 @@ public class AttendanceServlet extends HttpServlet {
         request.setAttribute("totalRecords", totalRecords);
         request.setAttribute("managerScope", managerScope);
         request.setAttribute("hrScope", hrScope);
+        request.setAttribute("canManageAttendance", canManageAttendance);
 
         request.getRequestDispatcher("/views/attendance/attendance-detail.jsp")
                .forward(request, response);
@@ -472,6 +516,7 @@ public class AttendanceServlet extends HttpServlet {
         String workDateStr  = trim(request.getParameter("workDate"));
         String statusStr    = request.getParameter("attendanceStatus");
         String overtimeStr  = trim(request.getParameter("overtimeHours"));
+        String lateMinutesStr = trim(request.getParameter("lateMinutes"));
         String note         = trim(request.getParameter("note"));
 
         if (workDateStr.isEmpty() || statusStr == null || statusStr.isBlank()) {
@@ -498,6 +543,27 @@ public class AttendanceServlet extends HttpServlet {
             forwardEditForm(request, response, existing, "Invalid attendance status.");
             return;
         }
+        existing.setAttendanceStatus(status);
+
+        int lateMinutes = 0;
+        BigDecimal latePenaltyAmount = BigDecimal.ZERO;
+        if (status == AttendanceStatus.Late) {
+            try {
+                lateMinutes = Integer.parseInt(lateMinutesStr);
+                if (lateMinutes <= 0 || lateMinutes > 1440) {
+                    forwardEditForm(request, response, existing,
+                            "Late minutes must be between 1 and 1440.");
+                    return;
+                }
+                latePenaltyAmount = calculateLatePenalty(lateMinutes);
+                existing.setLateMinutes(lateMinutes);
+                existing.setLatePenaltyAmount(latePenaltyAmount);
+            } catch (NumberFormatException ex) {
+                forwardEditForm(request, response, existing,
+                        "Please enter the number of late minutes.");
+                return;
+            }
+        }
 
         BigDecimal overtimeHours = BigDecimal.ZERO;
         if (!overtimeStr.isEmpty()) {
@@ -508,6 +574,7 @@ public class AttendanceServlet extends HttpServlet {
                             "Overtime hours cannot be negative.");
                     return;
                 }
+                existing.setOvertimeHours(overtimeHours);
             } catch (NumberFormatException ex) {
                 forwardEditForm(request, response, existing, "Invalid overtime hours.");
                 return;
@@ -530,10 +597,8 @@ public class AttendanceServlet extends HttpServlet {
         existing.setWorkDate(workDate);
         existing.setOvertimeHours(overtimeHours);
         existing.setAttendanceStatus(status);
-        if (status != AttendanceStatus.Late) {
-            existing.setLateMinutes(0);
-            existing.setLatePenaltyAmount(BigDecimal.ZERO);
-        }
+        existing.setLateMinutes(lateMinutes);
+        existing.setLatePenaltyAmount(latePenaltyAmount);
         existing.setNote(note);
 
         attendanceDAO.update(existing);
@@ -549,6 +614,13 @@ public class AttendanceServlet extends HttpServlet {
         request.setAttribute("statuses", AttendanceStatus.values());
         request.getRequestDispatcher("/views/attendance/edit-attendance.jsp")
                .forward(request, response);
+    }
+
+    private BigDecimal calculateLatePenalty(int lateMinutes) {
+        if (lateMinutes < 5) return BigDecimal.ZERO;
+        if (lateMinutes <= 30) return new BigDecimal("50000");
+        if (lateMinutes <= 60) return new BigDecimal("100000");
+        return new BigDecimal("200000");
     }
 
     private void handleVerify(HttpServletRequest request, HttpServletResponse response)
@@ -649,6 +721,92 @@ public class AttendanceServlet extends HttpServlet {
         response.sendRedirect(ctx + "/attendance");
     }
 
+    private void handleConfirmHrDepartment(HttpServletRequest request,
+                                           HttpServletResponse response)
+            throws SQLException, IOException {
+        User currentUser = getCurrentUser(request);
+        HttpSession session = request.getSession(true);
+        String ctx = request.getContextPath();
+        String roleName = currentUser != null && currentUser.getRole() != null
+                ? currentUser.getRole().getRoleName() : "";
+        if (!"HR_MANAGER".equalsIgnoreCase(roleName)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+            return;
+        }
+
+        Department hrDepartment = findDepartmentByCode("HR");
+        if (hrDepartment == null) {
+            session.setAttribute("importError", "Human Resources department was not found.");
+            response.sendRedirect(ctx + "/attendance");
+            return;
+        }
+        if (hrDepartment.getManagerId() == null
+                || hrDepartment.getManagerId() != currentUser.getUserId()) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+            return;
+        }
+
+        YearMonth month = parseYearMonth(request.getParameter("year"), request.getParameter("month"));
+        if (month == null) month = YearMonth.now();
+        int departmentId = hrDepartment.getDepartmentId();
+        String redirect = ctx + "/attendance?deptId=" + departmentId
+                + "&year=" + month.getYear() + "&month=" + month.getMonthValue();
+
+        if (reportDAO.hasHrManagerApprovedMonth(
+                month.getYear(), month.getMonthValue(), departmentId)) {
+            session.setAttribute("importError",
+                    "Human Resources attendance for " + monthLabel(month)
+                            + " has already been confirmed and is closed.");
+            response.sendRedirect(redirect);
+            return;
+        }
+
+        int verified = attendanceDAO.verifyPendingByDepartmentMonth(
+                currentUser.getUserId(), month.getYear(), month.getMonthValue(), departmentId);
+        List<AttendanceRecordDAO.MonthlySummary> summaries =
+                attendanceDAO.aggregateMonthByDepartment(
+                        month.getYear(), month.getMonthValue(), departmentId);
+        if (summaries.isEmpty()) {
+            session.setAttribute("importError",
+                    "No Human Resources attendance records are available for " + monthLabel(month) + ".");
+            response.sendRedirect(redirect);
+            return;
+        }
+
+        int reports = 0;
+        for (AttendanceRecordDAO.MonthlySummary summary : summaries) {
+            AttendanceReport report = buildReport(
+                    summary, currentUser.getUserId(), month.getYear(), month.getMonthValue());
+            if (reportDAO.upsertApprovedByHrManager(
+                    report, currentUser.getUserId(),
+                    "HR attendance reviewed and confirmed by HR Manager")) {
+                reports++;
+            }
+        }
+
+        session.setAttribute("importMessage",
+                "Confirmed " + verified + " pending Human Resources attendance record(s) and approved "
+                        + reports + " monthly report(s). HR Staff can now calculate payroll.");
+        response.sendRedirect(redirect);
+    }
+
+    private AttendanceReport buildReport(AttendanceRecordDAO.MonthlySummary summary,
+                                         int managerUserId, int year, int month) {
+        AttendanceReport report = new AttendanceReport();
+        report.setEmployeeId(summary.employeeId);
+        report.setManagerId(managerUserId);
+        report.setDepartmentId(summary.departmentId);
+        report.setReportMonth(month);
+        report.setReportYear(year);
+        report.setActualWorkingDays(BigDecimal.valueOf(summary.actualWorkingDays));
+        report.setPaidLeaveDays(BigDecimal.valueOf(summary.paidLeaveDays));
+        report.setUnpaidLeaveDays(BigDecimal.valueOf(summary.unpaidLeaveDays));
+        report.setMaternityLeaveDays(BigDecimal.valueOf(summary.maternityLeaveDays));
+        report.setOvertimeHours(summary.overtimeHours);
+        report.setLatePenaltyAmount(summary.latePenaltyAmount);
+        return report;
+    }
+
     private AttendanceRecord loadOwnedRecordOrError(HttpServletRequest request,
                                                     HttpServletResponse response)
             throws SQLException, IOException {
@@ -678,8 +836,14 @@ public class AttendanceServlet extends HttpServlet {
         Employee attendanceEmployee = employeeDAO.findById(existing.getEmployeeId());
         boolean isOwnAttendance = attendanceEmployee != null
                 && attendanceEmployee.getUserId() == currentUser.getUserId();
+        String roleName = currentUser.getRole() == null ? "" : currentUser.getRole().getRoleName();
+        boolean managesDepartment = ("MANAGER".equalsIgnoreCase(roleName)
+                || "HR_MANAGER".equalsIgnoreCase(roleName))
+                && attendanceEmployee != null
+                && managesAttendanceDepartment(
+                        currentUser.getUserId(), attendanceEmployee.getDepartmentId());
 
-        if (!ownsThis && !isOwnAttendance) {
+        if (!ownsThis && !isOwnAttendance && !managesDepartment) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN);
             return null;
         }
@@ -732,6 +896,41 @@ public class AttendanceServlet extends HttpServlet {
             if (d.getDepartmentId() == departmentId) return true;
         }
         return false;
+    }
+
+    private Department findDepartment(List<Department> departments, Integer departmentId) {
+        if (departmentId == null || departments == null) return null;
+        for (Department department : departments) {
+            if (department.getDepartmentId() == departmentId) return department;
+        }
+        return null;
+    }
+
+    private Department findDepartmentByCode(String departmentCode) throws SQLException {
+        for (Department department : departmentDAO.findAttendanceDepartments()) {
+            if (departmentCode.equalsIgnoreCase(department.getDepartmentCode())) return department;
+        }
+        return null;
+    }
+
+    private Department findAttendanceDepartmentManagedBy(int managerUserId) throws SQLException {
+        for (Department department : departmentDAO.findAttendanceDepartments()) {
+            if (department.getManagerId() != null
+                    && department.getManagerId() == managerUserId) {
+                return department;
+            }
+        }
+        return null;
+    }
+
+    private boolean managesAttendanceDepartment(int managerUserId, int departmentId)
+            throws SQLException {
+        Department department = departmentDAO.findById(departmentId);
+        return department != null
+                && department.isActive()
+                && department.getManagerId() != null
+                && department.getManagerId() == managerUserId
+                && !"IT".equalsIgnoreCase(department.getDepartmentCode());
     }
 
     private void attachPayrollTaskSummary(HttpServletRequest request, String roleName)

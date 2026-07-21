@@ -58,6 +58,7 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
 
     private static final int PAGE_SIZE = 10;
     private static final String REQUEST_FORM_SESSION_KEY = "employeeAccountRequestForm";
+    private static final String REQUEST_FIELD_ERRORS_SESSION_KEY = "employeeAccountRequestFieldErrors";
     private static final String TEMP_PASSWORD_CHARS =
             "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
@@ -134,7 +135,8 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             throw new ServletException(e);
         } catch (IllegalStateException e) {
             preserveRequestForm(request);
-            flashError(request, "Contract document must be 10 MB or smaller.");
+            flashFieldError(request, "contractDocument", "Contract document must be 10 MB or smaller.");
+            flashError(request, "Please correct the highlighted field.");
             response.sendRedirect(request.getContextPath() + "/employee-account-requests");
         }
     }
@@ -151,23 +153,26 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
         EmployeeAccountRequest accountRequest = readRequestForm(request);
         accountRequest.setRequestedBy(currentUser.getUserId());
 
-        String error = validateRequestForm(accountRequest, currentUser);
-        if (error != null) {
+        Map<String, String> fieldErrors = validateRequestForm(request, accountRequest, currentUser);
+        if (!fieldErrors.isEmpty()) {
             preserveRequestForm(request);
-            flashError(request, error);
+            flashFieldErrors(request, fieldErrors);
+            flashError(request, "Please correct the highlighted fields.");
             response.sendRedirect(request.getContextPath() + "/employee-account-requests");
             return;
         }
 
         if (userDAO.findByEmail(accountRequest.getEmail()) != null) {
             preserveRequestForm(request);
-            flashError(request, "This email is already linked to an existing account.");
+            flashFieldError(request, "email", "This email is already linked to an existing account.");
+            flashError(request, "Please correct the highlighted field.");
             response.sendRedirect(request.getContextPath() + "/employee-account-requests");
             return;
         }
         if (requestDAO.hasPendingByEmail(accountRequest.getEmail())) {
             preserveRequestForm(request);
-            flashError(request, "There is already a pending account request for this email.");
+            flashFieldError(request, "email", "There is already a pending account request for this email.");
+            flashError(request, "Please correct the highlighted field.");
             response.sendRedirect(request.getContextPath() + "/employee-account-requests");
             return;
         }
@@ -177,7 +182,8 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             document = readUploadedRequestDocument(request, currentUser.getUserId());
         } catch (IOException | ServletException ex) {
             preserveRequestForm(request);
-            flashError(request, ex.getMessage());
+            flashFieldError(request, "contractDocument", ex.getMessage());
+            flashError(request, "Please correct the highlighted field.");
             response.sendRedirect(request.getContextPath() + "/employee-account-requests");
             return;
         }
@@ -317,7 +323,7 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
 
         String hireDate = trim(request.getParameter("hireDate"));
         try {
-            r.setHireDate(hireDate.isEmpty() ? LocalDate.now() : LocalDate.parse(hireDate));
+            r.setHireDate(hireDate.isEmpty() ? null : LocalDate.parse(hireDate));
         } catch (DateTimeParseException ex) {
             r.setHireDate(null);
         }
@@ -329,7 +335,7 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
         }
         String contractStart = trim(request.getParameter("contractStartDate"));
         try {
-            r.setContractStartDate(contractStart.isEmpty() ? r.getHireDate() : LocalDate.parse(contractStart));
+            r.setContractStartDate(contractStart.isEmpty() ? null : LocalDate.parse(contractStart));
         } catch (DateTimeParseException ex) {
             r.setContractStartDate(null);
         }
@@ -339,62 +345,99 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             catch (DateTimeParseException ignored) {}
         }
         r.setBasicSalary(parsePositiveDecimal(request.getParameter("basicSalary")));
-        BigDecimal workingDays = parsePositiveDecimal(request.getParameter("standardWorkingDays"));
-        r.setStandardWorkingDays(workingDays == null ? new BigDecimal("26") : workingDays);
+        r.setStandardWorkingDays(parsePositiveDecimal(request.getParameter("standardWorkingDays")));
         r.setContractNote(limit(trim(request.getParameter("contractNote")), 255));
         return r;
     }
 
-    private String validateRequestForm(EmployeeAccountRequest r, User requester) throws SQLException {
-        List<String> missing = new ArrayList<>();
-        if (isBlank(r.getFullName())) missing.add("Full Name");
-        if (isBlank(r.getEmail())) missing.add("Email");
-        if (isBlank(r.getPhone())) missing.add("Phone");
-        if (r.getGender() == null) missing.add("Gender");
-        if (r.getDateOfBirth() == null) missing.add("Date of Birth");
-        if (isBlank(r.getAddress())) missing.add("Address");
-        if (r.getDepartmentId() <= 0) missing.add("Department");
-        if (r.getHireDate() == null) missing.add("Hire Date");
-        if (isRole(requester, "HR_MANAGER") && r.getRequestedRoleId() <= 0) missing.add("Requested Role");
-        if (r.getContractType() == null) missing.add("Contract Type");
-        if (r.getContractStartDate() == null) missing.add("Contract Start");
-        if (r.getBasicSalary() == null) missing.add("Basic Salary");
-        if (r.getStandardWorkingDays() == null) missing.add("Standard Working Days");
-        if (!missing.isEmpty()) {
-            return "Please fill in: " + String.join(", ", missing) + ".";
+    private Map<String, String> validateRequestForm(HttpServletRequest request,
+                                                     EmployeeAccountRequest r,
+                                                     User requester) throws SQLException {
+        Map<String, String> errors = new LinkedHashMap<>();
+
+        if (isBlank(r.getFullName())) {
+            errors.put("fullName", "Full name is required.");
+        } else if (!r.getFullName().matches("^[\\p{L}][\\p{L} .'-]{1,99}$")) {
+            errors.put("fullName", "Full name may contain letters, spaces, apostrophes, hyphens, and periods only.");
         }
-        if (!r.getEmail().matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
-            return "Please enter a valid email address.";
+        if (isBlank(r.getEmail())) {
+            errors.put("email", "Email is required.");
+        } else if (!r.getEmail().matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+            errors.put("email", "Enter a valid email address, for example employee@gmail.com.");
         }
-        if (!r.getPhone().matches("^[0-9]{10,15}$")) {
-            return "Phone number must contain digits only and be 10 to 15 characters long.";
+        if (isBlank(r.getPhone())) {
+            errors.put("phone", "Phone number is required.");
+        } else if (!r.getPhone().matches("^[0-9]{10}$")) {
+            errors.put("phone", "Phone number must contain exactly 10 digits.");
         }
-        if (r.getDateOfBirth().isAfter(LocalDate.now())) {
-            return "Date of birth cannot be in the future.";
+        if (r.getGender() == null) {
+            errors.put("gender", "Please select a gender.");
         }
-        if (r.getDateOfBirth().isAfter(LocalDate.now().minusYears(18))) {
-            return "Employee must be at least 18 years old.";
+        if (isBlank(request.getParameter("dateOfBirth")) || r.getDateOfBirth() == null) {
+            errors.put("dateOfBirth", "Enter a valid date of birth.");
+        } else if (r.getDateOfBirth().isAfter(LocalDate.now().minusYears(18))) {
+            errors.put("dateOfBirth", "Employee must be at least 18 years old.");
         }
-        if (r.getContractStartDate().isBefore(r.getHireDate())) {
-            return "Contract start date cannot be before hire date.";
+        if (isBlank(r.getAddress())) {
+            errors.put("address", "Address is required.");
         }
-        if (r.getContractEndDate() != null
+        if (r.getDepartmentId() <= 0) {
+            errors.put("departmentId", "Please select a department.");
+        }
+        if (isBlank(request.getParameter("hireDate")) || r.getHireDate() == null) {
+            errors.put("hireDate", "Enter a valid hire date.");
+        }
+        if (isRole(requester, "HR_MANAGER") && r.getRequestedRoleId() <= 0) {
+            errors.put("requestedRoleId", "Please select a requested role.");
+        }
+        if (r.getContractType() == null) {
+            errors.put("contractType", "Please select a contract type.");
+        }
+        if (isBlank(request.getParameter("contractStartDate")) || r.getContractStartDate() == null) {
+            errors.put("contractStartDate", "Enter a valid contract start date.");
+        }
+        if (!isBlank(request.getParameter("contractEndDate")) && r.getContractEndDate() == null) {
+            errors.put("contractEndDate", "Enter a valid contract end date.");
+        }
+        if (isBlank(request.getParameter("basicSalary")) || r.getBasicSalary() == null) {
+            errors.put("basicSalary", "Basic salary must be a non-negative number.");
+        }
+        if (isBlank(request.getParameter("standardWorkingDays")) || r.getStandardWorkingDays() == null
+                || r.getStandardWorkingDays().signum() <= 0
+                || r.getStandardWorkingDays().compareTo(new BigDecimal("31")) > 0) {
+            errors.put("standardWorkingDays", "Standard working days must be greater than 0 and no more than 31.");
+        }
+
+        if (!errors.containsKey("contractStartDate") && !errors.containsKey("hireDate")
+                && r.getContractStartDate().isBefore(r.getHireDate())) {
+            errors.put("contractStartDate", "Contract start date cannot be before hire date.");
+        }
+        if (!errors.containsKey("contractEndDate") && r.getContractEndDate() != null
+                && r.getContractStartDate() != null
                 && r.getContractEndDate().isBefore(r.getContractStartDate().plusMonths(1))) {
-            return "Contract end date must be at least 1 month after contract start date.";
+            errors.put("contractEndDate", "Contract end date must be at least 1 month after contract start date.");
         }
-        if (r.getBasicSalary().signum() < 0 || r.getStandardWorkingDays().signum() <= 0) {
-            return "Salary must be non-negative and standard working days must be greater than 0.";
+
+        Role requestedRole = null;
+        if (!errors.containsKey("requestedRoleId")) {
+            requestedRole = requestedRoleForRequester(r, requester);
+            if (requestedRole == null || !requestedRole.isActive()) {
+                errors.put("requestedRoleId", "Please select an active requested role.");
+            } else {
+                r.setRequestedRoleId(requestedRole.getRoleId());
+            }
         }
-        Role requestedRole = requestedRoleForRequester(r, requester);
-        if (requestedRole == null || !requestedRole.isActive()) {
-            return "The requested role is not configured or inactive.";
+        if (requestedRole != null && !errors.containsKey("departmentId")) {
+            String roleError = validateRequestedRoleAndDepartment(r, requestedRole, requester);
+            if (roleError != null) {
+                errors.put("departmentId", roleError);
+            }
         }
-        r.setRequestedRoleId(requestedRole.getRoleId());
-        String roleError = validateRequestedRoleAndDepartment(r, requestedRole, requester);
-        if (roleError != null) return roleError;
-        Department department = departmentDAO.findById(r.getDepartmentId());
-        r.setPositionTitle(generatedPositionTitle(requestedRole, department));
-        return null;
+        if (errors.isEmpty()) {
+            Department department = departmentDAO.findById(r.getDepartmentId());
+            r.setPositionTitle(generatedPositionTitle(requestedRole, department));
+        }
+        return errors;
     }
 
     private List<Department> requestDepartments(User requester) throws SQLException {
@@ -769,6 +812,7 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
         Object msg = session.getAttribute("accountRequestMessage");
         Object err = session.getAttribute("accountRequestError");
         Object form = session.getAttribute(REQUEST_FORM_SESSION_KEY);
+        Object fieldErrors = session.getAttribute(REQUEST_FIELD_ERRORS_SESSION_KEY);
         if (msg != null) {
             request.setAttribute("accountRequestMessage", msg);
             session.removeAttribute("accountRequestMessage");
@@ -781,6 +825,10 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             request.setAttribute("accountRequestForm", form);
             session.removeAttribute(REQUEST_FORM_SESSION_KEY);
         }
+        if (fieldErrors != null) {
+            request.setAttribute("accountRequestFieldErrors", fieldErrors);
+            session.removeAttribute(REQUEST_FIELD_ERRORS_SESSION_KEY);
+        }
     }
 
     private void flash(HttpServletRequest request, String message) {
@@ -789,6 +837,17 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
 
     private void flashError(HttpServletRequest request, String message) {
         request.getSession(true).setAttribute("accountRequestError", message);
+    }
+
+    private void flashFieldErrors(HttpServletRequest request, Map<String, String> errors) {
+        request.getSession(true).setAttribute(
+                REQUEST_FIELD_ERRORS_SESSION_KEY, new LinkedHashMap<>(errors));
+    }
+
+    private void flashFieldError(HttpServletRequest request, String field, String message) {
+        Map<String, String> errors = new LinkedHashMap<>();
+        errors.put(field, message);
+        flashFieldErrors(request, errors);
     }
 
     private void preserveRequestForm(HttpServletRequest request) {
@@ -812,6 +871,7 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
         HttpSession session = request.getSession(false);
         if (session != null) {
             session.removeAttribute(REQUEST_FORM_SESSION_KEY);
+            session.removeAttribute(REQUEST_FIELD_ERRORS_SESSION_KEY);
         }
     }
 

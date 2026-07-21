@@ -15,6 +15,7 @@ public class Employee {
     private int departmentId;
     private LocalDate hireDate;
     private EmploymentStatus employmentStatus;
+    private int dependentCount;
     private String bankName;
     private String bankAccountNumber;
     private String bankBranch;
@@ -49,6 +50,9 @@ public class Employee {
 
     public EmploymentStatus getEmploymentStatus()           { return employmentStatus; }
     public void setEmploymentStatus(EmploymentStatus s)     { this.employmentStatus = s; }
+
+    public int getDependentCount()                           { return dependentCount; }
+    public void setDependentCount(int dependentCount)        { this.dependentCount = dependentCount; }
 
     public String getBankName()                             { return bankName; }
     public void setBankName(String bankName)                { this.bankName = bankName; }

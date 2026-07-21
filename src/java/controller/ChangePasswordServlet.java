@@ -49,8 +49,8 @@ public class ChangePasswordServlet extends HttpServlet {
             return;
         }
 
-        if (newPass.length() < 6) {
-            request.setAttribute("error", "New password must be at least 6 characters.");
+        if (!PasswordUtil.meetsRequirements(newPass)) {
+            request.setAttribute("error", PasswordUtil.PASSWORD_REQUIREMENTS);
             request.getRequestDispatcher("/views/profile/change-password.jsp").forward(request, response);
             return;
         }

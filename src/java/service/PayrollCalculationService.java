@@ -7,7 +7,9 @@ import dao.EmployeeDAO;
 import dao.HolidayDAO;
 import model.AttendanceRecord;
 import model.AttendanceReport;
+import model.AllowanceType;
 import model.Contract;
+import model.Employee;
 import model.Payroll;
 
 import java.math.BigDecimal;
@@ -30,6 +32,9 @@ import java.util.Set;
  *   attendance bonus = 500,000 VND when the period has full attendance
  *   gross = work salary + payable allowances + attendance bonus + KPI bonus + OT salary
  *   insurance base = work salary + KPI bonus + OT salary
+ *   taxable income = gross - tax-exempt lunch allowance - employee insurance
+ *                    - personal deduction - dependent deductions
+ *   PIT = seven-bracket progressive tax requested by the payroll specification
  *   deductions = employee insurance + PIT + advance payment + late penalty
  *   net = gross - deductions
  *
@@ -50,6 +55,9 @@ public class PayrollCalculationService {
     public static final BigDecimal WEEKEND_OT_MULTIPLIER = new BigDecimal("2.0");
     public static final BigDecimal HOLIDAY_OT_MULTIPLIER = new BigDecimal("3.0");
     public static final BigDecimal FULL_ATTENDANCE_BONUS = new BigDecimal("500000");
+    public static final BigDecimal PERSONAL_DEDUCTION = new BigDecimal("11000000");
+    public static final BigDecimal DEPENDENT_DEDUCTION = new BigDecimal("4400000");
+    public static final BigDecimal LUNCH_TAX_EXEMPT_LIMIT = new BigDecimal("730000");
 
     private static final BigDecimal HOURS_PER_DAY = new BigDecimal("8");
     private static final int SCALE = 0;
@@ -108,12 +116,14 @@ public class PayrollCalculationService {
         BigDecimal otSalary = normalOtSalary.add(weekendOtSalary).add(holidayOtSalary);
 
         boolean fullMaternityMonth = maternityLeaveDays.compareTo(stdDays) >= 0;
+        AllowanceBreakdown allowanceBreakdown = fixedMonthly
+                || fullMaternityMonth || actualDays.signum() <= 0
+                ? new AllowanceBreakdown()
+                : calculateAllowances(
+                        employeeDAO.findRoleNameByEmployeeId(report.getEmployeeId()));
         BigDecimal allowance = fixedMonthly
                 ? nz(c.getFixedAllowanceAmount())
-                : (!fullMaternityMonth && actualDays.signum() > 0
-                    ? nz(allowanceDAO.sumPayableAllowancesForRole(
-                            employeeDAO.findRoleNameByEmployeeId(report.getEmployeeId())))
-                    : BigDecimal.ZERO);
+                : allowanceBreakdown.total;
         BigDecimal attendanceBonus = !fixedMonthly
                 && qualifiesForFullAttendanceBonus(actualDays, stdDays, fullMaternityMonth, overtime)
                     ? FULL_ATTENDANCE_BONUS
@@ -125,7 +135,20 @@ public class PayrollCalculationService {
         BigDecimal socialInsurance = insuranceBase.multiply(SOCIAL_INSURANCE_RATE);
         BigDecimal healthInsurance = insuranceBase.multiply(HEALTH_INSURANCE_RATE);
         BigDecimal unemploymentInsurance = insuranceBase.multiply(UNEMPLOYMENT_INSURANCE_RATE);
-        BigDecimal personalIncomeTax = BigDecimal.ZERO;
+        BigDecimal employeeInsurance = socialInsurance
+                .add(healthInsurance)
+                .add(unemploymentInsurance);
+        Employee employee = employeeDAO.findById(report.getEmployeeId());
+        int dependentCount = employee == null ? 0 : Math.max(employee.getDependentCount(), 0);
+        BigDecimal dependentDeduction = DEPENDENT_DEDUCTION
+                .multiply(BigDecimal.valueOf(dependentCount));
+        BigDecimal taxableIncome = gross
+                .subtract(allowanceBreakdown.taxExempt)
+                .subtract(employeeInsurance)
+                .subtract(PERSONAL_DEDUCTION)
+                .subtract(dependentDeduction)
+                .max(BigDecimal.ZERO);
+        BigDecimal personalIncomeTax = calculatePersonalIncomeTax(taxableIncome);
         BigDecimal deduction = socialInsurance
                 .add(healthInsurance)
                 .add(unemploymentInsurance)
@@ -216,6 +239,47 @@ public class PayrollCalculationService {
         return day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY;
     }
 
+    private AllowanceBreakdown calculateAllowances(String roleName) throws SQLException {
+        AllowanceBreakdown result = new AllowanceBreakdown();
+        for (AllowanceType allowanceType : allowanceDAO.findActiveForRole(roleName)) {
+            BigDecimal amount = nz(allowanceType.getAmount());
+            result.total = result.total.add(amount);
+            if (AllowanceType.LUNCH_CODE.equalsIgnoreCase(allowanceType.getAllowanceCode())) {
+                result.taxExempt = result.taxExempt.add(amount.min(LUNCH_TAX_EXEMPT_LIMIT));
+            }
+        }
+        return result;
+    }
+
+    public static BigDecimal calculatePersonalIncomeTax(BigDecimal taxableIncome) {
+        BigDecimal income = nz(taxableIncome).max(BigDecimal.ZERO);
+        if (income.compareTo(new BigDecimal("5000000")) <= 0) {
+            return income.multiply(new BigDecimal("0.05"));
+        }
+        if (income.compareTo(new BigDecimal("10000000")) <= 0) {
+            return income.multiply(new BigDecimal("0.10"))
+                    .subtract(new BigDecimal("250000"));
+        }
+        if (income.compareTo(new BigDecimal("18000000")) <= 0) {
+            return income.multiply(new BigDecimal("0.15"))
+                    .subtract(new BigDecimal("750000"));
+        }
+        if (income.compareTo(new BigDecimal("32000000")) <= 0) {
+            return income.multiply(new BigDecimal("0.20"))
+                    .subtract(new BigDecimal("1650000"));
+        }
+        if (income.compareTo(new BigDecimal("52000000")) <= 0) {
+            return income.multiply(new BigDecimal("0.25"))
+                    .subtract(new BigDecimal("3250000"));
+        }
+        if (income.compareTo(new BigDecimal("80000000")) <= 0) {
+            return income.multiply(new BigDecimal("0.30"))
+                    .subtract(new BigDecimal("5850000"));
+        }
+        return income.multiply(new BigDecimal("0.35"))
+                .subtract(new BigDecimal("9850000"));
+    }
+
     private static BigDecimal nz(BigDecimal v) {
         return v != null ? v : BigDecimal.ZERO;
     }
@@ -233,5 +297,10 @@ public class PayrollCalculationService {
         BigDecimal totalHours() {
             return normalHours.add(weekendHours).add(holidayHours);
         }
+    }
+
+    private static final class AllowanceBreakdown {
+        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal taxExempt = BigDecimal.ZERO;
     }
 }

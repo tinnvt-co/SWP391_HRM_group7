@@ -42,7 +42,12 @@ public class AttendanceAutoConfirmService {
                 report.setMaternityLeaveDays(BigDecimal.valueOf(s.maternityLeaveDays));
                 report.setOvertimeHours(s.overtimeHours);
                 report.setLatePenaltyAmount(s.latePenaltyAmount);
-                reportDAO.upsertSubmitted(report);
+                if ("HR".equalsIgnoreCase(batch.departmentCode)) {
+                    reportDAO.upsertApprovedByHrManager(
+                            report, null, "Auto-approved after 2-day attendance confirmation timeout");
+                } else {
+                    reportDAO.upsertSubmitted(report);
+                }
             }
         }
         return updatedRecords;

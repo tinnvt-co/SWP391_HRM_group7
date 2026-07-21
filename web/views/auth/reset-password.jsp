@@ -59,10 +59,16 @@
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-lock text-secondary"></i></span>
                     <input type="password" id="newPassword" name="newPassword" class="form-control"
-                           placeholder="Enter new password" minlength="6" required autofocus>
+                           placeholder="Enter a strong new password" minlength="8"
+                           pattern="(?=.*\p{N})(?=.*[^\p{L}\p{N}\s]).{8,}"
+                           title="Use at least 8 characters, including one number and one special character."
+                           aria-describedby="passwordRequirements" required autofocus>
                     <button class="btn btn-outline-secondary" type="button" onclick="toggle('newPassword','eye1')">
                         <i class="bi bi-eye" id="eye1"></i>
                     </button>
+                </div>
+                <div id="passwordRequirements" class="form-text">
+                    At least 8 characters, including one number and one special character.
                 </div>
             </div>
 

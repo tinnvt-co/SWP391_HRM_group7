@@ -17,7 +17,7 @@ public class AttendanceRecordDAO {
     private static final String ATTENDANCE_ROLE_FILTER =
             "ro.role_name IN ('EMPLOYEE', 'MANAGER', 'HR_STAFF', 'HR_MANAGER') AND d.department_code <> 'IT'";
     private static final String MANAGER_CONFIRM_ROLE_FILTER =
-            "ro.role_name IN ('EMPLOYEE', 'MANAGER')";
+            "ro.role_name IN ('EMPLOYEE', 'MANAGER', 'HR_STAFF', 'HR_MANAGER')";
 
     public int insert(AttendanceRecord r) throws SQLException {
         String sql = "INSERT INTO attendance_records (employee_id, work_date, "
@@ -372,6 +372,7 @@ public class AttendanceRecordDAO {
     public static final class AutoConfirmBatch {
         public int managerUserId;
         public int departmentId;
+        public String departmentCode;
         public int year;
         public int month;
         public int pendingCount;
@@ -381,7 +382,7 @@ public class AttendanceRecordDAO {
     public List<AutoConfirmBatch> findAutoConfirmBatches(LocalDateTime cutoff)
             throws SQLException {
         String sql =
-            "SELECT d.manager_id AS manager_user_id, e.department_id, "
+            "SELECT d.manager_id AS manager_user_id, e.department_id, d.department_code, "
           + "       YEAR(ar.work_date) AS report_year, "
           + "       MONTH(ar.work_date) AS report_month, "
           + "       COUNT(*) AS pending_count, "
@@ -394,7 +395,8 @@ public class AttendanceRecordDAO {
           + "WHERE d.manager_id IS NOT NULL "
           + "  AND " + ATTENDANCE_ROLE_FILTER + " "
           + "  AND ar.verification_status = 'Pending' "
-          + "GROUP BY d.manager_id, e.department_id, YEAR(ar.work_date), MONTH(ar.work_date) "
+          + "GROUP BY d.manager_id, e.department_id, d.department_code, "
+          + "         YEAR(ar.work_date), MONTH(ar.work_date) "
           + "HAVING MAX(ar.created_at) <= ? "
           + "ORDER BY report_year, report_month, manager_user_id";
 
@@ -411,6 +413,7 @@ public class AttendanceRecordDAO {
                 AutoConfirmBatch batch = new AutoConfirmBatch();
                 batch.managerUserId = rs.getInt("manager_user_id");
                 batch.departmentId = rs.getInt("department_id");
+                batch.departmentCode = rs.getString("department_code");
                 batch.year = rs.getInt("report_year");
                 batch.month = rs.getInt("report_month");
                 batch.pendingCount = rs.getInt("pending_count");
@@ -422,6 +425,63 @@ public class AttendanceRecordDAO {
             close(conn, ps, rs);
         }
         return list;
+    }
+
+    public static final class DepartmentMonthTask {
+        public int departmentId;
+        public String departmentName;
+        public int year;
+        public int month;
+        public int pendingRecordCount;
+    }
+
+    public List<DepartmentMonthTask> findPendingDepartmentMonthsByCode(String departmentCode)
+            throws SQLException {
+        String sql =
+            "SELECT d.department_id, d.department_name, "
+          + "       YEAR(ar.work_date) AS task_year, MONTH(ar.work_date) AS task_month, "
+          + "       SUM(CASE WHEN ar.verification_status='Pending' THEN 1 ELSE 0 END) "
+          + "           AS pending_record_count "
+          + "FROM attendance_records ar "
+          + "JOIN employees e ON ar.employee_id=e.employee_id "
+          + "JOIN users u ON e.user_id=u.user_id "
+          + "JOIN roles ro ON u.role_id=ro.role_id "
+          + "JOIN departments d ON e.department_id=d.department_id "
+          + "WHERE d.department_code=? AND d.is_active=1 "
+          + "  AND " + ATTENDANCE_ROLE_FILTER + " "
+          + "  AND NOT EXISTS ("
+          + "      SELECT 1 FROM attendance_reports approved_report "
+          + "      WHERE approved_report.department_id=d.department_id "
+          + "        AND approved_report.report_year=YEAR(ar.work_date) "
+          + "        AND approved_report.report_month=MONTH(ar.work_date) "
+          + "        AND approved_report.status='Approved By HR Manager'"
+          + "  ) "
+          + "GROUP BY d.department_id, d.department_name, "
+          + "         YEAR(ar.work_date), MONTH(ar.work_date) "
+          + "ORDER BY task_year, task_month";
+
+        List<DepartmentMonthTask> tasks = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, departmentCode);
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                DepartmentMonthTask task = new DepartmentMonthTask();
+                task.departmentId = rs.getInt("department_id");
+                task.departmentName = rs.getString("department_name");
+                task.year = rs.getInt("task_year");
+                task.month = rs.getInt("task_month");
+                task.pendingRecordCount = rs.getInt("pending_record_count");
+                tasks.add(task);
+            }
+        } finally {
+            close(conn, ps, rs);
+        }
+        return tasks;
     }
 
     public int autoVerifyPendingByManagerMonth(int managerUserId, int departmentId,

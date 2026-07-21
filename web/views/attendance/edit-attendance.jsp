@@ -109,7 +109,7 @@
 
                     <div class="section-title">Status</div>
                     <div class="row g-3 mb-4">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label for="attendanceStatus" class="form-label required">Attendance Status</label>
                             <select id="attendanceStatus" name="attendanceStatus" class="form-select" required>
                                 <c:forEach var="s" items="${statuses}">
@@ -121,7 +121,14 @@
                             </select>
                             <div class="form-text">Select the attendance status for this day.</div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4" id="lateMinutesGroup">
+                            <label for="lateMinutes" class="form-label required">Late Minutes</label>
+                            <input type="number" min="1" max="1440" step="1"
+                                   id="lateMinutes" name="lateMinutes" class="form-control"
+                                   value="${record.lateMinutes}">
+                            <div class="form-text">Late penalty: <span id="latePenaltyPreview">0</span></div>
+                        </div>
+                        <div class="col-md-4">
                             <label for="overtimeHours" class="form-label">Overtime (hours)</label>
                             <input type="number" step="0.25" min="0" id="overtimeHours" name="overtimeHours"
                                    class="form-control"
@@ -159,6 +166,10 @@
     const noteInput = document.getElementById('note');
     const charCount = document.getElementById('charCount');
     const workDate  = document.getElementById('workDate');
+    const attendanceStatus = document.getElementById('attendanceStatus');
+    const lateMinutesGroup = document.getElementById('lateMinutesGroup');
+    const lateMinutesInput = document.getElementById('lateMinutes');
+    const latePenaltyPreview = document.getElementById('latePenaltyPreview');
 
     if (workDate) workDate.max = new Date().toISOString().split('T')[0];
 
@@ -168,6 +179,27 @@
     }
     if (noteInput) noteInput.addEventListener('input', updateCharCount);
     updateCharCount();
+
+    function latePenalty(minutes) {
+        if (minutes < 5) return 0;
+        if (minutes <= 30) return 50000;
+        if (minutes <= 60) return 100000;
+        return 200000;
+    }
+
+    function updateLateFields() {
+        if (!attendanceStatus || !lateMinutesGroup || !lateMinutesInput) return;
+        const isLate = attendanceStatus.value === 'Late';
+        lateMinutesGroup.classList.toggle('d-none', !isLate);
+        lateMinutesInput.required = isLate;
+        if (!isLate) lateMinutesInput.value = '0';
+        const minutes = Number.parseInt(lateMinutesInput.value, 10) || 0;
+        latePenaltyPreview.textContent = latePenalty(minutes).toLocaleString('en-US');
+    }
+
+    if (attendanceStatus) attendanceStatus.addEventListener('change', updateLateFields);
+    if (lateMinutesInput) lateMinutesInput.addEventListener('input', updateLateFields);
+    updateLateFields();
 </script>
 </body>
 </html>

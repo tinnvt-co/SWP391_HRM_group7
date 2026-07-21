@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 public class AllowanceType {
 
+    public static final String LUNCH_CODE = "LUNCH";
     public static final String RESPONSIBILITY_HR_STAFF_CODE = "RESPONSIBILITY_HR_STAFF";
     public static final String RESPONSIBILITY_MANAGER_CODE = "RESPONSIBILITY_MANAGER";
 

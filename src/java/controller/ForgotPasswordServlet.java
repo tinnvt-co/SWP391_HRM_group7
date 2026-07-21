@@ -134,8 +134,8 @@ public class ForgotPasswordServlet extends HttpServlet {
             return;
         }
 
-        if (newPass.length() < 6) {
-            request.setAttribute("error", "New password must be at least 6 characters.");
+        if (!PasswordUtil.meetsRequirements(newPass)) {
+            request.setAttribute("error", PasswordUtil.PASSWORD_REQUIREMENTS);
             request.setAttribute("token", token);
             request.getRequestDispatcher("/views/auth/reset-password.jsp").forward(request, response);
             return;

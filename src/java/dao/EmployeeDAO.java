@@ -486,6 +486,7 @@ public class EmployeeDAO {
             try { e.setEmploymentStatus(EmploymentStatus.valueOf(status)); }
             catch (IllegalArgumentException ignored) {}
         }
+        e.setDependentCount(rs.getInt("dependent_count"));
         e.setBankName(rs.getString("bank_name"));
         e.setBankAccountNumber(rs.getString("bank_account_number"));
         e.setBankBranch(rs.getString("bank_branch"));

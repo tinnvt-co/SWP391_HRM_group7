@@ -111,7 +111,7 @@
         </c:url>
     </c:if>
     <c:if test="${not empty hrDepartmentConfirmationTask}">
-        <c:url var="hrDepartmentConfirmationTaskUrl" value="/attendance-report">
+        <c:url var="hrDepartmentConfirmationTaskUrl" value="/attendance">
             <c:param name="deptId" value="${hrDepartmentConfirmationTask.departmentId}"/>
             <c:param name="month" value="${hrDepartmentConfirmationTask.month}"/>
             <c:param name="year" value="${hrDepartmentConfirmationTask.year}"/>
@@ -169,16 +169,16 @@
                                     <i class="bi bi-person-check text-success"></i>
                                 </div>
                                 <div>
-                                    <div class="text-muted small">HR Department Attendance</div>
+                                    <div class="text-muted small">HR Attendance Tasks</div>
                                     <div class="fw-bold fs-5">${empty hrDepartmentConfirmationTask ? 0 : hrDepartmentConfirmationTask.count}</div>
                                     <div class="text-muted" style="font-size:0.78rem;">
                                         <c:choose>
                                             <c:when test="${not empty hrDepartmentConfirmationTask}">
-                                                Confirm Department &middot;
+                                                Next: Review Attendance &middot;
                                                 <c:out value="${hrDepartmentConfirmationTask.departmentName}"/> &middot;
                                                 Month ${hrDepartmentConfirmationTask.month}/${hrDepartmentConfirmationTask.year}
                                             </c:when>
-                                            <c:otherwise>No HR department attendance awaiting confirmation</c:otherwise>
+                                            <c:otherwise>No HR attendance awaiting review</c:otherwise>
                                         </c:choose>
                                     </div>
                                 </div>
@@ -273,39 +273,6 @@
     <c:if test="${not empty attendanceReportError}">
         <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-3">
             <i class="bi bi-exclamation-circle-fill"></i><span><c:out value="${attendanceReportError}"/></span>
-        </div>
-    </c:if>
-
-    <c:if test="${canConfirmHrDepartmentAttendance}">
-        <div class="card border-0 shadow-sm mb-3" style="border-left:4px solid #198754 !important;">
-            <div class="card-body d-flex align-items-center justify-content-between gap-3 flex-wrap">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="task-icon" style="background:#e6f9f0;">
-                        <i class="bi bi-people text-success"></i>
-                    </div>
-                    <div>
-                        <div class="fw-semibold text-dark">Human Resources Attendance Confirmation</div>
-                        <div class="small text-muted">
-                            Confirm HR Staff and HR Manager attendance for ${monthLabel} before HR Staff submits this department.
-                        </div>
-                    </div>
-                </div>
-                <form method="post"
-                      action="${pageContext.request.contextPath}/attendance-report?action=confirmHrDepartmentAttendance"
-                      onsubmit="return confirm('Confirm all pending attendance records in the Human Resources department?');">
-                    <input type="hidden" name="month" value="${selectedMonth}">
-                    <input type="hidden" name="year" value="${selectedYear}">
-                    <input type="hidden" name="deptId" value="${selectedDeptId}">
-                    <button type="submit" class="btn btn-success btn-sm px-3 fw-medium"
-                            ${pendingDepartmentConfirmationCount > 0 ? '' : 'disabled'}
-                            title="${pendingDepartmentConfirmationCount > 0 ? 'Confirm Human Resources department attendance' : 'No pending attendance in Human Resources'}">
-                        <i class="bi bi-check2-all me-2"></i>Confirm HR Department Attendance
-                        <c:if test="${pendingDepartmentConfirmationCount > 0}">
-                            <span class="badge bg-light text-success ms-1">${pendingDepartmentConfirmationCount}</span>
-                        </c:if>
-                    </button>
-                </form>
-            </div>
         </div>
     </c:if>
 

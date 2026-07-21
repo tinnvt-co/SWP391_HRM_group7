@@ -18,7 +18,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.YearMonth;
 import java.time.format.TextStyle;
@@ -75,8 +74,6 @@ public class AttendanceReportServlet extends HttpServlet {
                     : null;
             Integer selectedDeptId = selectedDepartment == null
                     ? null : selectedDepartment.getDepartmentId();
-            boolean selectedHrDepartment = selectedDepartment != null
-                    && "HR".equalsIgnoreCase(selectedDepartment.getDepartmentCode());
             PayrollTaskSummary payrollTaskSummary = hrStaffScope
                     ? payrollPeriodDAO.findHrStaffTaskSummary()
                     : (hrManagerScope ? payrollPeriodDAO.findHrManagerTaskSummary() : null);
@@ -98,7 +95,7 @@ public class AttendanceReportServlet extends HttpServlet {
             DepartmentTask attendanceTask = findAttendanceWorkflowTask(
                     hrStaffScope, hrManagerScope);
             DepartmentTask hrDepartmentConfirmationTask = hrManagerScope
-                    ? findHrDepartmentConfirmationTask(departments, year, month)
+                    ? findHrDepartmentConfirmationTask()
                     : null;
             if (hrManagerScope && selectedDeptId != null) {
                 totalReports = reportDAO.countForHrManagerByMonth(year, month, selectedDeptId);
@@ -136,7 +133,6 @@ public class AttendanceReportServlet extends HttpServlet {
             request.setAttribute("pendingHrManagerApprovalCount", pendingHrManagerApprovalCount);
             request.setAttribute("attendanceTask", attendanceTask);
             request.setAttribute("hrDepartmentConfirmationTask", hrDepartmentConfirmationTask);
-            request.setAttribute("selectedHrDepartment", selectedHrDepartment);
             request.setAttribute("payrollTaskSummary", payrollTaskSummary);
             request.setAttribute("payrollTaskApproval", hrManagerScope);
             request.setAttribute("canSubmitToHrManager",
@@ -145,9 +141,6 @@ public class AttendanceReportServlet extends HttpServlet {
             request.setAttribute("canSubmitSelectedDepartment",
                     readyToSubmitCount > 0
                             && pendingDepartmentConfirmationCount == 0);
-            request.setAttribute("canConfirmHrDepartmentAttendance",
-                    hrManagerScope && selectedHrDepartment
-                            && hasPermission(request, "APPROVE_ATTENDANCE_REPORT"));
             request.setAttribute("canApproveAttendanceReport",
                     hrManagerScope && selectedDeptId != null
                             && hasPermission(request, "APPROVE_ATTENDANCE_REPORT"));
@@ -181,14 +174,6 @@ public class AttendanceReportServlet extends HttpServlet {
                         return;
                     }
                     handleSubmitToHrManager(request, response);
-                }
-                case "confirmHrDepartmentAttendance" -> {
-                    if (!"HR_MANAGER".equalsIgnoreCase(roleName)
-                            || !hasPermission(request, "APPROVE_ATTENDANCE_REPORT")) {
-                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
-                        return;
-                    }
-                    handleConfirmHrDepartmentAttendance(request, response);
                 }
                 case "approve" -> {
                     if (!"HR_MANAGER".equalsIgnoreCase(roleName)
@@ -261,79 +246,6 @@ public class AttendanceReportServlet extends HttpServlet {
                             + " attendance reports are ready to submit for this period.");
         }
         response.sendRedirect(reportRedirect(ctx, year, month, departmentId));
-    }
-
-    private void handleConfirmHrDepartmentAttendance(HttpServletRequest request,
-                                                      HttpServletResponse response)
-            throws SQLException, IOException {
-        HttpSession session = request.getSession(true);
-        User currentUser = getCurrentUser(request);
-        String ctx = request.getContextPath();
-        int year = parseIntOr(request.getParameter("year"), YearMonth.now().getYear());
-        int month = parseIntOr(request.getParameter("month"), YearMonth.now().getMonthValue());
-        Department department = findAttendanceDepartment(
-                parseIntOrNull(request.getParameter("deptId")));
-        if (department == null) {
-            session.setAttribute("attendanceReportError",
-                    "Please select a valid attendance department.");
-            response.sendRedirect(reportRedirect(ctx, year, month, null));
-            return;
-        }
-        if (!"HR".equalsIgnoreCase(department.getDepartmentCode())) {
-            session.setAttribute("attendanceReportError",
-                    "HR Manager can perform initial attendance confirmation only for the Human Resources department.");
-            response.sendRedirect(reportRedirect(ctx, year, month, department.getDepartmentId()));
-            return;
-        }
-
-        int departmentId = department.getDepartmentId();
-        if (reportDAO.hasHrManagerApprovedMonth(year, month, departmentId)
-                || reportDAO.countPendingHrManagerByMonth(year, month, departmentId) > 0) {
-            session.setAttribute("attendanceReportError",
-                    "Attendance reports for this department are already in final approval or have been approved.");
-            response.sendRedirect(reportRedirect(ctx, year, month, departmentId));
-            return;
-        }
-
-        int pending = attendanceDAO.countPendingByDepartmentMonth(year, month, departmentId);
-        if (pending <= 0) {
-            session.setAttribute("attendanceReportError",
-                    "No Human Resources attendance records are waiting for confirmation.");
-            response.sendRedirect(reportRedirect(ctx, year, month, departmentId));
-            return;
-        }
-
-        int verified = attendanceDAO.verifyPendingByDepartmentMonth(
-                currentUser.getUserId(), year, month, departmentId);
-        int prepared = createDepartmentReports(
-                currentUser.getUserId(), year, month, departmentId);
-        session.setAttribute("attendanceReportMessage",
-                "Confirmed " + verified + " Human Resources attendance record(s) and prepared "
-                        + prepared + " report(s) for HR Staff.");
-        response.sendRedirect(reportRedirect(ctx, year, month, departmentId));
-    }
-
-    private int createDepartmentReports(int confirmingUserId, int year, int month,
-                                        int departmentId) throws SQLException {
-        List<AttendanceRecordDAO.MonthlySummary> summaries =
-                attendanceDAO.aggregateMonthByDepartment(year, month, departmentId);
-        int prepared = 0;
-        for (AttendanceRecordDAO.MonthlySummary s : summaries) {
-            AttendanceReport report = new AttendanceReport();
-            report.setEmployeeId(s.employeeId);
-            report.setManagerId(confirmingUserId);
-            report.setDepartmentId(s.departmentId);
-            report.setReportMonth(month);
-            report.setReportYear(year);
-            report.setActualWorkingDays(BigDecimal.valueOf(s.actualWorkingDays));
-            report.setPaidLeaveDays(BigDecimal.valueOf(s.paidLeaveDays));
-            report.setUnpaidLeaveDays(BigDecimal.valueOf(s.unpaidLeaveDays));
-            report.setMaternityLeaveDays(BigDecimal.valueOf(s.maternityLeaveDays));
-            report.setOvertimeHours(s.overtimeHours);
-            report.setLatePenaltyAmount(s.latePenaltyAmount);
-            if (reportDAO.upsertSubmitted(report)) prepared++;
-        }
-        return prepared;
     }
 
     private void handleApproveAll(HttpServletRequest request, HttpServletResponse response)
@@ -480,18 +392,13 @@ public class AttendanceReportServlet extends HttpServlet {
         return firstTask;
     }
 
-    private DepartmentTask findHrDepartmentConfirmationTask(List<Department> departments,
-                                                              int year, int month)
-            throws SQLException {
-        for (Department department : departments) {
-            if (!"HR".equalsIgnoreCase(department.getDepartmentCode())) continue;
-            int count = attendanceDAO.countPendingByDepartmentMonth(
-                    year, month, department.getDepartmentId());
-            return count <= 0 ? null : new DepartmentTask(
-                    department.getDepartmentId(), department.getDepartmentName(),
-                    year, month, count, "Confirm HR Department Attendance");
-        }
-        return null;
+    private DepartmentTask findHrDepartmentConfirmationTask() throws SQLException {
+        List<AttendanceRecordDAO.DepartmentMonthTask> tasks =
+                attendanceDAO.findPendingDepartmentMonthsByCode("HR");
+        if (tasks.isEmpty()) return null;
+        AttendanceRecordDAO.DepartmentMonthTask first = tasks.get(0);
+        return new DepartmentTask(first.departmentId, first.departmentName,
+                first.year, first.month, tasks.size(), "Review HR Attendance");
     }
 
     private Department resolveDepartment(List<Department> departments, Integer departmentId) {

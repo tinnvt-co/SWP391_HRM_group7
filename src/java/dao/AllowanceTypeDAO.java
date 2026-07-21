@@ -254,13 +254,13 @@ public class AllowanceTypeDAO {
                 AllowanceType.RESPONSIBILITY_HR_STAFF_CODE,
                 "Responsibility allowance - HR Staff",
                 DEFAULT_HR_STAFF_RESPONSIBILITY,
-                "Applies only to HR_STAFF payroll lines.",
+                "Supports HR Staff in carrying out their assigned responsibilities.",
                 actorUserId);
         insertDefaultIfMissing(
                 AllowanceType.RESPONSIBILITY_MANAGER_CODE,
                 "Responsibility allowance - Manager",
                 DEFAULT_MANAGER_RESPONSIBILITY,
-                "Applies to MANAGER and HR_MANAGER payroll lines.",
+                "Supports managers in carrying out their management responsibilities.",
                 actorUserId);
     }
 
