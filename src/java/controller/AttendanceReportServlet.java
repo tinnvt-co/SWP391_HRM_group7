@@ -96,7 +96,7 @@ public class AttendanceReportServlet extends HttpServlet {
                     ? reportDAO.countPendingHrManagerByMonth(year, month, selectedDeptId)
                     : 0;
             DepartmentTask attendanceTask = findAttendanceWorkflowTask(
-                    departments, year, month, hrStaffScope, hrManagerScope);
+                    hrStaffScope, hrManagerScope);
             DepartmentTask hrDepartmentConfirmationTask = hrManagerScope
                     ? findHrDepartmentConfirmationTask(departments, year, month)
                     : null;
@@ -451,44 +451,33 @@ public class AttendanceReportServlet extends HttpServlet {
         return page;
     }
 
-    private DepartmentTask findAttendanceWorkflowTask(List<Department> departments,
-                                                        int year, int month,
-                                                        boolean hrStaffScope,
+    private DepartmentTask findAttendanceWorkflowTask(boolean hrStaffScope,
                                                         boolean hrManagerScope)
             throws SQLException {
         if (!hrStaffScope && !hrManagerScope) return null;
 
-        DepartmentTask task = null;
-        int total = 0;
-        for (Department department : departments) {
-            int departmentCount;
-            String actionLabel;
-            if (hrStaffScope) {
-                int pendingConfirmation =
-                        attendanceDAO.countPendingByDepartmentMonth(
-                                year, month, department.getDepartmentId());
-                departmentCount = pendingConfirmation == 0
-                        ? reportDAO.countReadyForHrManagerSubmission(
-                                year, month, department.getDepartmentId())
-                        : 0;
-                actionLabel = "Submit Department";
-            } else {
-                departmentCount = reportDAO.countPendingHrManagerByMonth(
-                        year, month, department.getDepartmentId());
-                actionLabel = "Approve Department";
-            }
+        List<AttendanceReportDAO.DepartmentWorkflowTask> candidates = hrStaffScope
+                ? reportDAO.findReadyDepartmentTasksForHrStaff()
+                : reportDAO.findPendingDepartmentTasksForHrManager();
+        DepartmentTask firstTask = null;
+        int actionableTaskCount = 0;
+        String actionLabel = hrStaffScope ? "Submit Department" : "Approve Department";
 
-            if (departmentCount <= 0) continue;
-            total += departmentCount;
-            if (task == null) {
-                task = new DepartmentTask(department.getDepartmentId(),
-                        department.getDepartmentName(), year, month,
-                        departmentCount, actionLabel);
+        for (AttendanceReportDAO.DepartmentWorkflowTask candidate : candidates) {
+            if (hrStaffScope && attendanceDAO.countPendingByDepartmentMonth(
+                    candidate.getYear(), candidate.getMonth(), candidate.getDepartmentId()) > 0) {
+                continue;
+            }
+            actionableTaskCount++;
+            if (firstTask == null) {
+                firstTask = new DepartmentTask(
+                        candidate.getDepartmentId(), candidate.getDepartmentName(),
+                        candidate.getYear(), candidate.getMonth(), 0, actionLabel);
             }
         }
 
-        if (task != null) task.setCount(total);
-        return task;
+        if (firstTask != null) firstTask.setCount(actionableTaskCount);
+        return firstTask;
     }
 
     private DepartmentTask findHrDepartmentConfirmationTask(List<Department> departments,

@@ -56,6 +56,7 @@
             <c:param name="action" value="approval"/>
             <c:param name="month" value="${payrollTaskSummary.month}"/>
             <c:param name="year" value="${payrollTaskSummary.year}"/>
+            <c:param name="deptId" value="${payrollTaskSummary.departmentId}"/>
         </c:url>
     </c:if>
     <div class="row g-3 mb-3">
@@ -111,6 +112,7 @@
                                 <c:choose>
                                     <c:when test="${payrollTaskSummary.actionable}">
                                         ${payrollTaskSummary.taskLabel}
+                                        &middot; <c:out value="${payrollTaskSummary.departmentName}"/>
                                         &middot; Month ${payrollTaskSummary.month}/${payrollTaskSummary.year}
                                     </c:when>
                                     <c:otherwise>No pending payroll tasks</c:otherwise>
@@ -138,6 +140,17 @@
         <div class="card-body">
             <form method="get" class="row g-2 align-items-end">
                 <input type="hidden" name="action" value="approval">
+                <div class="col-md-3">
+                    <label class="form-label small text-muted mb-1">Department</label>
+                    <select name="deptId" class="form-select form-select-sm">
+                        <c:forEach var="dept" items="${departments}">
+                            <option value="${dept.departmentId}"
+                                    ${dept.departmentId == selectedDeptId ? 'selected' : ''}>
+                                <c:out value="${dept.departmentName}"/>
+                            </option>
+                        </c:forEach>
+                    </select>
+                </div>
                 <div class="col-md-3">
                     <label class="form-label small text-muted mb-1">Month</label>
                     <select name="month" class="form-select form-select-sm">
@@ -188,23 +201,6 @@
                     </c:otherwise>
                 </c:choose>
             </div>
-            <c:if test="${pendingApprovalBatchCount > 0}">
-                <div class="d-flex gap-2">
-                    <form method="post" action="${pageContext.request.contextPath}/payroll?action=approve"
-                          onsubmit="return confirm('Approve all pending payroll for this month?');">
-                        <input type="hidden" name="year" value="${selectedYear}">
-                        <input type="hidden" name="month" value="${selectedMonth}">
-                        <button type="submit" class="btn btn-sm btn-success">
-                            <i class="bi bi-check2-circle me-1"></i>Approve All
-                            <span class="badge bg-light text-success ms-1">${pendingApprovalBatchCount}</span>
-                        </button>
-                    </form>
-                    <button type="button" class="btn btn-sm btn-outline-danger"
-                            data-bs-toggle="modal" data-bs-target="#rejectModal">
-                        <i class="bi bi-x-circle me-1"></i>Reject All
-                    </button>
-                </div>
-            </c:if>
             <c:if test="${not empty period and period.status == 'PendingApproval'}">
                 <div class="d-flex gap-2">
                     <form method="post" action="${pageContext.request.contextPath}/payroll?action=approve"
@@ -294,17 +290,17 @@
                     <ul class="pagination pagination-sm mb-0">
                         <li class="page-item ${currentPage == 1 ? 'disabled' : ''}">
                             <a class="page-link"
-                               href="?action=approval&month=${selectedMonth}&year=${selectedYear}&page=${currentPage - 1}">Previous</a>
+                               href="?action=approval&deptId=${selectedDeptId}&month=${selectedMonth}&year=${selectedYear}&page=${currentPage - 1}">Previous</a>
                         </li>
                         <c:forEach var="pg" begin="1" end="${totalPages}">
                             <li class="page-item ${pg == currentPage ? 'active' : ''}">
                                 <a class="page-link"
-                                   href="?action=approval&month=${selectedMonth}&year=${selectedYear}&page=${pg}">${pg}</a>
+                                   href="?action=approval&deptId=${selectedDeptId}&month=${selectedMonth}&year=${selectedYear}&page=${pg}">${pg}</a>
                             </li>
                         </c:forEach>
                         <li class="page-item ${currentPage == totalPages ? 'disabled' : ''}">
                             <a class="page-link"
-                               href="?action=approval&month=${selectedMonth}&year=${selectedYear}&page=${currentPage + 1}">Next</a>
+                               href="?action=approval&deptId=${selectedDeptId}&month=${selectedMonth}&year=${selectedYear}&page=${currentPage + 1}">Next</a>
                         </li>
                     </ul>
                 </nav>

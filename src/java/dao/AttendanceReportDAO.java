@@ -251,6 +251,55 @@ public class AttendanceReportDAO {
         }
     }
 
+    public List<DepartmentWorkflowTask> findReadyDepartmentTasksForHrStaff()
+            throws SQLException {
+        return findDepartmentWorkflowTasks(false);
+    }
+
+    public List<DepartmentWorkflowTask> findPendingDepartmentTasksForHrManager()
+            throws SQLException {
+        return findDepartmentWorkflowTasks(true);
+    }
+
+    private List<DepartmentWorkflowTask> findDepartmentWorkflowTasks(boolean hrManagerTask)
+            throws SQLException {
+        String statusPredicate = hrManagerTask
+                ? "ar.status='Pending HR Manager Approval' "
+                : "ar.status IN ('Submitted To HR Staff', 'Rejected By HR Manager') ";
+        StringBuilder sql = new StringBuilder(
+            "SELECT ar.department_id, d.department_name, "
+          + "       ar.report_year, ar.report_month, COUNT(*) AS report_count "
+          + "FROM attendance_reports ar "
+          + "JOIN departments d ON d.department_id=ar.department_id "
+          + "WHERE " + statusPredicate
+          + "  AND d.is_active=1 AND d.department_code <> 'IT' ");
+        sql.append(managerConfirmedPredicate("ar"));
+        sql.append("GROUP BY ar.department_id, d.department_name, "
+                 + "         ar.report_year, ar.report_month "
+                 + "ORDER BY ar.report_year, ar.report_month, d.department_name");
+
+        List<DepartmentWorkflowTask> tasks = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql.toString());
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                tasks.add(new DepartmentWorkflowTask(
+                        rs.getInt("department_id"),
+                        rs.getString("department_name"),
+                        rs.getInt("report_year"),
+                        rs.getInt("report_month"),
+                        rs.getInt("report_count")));
+            }
+        } finally {
+            close(conn, ps, rs);
+        }
+        return tasks;
+    }
+
     public int approvePendingHrManagerByMonth(int year, int month,
                                               Integer departmentId,
                                               int reviewedBy) throws SQLException {
@@ -607,6 +656,29 @@ public class AttendanceReportDAO {
 
     private static BigDecimal nz(BigDecimal v, BigDecimal dflt) {
         return v != null ? v : dflt;
+    }
+
+    public static final class DepartmentWorkflowTask {
+        private final int departmentId;
+        private final String departmentName;
+        private final int year;
+        private final int month;
+        private final int reportCount;
+
+        DepartmentWorkflowTask(int departmentId, String departmentName,
+                               int year, int month, int reportCount) {
+            this.departmentId = departmentId;
+            this.departmentName = departmentName;
+            this.year = year;
+            this.month = month;
+            this.reportCount = reportCount;
+        }
+
+        public int getDepartmentId() { return departmentId; }
+        public String getDepartmentName() { return departmentName; }
+        public int getYear() { return year; }
+        public int getMonth() { return month; }
+        public int getReportCount() { return reportCount; }
     }
 
     private void close(Connection c, PreparedStatement ps, ResultSet rs) {

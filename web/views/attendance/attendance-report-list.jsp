@@ -146,7 +146,7 @@
                                 <div class="text-muted" style="font-size:0.78rem;">
                                     <c:choose>
                                         <c:when test="${not empty attendanceTask}">
-                                            ${attendanceTask.actionLabel} &middot;
+                                            Next: ${attendanceTask.actionLabel} &middot;
                                             <c:out value="${attendanceTask.departmentName}"/> &middot;
                                             Month ${attendanceTask.month}/${attendanceTask.year}
                                         </c:when>
