@@ -98,7 +98,7 @@
                         <li><strong>Annual Leave</strong> &mdash; paid yearly leave</li>
                         <li><strong>Sick Leave</strong> &mdash; medical-related absence</li>
                         <li><strong>Personal Leave</strong> &mdash; private matters</li>
-                        <li><strong>Maternity Leave</strong> &mdash; social-insurance paid maternity absence</li>
+                        <li><strong>Maternity Leave</strong> &mdash; social-insurance paid maternity absence; male employees may request up to 7 calendar days</li>
                         <li><strong>Unpaid Leave</strong> &mdash; without salary</li>
                     </ul>
                 </div>

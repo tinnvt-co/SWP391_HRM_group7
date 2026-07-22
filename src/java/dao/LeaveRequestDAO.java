@@ -271,6 +271,26 @@ public class LeaveRequestDAO {
         return false;
     }
 
+    public boolean hasApprovedCoveringDate(int employeeId, LocalDate workDate) throws SQLException {
+        String sql = "SELECT 1 FROM leave_requests "
+                   + "WHERE employee_id = ? AND status = 'Approved' "
+                   + "AND start_date <= ? AND end_date >= ? LIMIT 1";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, employeeId);
+            ps.setDate(2, Date.valueOf(workDate));
+            ps.setDate(3, Date.valueOf(workDate));
+            rs = ps.executeQuery();
+            return rs.next();
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
     private LeaveRequest mapRow(ResultSet rs) throws SQLException {
         LeaveRequest lr = new LeaveRequest();
         lr.setLeaveRequestId(rs.getInt("leave_request_id"));

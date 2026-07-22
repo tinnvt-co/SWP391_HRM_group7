@@ -76,6 +76,19 @@
         </div>
     </div>
 
+    <c:if test="${param.error == 'approved-leave-locked'}">
+        <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-lock-fill"></i>
+            <span>This attendance record is based on an approved leave request and cannot be edited.</span>
+        </div>
+    </c:if>
+    <c:if test="${param.error == 'already-verified'}">
+        <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-lock-fill"></i>
+            <span>This attendance record has already been verified and cannot be edited.</span>
+        </div>
+    </c:if>
+
     <%-- Date filter --%>
     <div class="card border-0 shadow-sm rounded-3 mb-4">
         <div class="card-body py-3">
@@ -252,10 +265,20 @@
                                             <td class="text-center">
                                                 <c:if test="${r.verificationStatus != 'Verified'}">
                                                     <div class="d-flex justify-content-center gap-1">
-                                                        <a href="${pageContext.request.contextPath}/attendance?action=edit&id=${r.attendanceId}"
-                                                           class="btn btn-sm btn-outline-primary" title="Edit">
-                                                            <i class="bi bi-pencil-square"></i>
-                                                        </a>
+                                                        <c:choose>
+                                                            <c:when test="${r.approvedLeaveLocked}">
+                                                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                                        title="Locked by approved ${r.approvedLeaveType}" disabled>
+                                                                    <i class="bi bi-lock-fill"></i>
+                                                                </button>
+                                                            </c:when>
+                                                            <c:otherwise>
+                                                                <a href="${pageContext.request.contextPath}/attendance?action=edit&id=${r.attendanceId}"
+                                                                   class="btn btn-sm btn-outline-primary" title="Edit">
+                                                                    <i class="bi bi-pencil-square"></i>
+                                                                </a>
+                                                            </c:otherwise>
+                                                        </c:choose>
                                                         <form method="post"
                                                               action="${pageContext.request.contextPath}/attendance?action=verify&id=${r.attendanceId}"
                                                               class="d-inline"

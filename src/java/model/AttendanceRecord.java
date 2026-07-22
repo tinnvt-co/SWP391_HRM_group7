@@ -16,6 +16,10 @@ public class AttendanceRecord {
             return name();
         }
 
+        public boolean isOvertimeAllowed() {
+            return this == Present || this == Late;
+        }
+
         public static AttendanceStatus fromDb(String value) {
             if (value == null) return null;
             if ("Unpaid Leave".equals(value)) return UnpaidLeave;
@@ -46,6 +50,8 @@ public class AttendanceRecord {
     private String employeeCode;
     private Integer employeeManagerUserId;
     private String verifiedByFullName;
+    private boolean approvedLeaveLocked;
+    private String approvedLeaveType;
 
     public AttendanceRecord() {}
 
@@ -105,4 +111,10 @@ public class AttendanceRecord {
 
     public String getVerifiedByFullName()                     { return verifiedByFullName; }
     public void setVerifiedByFullName(String name)            { this.verifiedByFullName = name; }
+
+    public boolean isApprovedLeaveLocked()                    { return approvedLeaveLocked; }
+    public void setApprovedLeaveLocked(boolean locked)        { this.approvedLeaveLocked = locked; }
+
+    public String getApprovedLeaveType()                      { return approvedLeaveType; }
+    public void setApprovedLeaveType(String type)             { this.approvedLeaveType = type; }
 }

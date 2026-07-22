@@ -36,6 +36,7 @@ import java.util.Set;
 public class LeaveRequestServlet extends HttpServlet {
 
     private static final int ATTENDANCE_LEAVE_PAGE_SIZE = 10;
+    private static final long MALE_MATERNITY_MAX_DAYS = 7;
 
     private final LeaveRequestDAO leaveDAO   = new LeaveRequestDAO();
     private final EmployeeDAO     employeeDAO = new EmployeeDAO();
@@ -494,13 +495,20 @@ public class LeaveRequestServlet extends HttpServlet {
             return;
         }
 
+        long days = ChronoUnit.DAYS.between(startDate, endDate) + 1;
+        if (leaveType == LeaveType.MaternityLeave
+                && "Male".equalsIgnoreCase(employee.getGender())
+                && days > MALE_MATERNITY_MAX_DAYS) {
+            forwardForm(request, response, employee,
+                    "Male employees can request a maximum of 7 calendar days of maternity leave.");
+            return;
+        }
+
         if (leaveDAO.hasOverlapping(employee.getEmployeeId(), startDate, endDate)) {
             forwardForm(request, response, employee,
                     "You already have a pending or approved leave request that overlaps with this date range.");
             return;
         }
-
-        long days = ChronoUnit.DAYS.between(startDate, endDate) + 1;
 
         LeaveRequest lr = new LeaveRequest();
         lr.setEmployeeId(employee.getEmployeeId());

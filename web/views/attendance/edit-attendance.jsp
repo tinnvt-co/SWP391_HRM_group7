@@ -103,7 +103,8 @@
                         <div class="col-md-6">
                             <label for="workDate" class="form-label required">Work Date</label>
                             <input type="date" id="workDate" name="workDate" class="form-control"
-                                   value="${record.workDate}" required>
+                                   value="${record.workDate}" readonly aria-readonly="true">
+                            <div class="form-text">The date belongs to the selected attendance record and cannot be changed.</div>
                         </div>
                     </div>
 
@@ -113,7 +114,7 @@
                             <label for="attendanceStatus" class="form-label required">Attendance Status</label>
                             <select id="attendanceStatus" name="attendanceStatus" class="form-select" required>
                                 <c:forEach var="s" items="${statuses}">
-                                    <option value="${s}"
+                                    <option value="${s}" data-overtime-allowed="${s.overtimeAllowed}"
                                             ${record.attendanceStatus == s ? 'selected' : ''}>
                                         ${s.dbValue}
                                     </option>
@@ -128,7 +129,7 @@
                                    value="${record.lateMinutes}">
                             <div class="form-text">Late penalty: <span id="latePenaltyPreview">0</span></div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-4" id="overtimeHoursGroup">
                             <label for="overtimeHours" class="form-label">Overtime (hours)</label>
                             <input type="number" step="0.25" min="0" id="overtimeHours" name="overtimeHours"
                                    class="form-control"
@@ -165,13 +166,12 @@
 <script>
     const noteInput = document.getElementById('note');
     const charCount = document.getElementById('charCount');
-    const workDate  = document.getElementById('workDate');
     const attendanceStatus = document.getElementById('attendanceStatus');
     const lateMinutesGroup = document.getElementById('lateMinutesGroup');
     const lateMinutesInput = document.getElementById('lateMinutes');
     const latePenaltyPreview = document.getElementById('latePenaltyPreview');
-
-    if (workDate) workDate.max = new Date().toISOString().split('T')[0];
+    const overtimeHoursGroup = document.getElementById('overtimeHoursGroup');
+    const overtimeHoursInput = document.getElementById('overtimeHours');
 
     function updateCharCount() {
         if (!noteInput || !charCount) return;
@@ -197,9 +197,23 @@
         latePenaltyPreview.textContent = latePenalty(minutes).toLocaleString('en-US');
     }
 
-    if (attendanceStatus) attendanceStatus.addEventListener('change', updateLateFields);
+    function updateOvertimeField() {
+        if (!attendanceStatus || !overtimeHoursGroup || !overtimeHoursInput) return;
+        const selectedOption = attendanceStatus.options[attendanceStatus.selectedIndex];
+        const overtimeAllowed = selectedOption
+                && selectedOption.dataset.overtimeAllowed === 'true';
+        overtimeHoursGroup.classList.toggle('d-none', !overtimeAllowed);
+        overtimeHoursInput.disabled = !overtimeAllowed;
+        if (!overtimeAllowed) overtimeHoursInput.value = '0';
+    }
+
+    if (attendanceStatus) attendanceStatus.addEventListener('change', function () {
+        updateLateFields();
+        updateOvertimeField();
+    });
     if (lateMinutesInput) lateMinutesInput.addEventListener('input', updateLateFields);
     updateLateFields();
+    updateOvertimeField();
 </script>
 </body>
 </html>

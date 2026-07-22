@@ -4,6 +4,7 @@ import dao.AttendanceRecordDAO;
 import dao.AttendanceReportDAO;
 import dao.DepartmentDAO;
 import dao.EmployeeDAO;
+import dao.LeaveRequestDAO;
 import dao.PayrollPeriodDAO;
 import model.AttendanceRecord;
 import model.AttendanceRecord.AttendanceStatus;
@@ -11,6 +12,7 @@ import model.AttendanceRecord.VerificationStatus;
 import model.AttendanceReport;
 import model.Department;
 import model.Employee;
+import model.LeaveRequest;
 import model.PayrollTaskSummary;
 import model.User;
 import service.AttendanceAutoConfirmService;
@@ -51,6 +53,7 @@ public class AttendanceServlet extends HttpServlet {
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
     private final AttendanceReportDAO reportDAO = new AttendanceReportDAO();
     private final DepartmentDAO departmentDAO = new DepartmentDAO();
+    private final LeaveRequestDAO leaveRequestDAO = new LeaveRequestDAO();
     private final PayrollPeriodDAO payrollPeriodDAO = new PayrollPeriodDAO();
     private final AttendanceAutoConfirmService autoConfirmService = new AttendanceAutoConfirmService();
 
@@ -311,6 +314,7 @@ public class AttendanceServlet extends HttpServlet {
 
         List<AttendanceRecord> records = attendanceDAO.findByEmployeeId(
                 employeeId, fromDate, toDate, (page - 1) * PAGE_SIZE, PAGE_SIZE);
+        attachApprovedLeaveLocks(records, employeeId);
 
         boolean canManageAttendance = managesEmployee;
 
@@ -491,8 +495,12 @@ public class AttendanceServlet extends HttpServlet {
         if (existing == null) return;
 
         if (existing.getVerificationStatus() == VerificationStatus.Verified) {
-            response.sendRedirect(request.getContextPath()
-                    + "/attendance?error=already-verified");
+            redirectToEmployeeDetail(request, response, existing, "already-verified");
+            return;
+        }
+
+        if (isApprovedLeaveLocked(existing)) {
+            redirectToEmployeeDetail(request, response, existing, "approved-leave-locked");
             return;
         }
 
@@ -509,32 +517,23 @@ public class AttendanceServlet extends HttpServlet {
         if (existing == null) return;
 
         if (existing.getVerificationStatus() == VerificationStatus.Verified) {
-            response.sendRedirect(request.getContextPath()
-                    + "/attendance?error=already-verified");
+            redirectToEmployeeDetail(request, response, existing, "already-verified");
             return;
         }
 
-        String workDateStr  = trim(request.getParameter("workDate"));
+        if (isApprovedLeaveLocked(existing)) {
+            redirectToEmployeeDetail(request, response, existing, "approved-leave-locked");
+            return;
+        }
+
         String statusStr    = request.getParameter("attendanceStatus");
         String overtimeStr  = trim(request.getParameter("overtimeHours"));
         String lateMinutesStr = trim(request.getParameter("lateMinutes"));
         String note         = trim(request.getParameter("note"));
 
-        if (workDateStr.isEmpty() || statusStr == null || statusStr.isBlank()) {
+        if (statusStr == null || statusStr.isBlank()) {
             forwardEditForm(request, response, existing,
-                    "Please fill in all required fields (date, status).");
-            return;
-        }
-
-        LocalDate workDate;
-        try { workDate = LocalDate.parse(workDateStr); }
-        catch (DateTimeParseException ex) {
-            forwardEditForm(request, response, existing, "Invalid work date.");
-            return;
-        }
-
-        if (workDate.isAfter(LocalDate.now())) {
-            forwardEditForm(request, response, existing, "Work date cannot be in the future.");
+                    "Please select an attendance status.");
             return;
         }
 
@@ -567,7 +566,8 @@ public class AttendanceServlet extends HttpServlet {
         }
 
         BigDecimal overtimeHours = BigDecimal.ZERO;
-        if (!overtimeStr.isEmpty()) {
+        boolean overtimeAllowed = status.isOvertimeAllowed();
+        if (overtimeAllowed && !overtimeStr.isEmpty()) {
             try {
                 overtimeHours = new BigDecimal(overtimeStr);
                 if (overtimeHours.signum() < 0) {
@@ -588,14 +588,6 @@ public class AttendanceServlet extends HttpServlet {
             return;
         }
 
-        if (!workDate.isEqual(existing.getWorkDate())
-                && attendanceDAO.existsByEmployeeAndDate(existing.getEmployeeId(), workDate)) {
-            forwardEditForm(request, response, existing,
-                    "Another attendance record for this employee on this date already exists.");
-            return;
-        }
-
-        existing.setWorkDate(workDate);
         existing.setOvertimeHours(overtimeHours);
         existing.setAttendanceStatus(status);
         existing.setLateMinutes(lateMinutes);
@@ -605,6 +597,46 @@ public class AttendanceServlet extends HttpServlet {
         attendanceDAO.update(existing);
         response.sendRedirect(request.getContextPath()
                 + "/attendance?action=employeeDetail&employeeId=" + existing.getEmployeeId());
+    }
+
+    private void attachApprovedLeaveLocks(List<AttendanceRecord> records, int employeeId)
+            throws SQLException {
+        if (records == null || records.isEmpty()) return;
+
+        LocalDate firstDate = records.get(0).getWorkDate();
+        LocalDate lastDate = firstDate;
+        for (AttendanceRecord record : records) {
+            if (record.getWorkDate().isBefore(firstDate)) firstDate = record.getWorkDate();
+            if (record.getWorkDate().isAfter(lastDate)) lastDate = record.getWorkDate();
+        }
+
+        List<LeaveRequest> approvedLeaves = leaveRequestDAO
+                .findApprovedOverlappingForAttendance(firstDate, lastDate, null, employeeId);
+        for (AttendanceRecord record : records) {
+            for (LeaveRequest leave : approvedLeaves) {
+                if (!record.getWorkDate().isBefore(leave.getStartDate())
+                        && !record.getWorkDate().isAfter(leave.getEndDate())) {
+                    record.setApprovedLeaveLocked(true);
+                    record.setApprovedLeaveType(leave.getLeaveType() == null
+                            ? "Approved Leave" : leave.getLeaveType().getDbValue());
+                    break;
+                }
+            }
+        }
+    }
+
+    private boolean isApprovedLeaveLocked(AttendanceRecord record) throws SQLException {
+        return leaveRequestDAO.hasApprovedCoveringDate(
+                record.getEmployeeId(), record.getWorkDate());
+    }
+
+    private void redirectToEmployeeDetail(HttpServletRequest request,
+                                          HttpServletResponse response,
+                                          AttendanceRecord record,
+                                          String errorCode) throws IOException {
+        response.sendRedirect(request.getContextPath()
+                + "/attendance?action=employeeDetail&employeeId=" + record.getEmployeeId()
+                + "&error=" + errorCode);
     }
 
     private void forwardEditForm(HttpServletRequest request, HttpServletResponse response,

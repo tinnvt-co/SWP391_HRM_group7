@@ -12,7 +12,7 @@ import java.util.List;
 public class EmployeeDAO {
 
     public Employee findByUserId(int userId) throws SQLException {
-        String sql = "SELECT e.*, u.full_name, d.department_name "
+        String sql = "SELECT e.*, u.full_name, u.gender, d.department_name "
                    + "FROM employees e "
                    + "JOIN users u       ON e.user_id       = u.user_id "
                    + "JOIN departments d ON e.department_id = d.department_id "
@@ -554,6 +554,11 @@ public class EmployeeDAO {
         if (updated != null) e.setUpdatedAt(updated.toLocalDateTime());
         e.setFullName(rs.getString("full_name"));
         e.setDepartmentName(rs.getString("department_name"));
+        try {
+            e.setGender(rs.getString("gender"));
+        } catch (SQLException ignored) {
+            // Gender is selected only by queries that need personal profile rules.
+        }
         return e;
     }
 
