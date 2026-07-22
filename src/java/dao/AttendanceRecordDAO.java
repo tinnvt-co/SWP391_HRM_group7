@@ -529,6 +529,9 @@ public class AttendanceRecordDAO {
         public String fullName;
         public String departmentName;
         public int departmentId;
+        public LocalDate hireDate;
+        public LocalDate contractStartDate;
+        public boolean attendanceEligible;
         public int totalRecords;
         public int pendingCount;
         public int verifiedCount;
@@ -541,6 +544,9 @@ public class AttendanceRecordDAO {
         public String getFullName() { return fullName; }
         public String getDepartmentName() { return departmentName; }
         public int getDepartmentId() { return departmentId; }
+        public LocalDate getHireDate() { return hireDate; }
+        public LocalDate getContractStartDate() { return contractStartDate; }
+        public boolean isAttendanceEligible() { return attendanceEligible; }
         public int getTotalRecords() { return totalRecords; }
         public int getPendingCount() { return pendingCount; }
         public int getVerifiedCount() { return verifiedCount; }
@@ -570,6 +576,15 @@ public class AttendanceRecordDAO {
                                                     LocalDate fromDate, LocalDate toDate) throws SQLException {
         StringBuilder sql = new StringBuilder(
             "SELECT e.employee_id, e.employee_code, u.full_name, d.department_name, e.department_id, "
+          + " e.hire_date, "
+          + " (SELECT MIN(c0.start_date) FROM contracts c0 "
+          + "  WHERE c0.employee_id = e.employee_id) AS contract_start_date, "
+          + " CASE WHEN e.hire_date <= ? AND EXISTS ("
+          + "      SELECT 1 FROM contracts c1 WHERE c1.employee_id = e.employee_id "
+          + "        AND ((c1.status = 'Active' AND c1.start_date <= ?) "
+          + "          OR (c1.status = 'Expired' AND c1.start_date <= ? "
+          + "              AND (c1.end_date IS NULL OR c1.end_date >= ?)))) "
+          + "      THEN 1 ELSE 0 END AS attendance_eligible, "
           + " COALESCE(COUNT(a.attendance_id), 0) AS total_records, "
           + " COALESCE(SUM(CASE WHEN a.verification_status='Pending' THEN 1 ELSE 0 END), 0) AS pending_cnt, "
           + " COALESCE(SUM(CASE WHEN a.verification_status='Verified' THEN 1 ELSE 0 END), 0) AS verified_cnt, "
@@ -582,6 +597,10 @@ public class AttendanceRecordDAO {
           + "JOIN departments d ON e.department_id = d.department_id "
           + "LEFT JOIN attendance_records a ON a.employee_id = e.employee_id ");
         List<Object> params = new ArrayList<>();
+        params.add(Date.valueOf(toDate));
+        params.add(Date.valueOf(toDate));
+        params.add(Date.valueOf(toDate));
+        params.add(Date.valueOf(fromDate));
         if (fromDate != null) { sql.append("AND a.work_date >= ? "); params.add(Date.valueOf(fromDate)); }
         if (toDate != null)   { sql.append("AND a.work_date <= ? "); params.add(Date.valueOf(toDate)); }
         sql.append("WHERE u.is_active = 1 ");
@@ -613,6 +632,12 @@ public class AttendanceRecordDAO {
                 s.fullName      = rs.getString("full_name");
                 s.departmentName = rs.getString("department_name");
                 s.departmentId  = rs.getInt("department_id");
+                Date hireDate = rs.getDate("hire_date");
+                Date contractStartDate = rs.getDate("contract_start_date");
+                s.hireDate = hireDate == null ? null : hireDate.toLocalDate();
+                s.contractStartDate = contractStartDate == null
+                        ? null : contractStartDate.toLocalDate();
+                s.attendanceEligible = rs.getBoolean("attendance_eligible");
                 s.totalRecords  = rs.getInt("total_records");
                 s.pendingCount  = rs.getInt("pending_cnt");
                 s.verifiedCount = rs.getInt("verified_cnt");

@@ -82,9 +82,11 @@ public class PayrollCalculationService {
     }
 
     public BuildResult build(int periodId, AttendanceReport report) throws SQLException {
-        Contract c = contractDAO.findActiveByEmployeeId(report.getEmployeeId());
+        Contract c = contractDAO.findEffectiveByEmployeeId(
+                report.getEmployeeId(), report.getReportYear(), report.getReportMonth());
         if (c == null) {
-            return BuildResult.skip("No active contract for " + report.getEmployeeCode());
+            return BuildResult.skip("No effective contract for " + report.getEmployeeCode()
+                    + " in " + report.getReportMonth() + "/" + report.getReportYear());
         }
 
         BigDecimal basic = nz(c.getBasicSalary());
@@ -156,7 +158,7 @@ public class PayrollCalculationService {
                 .add(advance)
                 .add(payableLatePenalty);
         BigDecimal net = gross.subtract(deduction);
-        BigDecimal socialInsuranceBenefit = daily.multiply(maternityLeaveDays);
+        BigDecimal socialInsuranceBenefit = daily.multiply(maternityLeaveDays.min(stdDays));
 
         Payroll p = new Payroll();
         p.setPayrollPeriodId(periodId);

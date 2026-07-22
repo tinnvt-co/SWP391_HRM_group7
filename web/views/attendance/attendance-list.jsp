@@ -34,6 +34,9 @@
         .stat-present  { background:#e6f9f0; color:#166534; }
         .stat-absent   { background:#fee2e2; color:#b91c1c; }
         .stat-leave    { background:#e3f0fb; color:#1a3c5e; }
+        .stat-not-employed { background:#f1f3f5; color:#495057; }
+        .emp-card-inactive { cursor:default; background:#fafbfc; }
+        .emp-card-inactive:hover { transform:none; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
         .dept-card { border: none; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
             transition: transform 0.15s, box-shadow 0.15s; }
         .dept-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
@@ -232,17 +235,39 @@
                 <div class="row g-3" id="employeeGrid">
                     <c:forEach var="c" items="${employeeCards}">
                         <div class="col-lg-4 col-md-6 emp-item">
-                            <a href="${pageContext.request.contextPath}/attendance?action=employeeDetail&employeeId=${c.employeeId}&fromDate=${monthStart}&toDate=${monthEnd}"
-                               class="card emp-card h-100">
+                            <c:choose>
+                                <c:when test="${c.attendanceEligible}">
+                                    <a href="${pageContext.request.contextPath}/attendance?action=employeeDetail&employeeId=${c.employeeId}&fromDate=${monthStart}&toDate=${monthEnd}"
+                                       class="card emp-card h-100">
+                                </c:when>
+                                <c:otherwise>
+                                    <div class="card emp-card emp-card-inactive h-100">
+                                </c:otherwise>
+                            </c:choose>
                                 <div class="card-body d-flex align-items-start gap-3">
                                     <div class="avatar-md">${fn:substring(c.fullName, 0, 1)}</div>
                                     <div class="flex-grow-1">
                                         <div class="fw-bold" style="font-size:0.92rem;">${c.fullName}</div>
                                         <div class="text-muted" style="font-size:0.78rem;">${c.employeeCode} &middot; ${c.departmentName}</div>
-                                        <div class="d-flex flex-wrap gap-1 mt-2">
-                                            <span class="stat-badge stat-present">
-                                                <i class="bi bi-check-circle-fill me-1"></i>${c.presentDays} days
-                                            </span>
+                                        <c:choose>
+                                            <c:when test="${not c.attendanceEligible}">
+                                                <div class="mt-2">
+                                                    <span class="stat-badge stat-not-employed">
+                                                        <i class="bi bi-person-plus me-1"></i>Not employed in ${importMonthLabel}
+                                                    </span>
+                                                    <div class="text-muted mt-2" style="font-size:0.76rem;">
+                                                        Hire date: ${c.hireDate}
+                                                        <c:if test="${not empty c.contractStartDate}">
+                                                            &middot; Contract starts: ${c.contractStartDate}
+                                                        </c:if>
+                                                    </div>
+                                                </div>
+                                            </c:when>
+                                            <c:otherwise>
+                                                <div class="d-flex flex-wrap gap-1 mt-2">
+                                                    <span class="stat-badge stat-present">
+                                                        <i class="bi bi-check-circle-fill me-1"></i>${c.presentDays} days
+                                                    </span>
                                             <c:if test="${c.absentDays > 0}">
                                                 <span class="stat-badge stat-absent">
                                                     <i class="bi bi-x-circle-fill me-1"></i>${c.absentDays} absent
@@ -253,8 +278,8 @@
                                                     <i class="bi bi-calendar-check me-1"></i>${c.leaveDays} leave
                                                 </span>
                                             </c:if>
-                                        </div>
-                                        <div class="d-flex flex-wrap gap-1 mt-1">
+                                                </div>
+                                                <div class="d-flex flex-wrap gap-1 mt-1">
                                             <c:if test="${c.pendingCount > 0}">
                                                 <span class="stat-badge stat-pending">
                                                     <i class="bi bi-clock me-1"></i>${c.pendingCount} pending
@@ -265,11 +290,18 @@
                                                     <i class="bi bi-patch-check me-1"></i>${c.verifiedCount} verified
                                                 </span>
                                             </c:if>
-                                        </div>
+                                                </div>
+                                            </c:otherwise>
+                                        </c:choose>
                                     </div>
-                                    <i class="bi bi-chevron-right text-muted mt-1"></i>
+                                    <c:if test="${c.attendanceEligible}">
+                                        <i class="bi bi-chevron-right text-muted mt-1"></i>
+                                    </c:if>
                                 </div>
-                            </a>
+                            <c:choose>
+                                <c:when test="${c.attendanceEligible}"></a></c:when>
+                                <c:otherwise></div></c:otherwise>
+                            </c:choose>
                         </div>
                     </c:forEach>
                 </div>

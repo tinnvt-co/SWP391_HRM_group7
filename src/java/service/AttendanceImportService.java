@@ -268,7 +268,7 @@ public class AttendanceImportService {
         }
         if (result.hasErrors()) return result;
 
-        List<Employee> importEmployees = scopedEmployees(allEmps, referenceEmployeeCodes,
+        List<Employee> importEmployees = resolveImportRoster(allEmps, referenceEmployeeCodes,
                 punchesByEmployee.keySet(), result);
         Map<Integer, Employee> employeesById = new LinkedHashMap<>();
         for (Employee e : importEmployees) employeesById.put(e.getEmployeeId(), e);
@@ -284,7 +284,12 @@ public class AttendanceImportService {
             Map<LocalDate, LeaveDay> empLeaves =
                     leaveDays.getOrDefault(emp.getEmployeeId(), Collections.emptyMap());
 
-            for (LocalDate date = monthStart; !date.isAfter(monthEnd); date = date.plusDays(1)) {
+            LocalDate employeeStart = emp.getAttendanceStartDate() == null
+                    ? monthStart : emp.getAttendanceStartDate();
+            LocalDate employeeEnd = emp.getAttendanceEndDate() == null
+                    ? monthEnd : emp.getAttendanceEndDate();
+
+            for (LocalDate date = employeeStart; !date.isAfter(employeeEnd); date = date.plusDays(1)) {
                 List<LocalTime> punches = punchesByDate.get(date);
                 LeaveDay leaveDay = empLeaves.get(date);
                 AttendanceRecord rec;
@@ -521,42 +526,50 @@ public class AttendanceImportService {
         return -1;
     }
 
-    private List<Employee> scopedEmployees(List<Employee> allEmps,
-                                           Set<String> referenceEmployeeCodes,
-                                           Set<Integer> employeeIdsWithPunches,
-                                           Result result) {
-        if (referenceEmployeeCodes == null || referenceEmployeeCodes.isEmpty()) {
-            return allEmps;
-        }
-
+    private List<Employee> resolveImportRoster(List<Employee> allEmps,
+                                               Set<String> referenceEmployeeCodes,
+                                               Set<Integer> employeeIdsWithPunches,
+                                               Result result) {
         Map<String, Employee> byCode = buildEmployeeLookup(allEmps);
-        Map<Integer, Employee> scoped = new LinkedHashMap<>();
+        Set<Integer> employeeIdsListedInWorkbook = new java.util.HashSet<>();
         int matchedReferenceCodes = 0;
 
-        for (String code : referenceEmployeeCodes) {
-            Employee emp = byCode.get(code);
-            if (emp != null) {
-                scoped.put(emp.getEmployeeId(), emp);
-                matchedReferenceCodes++;
+        if (referenceEmployeeCodes != null) {
+            for (String code : referenceEmployeeCodes) {
+                Employee emp = byCode.get(code);
+                if (emp != null) {
+                    employeeIdsListedInWorkbook.add(emp.getEmployeeId());
+                    matchedReferenceCodes++;
+                }
             }
         }
+        employeeIdsListedInWorkbook.addAll(employeeIdsWithPunches);
 
-        for (Employee emp : allEmps) {
-            if (employeeIdsWithPunches.contains(emp.getEmployeeId())) {
-                scoped.put(emp.getEmployeeId(), emp);
-            }
-        }
-
-        if (scoped.isEmpty()) {
-            result.warnings.add("Reference employee list did not match system codes; using all attendance employees.");
-            return allEmps;
-        }
-        if (matchedReferenceCodes < referenceEmployeeCodes.size()) {
+        if (referenceEmployeeCodes != null
+                && matchedReferenceCodes < referenceEmployeeCodes.size()) {
             result.warnings.add("Reference employee list has "
                     + (referenceEmployeeCodes.size() - matchedReferenceCodes)
                     + " code(s) not found in the system.");
         }
-        return new ArrayList<>(scoped.values());
+
+        List<String> missingCodes = new ArrayList<>();
+        for (Employee emp : allEmps) {
+            if (!employeeIdsListedInWorkbook.contains(emp.getEmployeeId())) {
+                missingCodes.add(emp.getEmployeeCode());
+            }
+        }
+        if (!missingCodes.isEmpty()) {
+            int displayCount = Math.min(missingCodes.size(), 8);
+            String displayedCodes = String.join(", ", missingCodes.subList(0, displayCount));
+            String remaining = missingCodes.size() > displayCount
+                    ? ", +" + (missingCodes.size() - displayCount) + " more" : "";
+            result.warnings.add(missingCodes.size()
+                    + " eligible employee(s) were not listed in the workbook and had no punch rows ("
+                    + displayedCodes + remaining + "). Attendance was generated from approved leave, "
+                    + "holiday, and absence rules.");
+        }
+
+        return allEmps;
     }
 
     private DetailHeader findDetailHeader(XlsxReader.Sheet sheet) {

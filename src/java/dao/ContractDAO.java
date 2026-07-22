@@ -8,6 +8,7 @@ import model.Contract.Status;
 import model.ContractDocument;
 
 import java.sql.*;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -138,6 +139,33 @@ public class ContractDAO {
             conn = DBContext.getConnection();
             ps = conn.prepareStatement(sql);
             ps.setInt(1, employeeId);
+            rs = ps.executeQuery();
+            return rs.next() ? mapRow(rs) : null;
+        } finally {
+            close(conn, ps, rs);
+        }
+    }
+
+    public Contract findEffectiveByEmployeeId(int employeeId, int year, int month)
+            throws SQLException {
+        YearMonth period = YearMonth.of(year, month);
+        String sql = BASE_SELECT
+                   + "WHERE c.employee_id = ? "
+                   + "  AND ((c.status = 'Active' AND c.start_date <= ?) "
+                   + "    OR (c.status = 'Expired' AND c.start_date <= ? "
+                   + "        AND (c.end_date IS NULL OR c.end_date >= ?))) "
+                   + "ORDER BY (c.status = 'Active') DESC, c.start_date DESC, "
+                   + "         c.contract_id DESC LIMIT 1";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, employeeId);
+            ps.setDate(2, Date.valueOf(period.atEndOfMonth()));
+            ps.setDate(3, Date.valueOf(period.atEndOfMonth()));
+            ps.setDate(4, Date.valueOf(period.atDay(1)));
             rs = ps.executeQuery();
             return rs.next() ? mapRow(rs) : null;
         } finally {

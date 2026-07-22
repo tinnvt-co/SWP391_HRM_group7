@@ -14,6 +14,8 @@ public class Employee {
     private String employeeCode;
     private int departmentId;
     private LocalDate hireDate;
+    private LocalDate attendanceStartDate;
+    private LocalDate attendanceEndDate;
     private EmploymentStatus employmentStatus;
     private int dependentCount;
     private String bankName;
@@ -47,6 +49,12 @@ public class Employee {
 
     public LocalDate getHireDate()                          { return hireDate; }
     public void setHireDate(LocalDate hireDate)             { this.hireDate = hireDate; }
+
+    public LocalDate getAttendanceStartDate()               { return attendanceStartDate; }
+    public void setAttendanceStartDate(LocalDate date)      { this.attendanceStartDate = date; }
+
+    public LocalDate getAttendanceEndDate()                 { return attendanceEndDate; }
+    public void setAttendanceEndDate(LocalDate date)        { this.attendanceEndDate = date; }
 
     public EmploymentStatus getEmploymentStatus()           { return employmentStatus; }
     public void setEmploymentStatus(EmploymentStatus s)     { this.employmentStatus = s; }

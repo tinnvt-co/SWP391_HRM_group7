@@ -376,7 +376,8 @@ public class AttendanceServlet extends HttpServlet {
                 return;
             }
 
-            List<Employee> allEmps = employeeDAO.findAttendanceActive();
+            List<Employee> allEmps = employeeDAO.findAttendanceEligible(
+                    target.atDay(1), target.atEndOfMonth());
             if (allEmps.isEmpty()) {
                 handleImportFailure(session, response, ctx, target,
                         "No active attendance employees were found in the system.");

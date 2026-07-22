@@ -5,6 +5,7 @@ import model.Employee;
 import model.Employee.EmploymentStatus;
 
 import java.sql.*;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -444,6 +445,55 @@ public class EmployeeDAO {
         return list;
     }
 
+    public List<Employee> findAttendanceEligible(LocalDate periodStart,
+                                                  LocalDate periodEnd) throws SQLException {
+        String sql = "SELECT e.*, u.full_name, d.department_name, "
+                   + "       GREATEST(e.hire_date, c.start_date, ?) AS attendance_start_date, "
+                   + "       LEAST(CASE WHEN c.status = 'Active' THEN ? "
+                   + "                  ELSE COALESCE(c.end_date, ?) END, ?) AS attendance_end_date "
+                   + "FROM employees e "
+                   + "JOIN users u       ON e.user_id       = u.user_id "
+                   + "JOIN roles ro      ON u.role_id       = ro.role_id "
+                   + "JOIN departments d ON e.department_id = d.department_id "
+                   + "JOIN contracts c ON c.contract_id = ("
+                   + "    SELECT c2.contract_id FROM contracts c2 "
+                   + "    WHERE c2.employee_id = e.employee_id "
+                   + "      AND ((c2.status = 'Active' AND c2.start_date <= ?) "
+                   + "        OR (c2.status = 'Expired' AND c2.start_date <= ? "
+                   + "            AND (c2.end_date IS NULL OR c2.end_date >= ?))) "
+                   + "    ORDER BY (c2.status = 'Active') DESC, c2.start_date DESC, "
+                   + "             c2.contract_id DESC LIMIT 1"
+                   + ") "
+                   + "WHERE u.is_active = 1 "
+                   + "  AND e.employment_status IN ('Working', 'Probation') "
+                   + "  AND e.hire_date <= ? "
+                   + "  AND ro.role_name IN ('EMPLOYEE', 'MANAGER', 'HR_STAFF', 'HR_MANAGER') "
+                   + "  AND d.department_code <> 'IT' "
+                   + "ORDER BY u.full_name";
+
+        List<Employee> list = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBContext.getConnection();
+            ps = conn.prepareStatement(sql);
+            ps.setDate(1, Date.valueOf(periodStart));
+            ps.setDate(2, Date.valueOf(periodEnd));
+            ps.setDate(3, Date.valueOf(periodEnd));
+            ps.setDate(4, Date.valueOf(periodEnd));
+            ps.setDate(5, Date.valueOf(periodEnd));
+            ps.setDate(6, Date.valueOf(periodEnd));
+            ps.setDate(7, Date.valueOf(periodStart));
+            ps.setDate(8, Date.valueOf(periodEnd));
+            rs = ps.executeQuery();
+            while (rs.next()) list.add(mapRow(rs));
+        } finally {
+            close(conn, ps, rs);
+        }
+        return list;
+    }
+
     public List<Employee> findAttendanceActiveByDepartment(Integer departmentId) throws SQLException {
         StringBuilder sql = new StringBuilder(
                 "SELECT e.*, u.full_name, d.department_name "
@@ -481,6 +531,14 @@ public class EmployeeDAO {
         e.setDepartmentId(rs.getInt("department_id"));
         Date hire = rs.getDate("hire_date");
         if (hire != null) e.setHireDate(hire.toLocalDate());
+        try {
+            Date attendanceStart = rs.getDate("attendance_start_date");
+            if (attendanceStart != null) e.setAttendanceStartDate(attendanceStart.toLocalDate());
+            Date attendanceEnd = rs.getDate("attendance_end_date");
+            if (attendanceEnd != null) e.setAttendanceEndDate(attendanceEnd.toLocalDate());
+        } catch (SQLException ignored) {
+            // Attendance boundaries are present only in period-scoped roster queries.
+        }
         String status = rs.getString("employment_status");
         if (status != null) {
             try { e.setEmploymentStatus(EmploymentStatus.valueOf(status)); }
