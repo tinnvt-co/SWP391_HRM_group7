@@ -360,6 +360,12 @@
                                         </c:when>
                                         <c:when test="${r.status == 'RejectedByHrManager'}">
                                             <span class="status-pill st-rejected">Rejected by HR Manager</span>
+                                            <c:if test="${not empty r.hrNote}">
+                                                <div class="text-danger mt-1" style="font-size:0.76rem;max-width:240px;white-space:normal;">
+                                                    <i class="bi bi-chat-left-text me-1"></i>
+                                                    <strong>Reason:</strong> <c:out value="${r.hrNote}"/>
+                                                </div>
+                                            </c:if>
                                         </c:when>
                                         <c:otherwise>${r.status}</c:otherwise>
                                     </c:choose>
