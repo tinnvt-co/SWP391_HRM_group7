@@ -5,12 +5,14 @@ import dao.AttendanceRecordDAO;
 import dao.ContractDAO;
 import dao.EmployeeDAO;
 import dao.HolidayDAO;
+import dao.PayrollPeriodDAO;
 import model.AttendanceRecord;
 import model.AttendanceReport;
 import model.AllowanceType;
 import model.Contract;
 import model.Employee;
 import model.Payroll;
+import model.PayrollPeriod;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -67,6 +69,7 @@ public class PayrollCalculationService {
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
     private final AttendanceRecordDAO attendanceDAO = new AttendanceRecordDAO();
     private final HolidayDAO holidayDAO = new HolidayDAO();
+    private final PayrollPeriodDAO periodDAO = new PayrollPeriodDAO();
 
     public static final class BuildResult {
         public final Payroll payroll;
@@ -90,10 +93,17 @@ public class PayrollCalculationService {
         }
 
         BigDecimal basic = nz(c.getBasicSalary());
-        BigDecimal stdDays = nz(c.getStandardWorkingDays());
-        if (stdDays.signum() <= 0) stdDays = new BigDecimal("26");
+        PayrollPeriod period = periodDAO.findById(periodId);
+        BigDecimal stdDays = period == null
+                ? nz(report.getStandardWorkingDays())
+                : nz(period.getStandardWorkingDays());
+        if (stdDays.signum() <= 0) {
+            return BuildResult.skip("Payroll period has no valid standard working-day snapshot.");
+        }
 
         BigDecimal actualDays = nz(report.getActualWorkingDays());
+        BigDecimal expectedDays = nz(report.getExpectedWorkingDays());
+        if (expectedDays.signum() <= 0) expectedDays = stdDays;
         BigDecimal kpi = nz(report.getKpiBonus());
         BigDecimal advance = nz(report.getAdvancePayment());
         BigDecimal latePenalty = nz(report.getLatePenaltyAmount());
@@ -103,7 +113,7 @@ public class PayrollCalculationService {
         BigDecimal daily = basic.divide(stdDays, 4, RoundingMode.HALF_UP);
         BigDecimal workSalary = fixedMonthly ? basic : daily.multiply(actualDays);
 
-        BigDecimal hourly = basic.divide(new BigDecimal("26"), 4, RoundingMode.HALF_UP)
+        BigDecimal hourly = basic.divide(stdDays, 4, RoundingMode.HALF_UP)
                 .divide(HOURS_PER_DAY, 4, RoundingMode.HALF_UP);
         OvertimeBreakdown overtime = classifyOvertime(report);
         BigDecimal normalOtSalary = fixedMonthly
@@ -117,7 +127,7 @@ public class PayrollCalculationService {
                 : hourly.multiply(overtime.holidayHours).multiply(HOLIDAY_OT_MULTIPLIER);
         BigDecimal otSalary = normalOtSalary.add(weekendOtSalary).add(holidayOtSalary);
 
-        boolean fullMaternityMonth = maternityLeaveDays.compareTo(stdDays) >= 0;
+        boolean fullMaternityMonth = maternityLeaveDays.compareTo(expectedDays) >= 0;
         AllowanceBreakdown allowanceBreakdown = fixedMonthly
                 || fullMaternityMonth || actualDays.signum() <= 0
                 ? new AllowanceBreakdown()
@@ -127,7 +137,7 @@ public class PayrollCalculationService {
                 ? nz(c.getFixedAllowanceAmount())
                 : allowanceBreakdown.total;
         BigDecimal attendanceBonus = !fixedMonthly
-                && qualifiesForFullAttendanceBonus(actualDays, stdDays, fullMaternityMonth, overtime)
+                && qualifiesForFullAttendanceBonus(actualDays, expectedDays, fullMaternityMonth, overtime)
                     ? FULL_ATTENDANCE_BONUS
                     : BigDecimal.ZERO;
         BigDecimal payableLatePenalty = fixedMonthly ? BigDecimal.ZERO : latePenalty;

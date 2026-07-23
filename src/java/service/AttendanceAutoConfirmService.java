@@ -13,6 +13,7 @@ public class AttendanceAutoConfirmService {
 
     private final AttendanceRecordDAO attendanceDAO = new AttendanceRecordDAO();
     private final AttendanceReportDAO reportDAO = new AttendanceReportDAO();
+    private final WorkingCalendarService workingCalendarService = new WorkingCalendarService();
 
     public int runDueAutoConfirm() throws SQLException {
         LocalDateTime cutoff = LocalDateTime.now().minusDays(2);
@@ -36,6 +37,11 @@ public class AttendanceAutoConfirmService {
                 report.setDepartmentId(s.departmentId);
                 report.setReportMonth(batch.month);
                 report.setReportYear(batch.year);
+                WorkingCalendarService.PeriodDays periodDays =
+                        workingCalendarService.periodDaysForEmployee(
+                                s.employeeId, batch.year, batch.month);
+                report.setStandardWorkingDays(periodDays.standardWorkingDays);
+                report.setExpectedWorkingDays(periodDays.expectedWorkingDays);
                 report.setActualWorkingDays(BigDecimal.valueOf(s.actualWorkingDays));
                 report.setPaidLeaveDays(BigDecimal.valueOf(s.paidLeaveDays));
                 report.setUnpaidLeaveDays(BigDecimal.valueOf(s.unpaidLeaveDays));

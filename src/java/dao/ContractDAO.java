@@ -6,6 +6,7 @@ import model.Contract.ContractType;
 import model.Contract.SalaryPolicy;
 import model.Contract.Status;
 import model.ContractDocument;
+import model.WorkSchedule;
 
 import java.sql.*;
 import java.time.YearMonth;
@@ -17,6 +18,9 @@ public class ContractDAO {
     private static final String BASE_SELECT =
             "SELECT c.contract_id, c.employee_id, c.contract_code, c.contract_type, "
           + "       c.start_date, c.end_date, c.basic_salary, c.standard_working_days, "
+          + "       c.work_schedule_id, ws.schedule_code, ws.schedule_name, ws.working_days, "
+          + "       ws.daily_working_hours, ws.check_in_time, ws.check_out_time, ws.is_active AS schedule_active, "
+          + "       ws.is_default AS schedule_default, "
           + "       c.salary_policy, c.fixed_allowance_amount, c.is_system_contract, "
           + "       c.status, c.note, c.created_by, c.updated_by, c.created_at, c.updated_at, "
           + "       u.full_name AS emp_full_name, e.employee_code, d.department_name, "
@@ -27,6 +31,7 @@ public class ContractDAO {
           + "JOIN employees e   ON c.employee_id   = e.employee_id "
           + "JOIN users u       ON e.user_id       = u.user_id "
           + "JOIN departments d ON e.department_id = d.department_id "
+          + "JOIN work_schedules ws ON c.work_schedule_id = ws.work_schedule_id "
           + "LEFT JOIN contract_documents cd ON cd.contract_id = c.contract_id AND cd.is_active = 1 ";
 
     public List<Contract> findAll(Status statusFilter) throws SQLException {
@@ -207,7 +212,7 @@ public class ContractDAO {
 
     public int insert(Contract c) throws SQLException {
         String sql = "INSERT INTO contracts (employee_id, contract_code, contract_type, start_date, end_date, "
-                   + "basic_salary, standard_working_days, salary_policy, fixed_allowance_amount, "
+                   + "basic_salary, work_schedule_id, salary_policy, fixed_allowance_amount, "
                    + "is_system_contract, status, note, created_by, updated_by) "
                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         Connection conn = null;
@@ -221,7 +226,7 @@ public class ContractDAO {
             ps.setDate(4, Date.valueOf(c.getStartDate()));
             ps.setObject(5, c.getEndDate() != null ? Date.valueOf(c.getEndDate()) : null);
             ps.setBigDecimal(6, c.getBasicSalary());
-            ps.setBigDecimal(7, c.getStandardWorkingDays());
+            ps.setInt(7, c.getWorkScheduleId());
             ps.setString(8, c.getSalaryPolicy() == null
                     ? SalaryPolicy.AttendanceBased.getDbValue()
                     : c.getSalaryPolicy().getDbValue());
@@ -248,7 +253,7 @@ public class ContractDAO {
 
     public boolean update(Contract c, boolean includeSystemContracts) throws SQLException {
         String sql = "UPDATE contracts SET contract_type=?, start_date=?, end_date=?, basic_salary=?, "
-                   + "standard_working_days=?, note=?, updated_by=?, updated_at=NOW() "
+                   + "work_schedule_id=?, note=?, updated_by=?, updated_at=NOW() "
                    + "WHERE contract_id=?";
         if (!includeSystemContracts) {
             sql += " AND is_system_contract=0";
@@ -262,7 +267,7 @@ public class ContractDAO {
             ps.setDate(2, Date.valueOf(c.getStartDate()));
             ps.setObject(3, c.getEndDate() != null ? Date.valueOf(c.getEndDate()) : null);
             ps.setBigDecimal(4, c.getBasicSalary());
-            ps.setBigDecimal(5, c.getStandardWorkingDays());
+            ps.setInt(5, c.getWorkScheduleId());
             ps.setString(6, c.getNote());
             if (c.getUpdatedBy() != null) ps.setInt(7, c.getUpdatedBy()); else ps.setNull(7, Types.INTEGER);
             ps.setInt(8, c.getContractId());
@@ -300,6 +305,20 @@ public class ContractDAO {
         if (end != null) c.setEndDate(end.toLocalDate());
         c.setBasicSalary(rs.getBigDecimal("basic_salary"));
         c.setStandardWorkingDays(rs.getBigDecimal("standard_working_days"));
+        c.setWorkScheduleId(rs.getInt("work_schedule_id"));
+        WorkSchedule schedule = new WorkSchedule();
+        schedule.setWorkScheduleId(c.getWorkScheduleId());
+        schedule.setScheduleCode(rs.getString("schedule_code"));
+        schedule.setScheduleName(rs.getString("schedule_name"));
+        schedule.setWorkingDays(rs.getString("working_days"));
+        schedule.setDailyWorkingHours(rs.getBigDecimal("daily_working_hours"));
+        Time scheduleCheckIn = rs.getTime("check_in_time");
+        if (scheduleCheckIn != null) schedule.setCheckInTime(scheduleCheckIn.toLocalTime());
+        Time scheduleCheckOut = rs.getTime("check_out_time");
+        if (scheduleCheckOut != null) schedule.setCheckOutTime(scheduleCheckOut.toLocalTime());
+        schedule.setDefaultSchedule(rs.getBoolean("schedule_default"));
+        schedule.setActive(rs.getBoolean("schedule_active"));
+        c.setWorkSchedule(schedule);
         c.setSalaryPolicy(SalaryPolicy.fromDb(getStringOrNull(rs, "salary_policy")));
         c.setFixedAllowanceAmount(getBigDecimalOrZero(rs, "fixed_allowance_amount"));
         c.setSystemContract(getBooleanOrFalse(rs, "is_system_contract"));

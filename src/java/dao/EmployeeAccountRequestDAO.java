@@ -15,20 +15,22 @@ public class EmployeeAccountRequestDAO {
           + "       req.full_name AS requested_by_name, "
           + "       rev.full_name AS reviewed_by_name, "
           + "       cu.username AS created_username, "
-          + "       rr.role_name AS requested_role_name "
+          + "       rr.role_name AS requested_role_name, "
+          + "       ws.schedule_name AS work_schedule_name "
           + "FROM employee_account_requests ear "
           + "JOIN departments d ON ear.department_id = d.department_id "
           + "JOIN users req ON ear.requested_by = req.user_id "
           + "LEFT JOIN users rev ON ear.reviewed_by = rev.user_id "
           + "LEFT JOIN users cu ON ear.created_user_id = cu.user_id "
-          + "LEFT JOIN roles rr ON ear.requested_role_id = rr.role_id ";
+          + "LEFT JOIN roles rr ON ear.requested_role_id = rr.role_id "
+          + "LEFT JOIN work_schedules ws ON ear.work_schedule_id = ws.work_schedule_id ";
 
     public int insert(EmployeeAccountRequest r) throws SQLException {
         String sql = "INSERT INTO employee_account_requests "
                    + "(full_name, email, phone, gender, date_of_birth, address, department_id, "
                    + " requested_role_id, position_title, hire_date, employee_code, "
                    + " contract_code, contract_type, contract_start_date, contract_end_date, "
-                   + " basic_salary, standard_working_days, contract_note, "
+                   + " basic_salary, work_schedule_id, contract_note, "
                    + " contract_document_original_name, contract_document_stored_name, "
                    + " contract_document_path, contract_document_mime_type, contract_document_size, "
                    + " requested_by) "
@@ -58,7 +60,7 @@ public class EmployeeAccountRequestDAO {
             if (r.getContractEndDate() != null) ps.setDate(15, Date.valueOf(r.getContractEndDate()));
             else                                ps.setNull(15, Types.DATE);
             ps.setBigDecimal(16, r.getBasicSalary());
-            ps.setBigDecimal(17, r.getStandardWorkingDays());
+            ps.setInt(17, r.getWorkScheduleId());
             ps.setString(18, r.getContractNote());
             ps.setString(19, r.getContractDocumentOriginalName());
             ps.setString(20, r.getContractDocumentStoredName());
@@ -259,6 +261,8 @@ public class EmployeeAccountRequestDAO {
         if (contractEnd != null) r.setContractEndDate(contractEnd.toLocalDate());
         r.setBasicSalary(getBigDecimalOrNull(rs, "basic_salary"));
         r.setStandardWorkingDays(getBigDecimalOrNull(rs, "standard_working_days"));
+        r.setWorkScheduleId(getIntOrNull(rs, "work_schedule_id"));
+        r.setWorkScheduleName(getStringOrNull(rs, "work_schedule_name"));
         r.setContractNote(getStringOrNull(rs, "contract_note"));
         r.setContractDocumentOriginalName(getStringOrNull(rs, "contract_document_original_name"));
         r.setContractDocumentStoredName(getStringOrNull(rs, "contract_document_stored_name"));

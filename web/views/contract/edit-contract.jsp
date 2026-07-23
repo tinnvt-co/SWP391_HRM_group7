@@ -134,9 +134,17 @@
                                    value="${contract.basicSalary}" ${readonly ? 'disabled' : ''} required>
                         </div>
                         <div class="col-md-6">
-                            <label for="standardWorkingDays" class="form-label required">Standard Working Days</label>
-                            <input type="number" step="0.5" min="1" max="31" id="standardWorkingDays" name="standardWorkingDays" class="form-control"
-                                   value="${contract.standardWorkingDays}" ${readonly ? 'disabled' : ''} required>
+                            <label for="workScheduleId" class="form-label required">Work Schedule</label>
+                            <select id="workScheduleId" name="workScheduleId" class="form-select"
+                                    ${readonly ? 'disabled' : ''} required>
+                                <c:forEach var="schedule" items="${workSchedules}">
+                                    <option value="${schedule.workScheduleId}"
+                                            ${contract.workScheduleId == schedule.workScheduleId ? 'selected' : ''}>
+                                        ${schedule.scheduleName} (${schedule.dailyWorkingHours} hours/day)
+                                    </option>
+                                </c:forEach>
+                            </select>
+                            <div class="form-text">Monthly working days are calculated from this schedule.</div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-muted">Salary Policy</label>

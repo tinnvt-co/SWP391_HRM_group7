@@ -117,9 +117,18 @@
                                    value="${not empty param.basicSalary ? param.basicSalary : '0'}" required>
                         </div>
                         <div class="col-md-6">
-                            <label for="standardWorkingDays" class="form-label required">Standard Working Days</label>
-                            <input type="number" step="0.5" min="1" max="31" id="standardWorkingDays" name="standardWorkingDays" class="form-control"
-                                   value="${not empty param.standardWorkingDays ? param.standardWorkingDays : '26'}" required>
+                            <label for="workScheduleId" class="form-label required">Work Schedule</label>
+                            <select id="workScheduleId" name="workScheduleId" class="form-select" required>
+                                <option value="">Select a work schedule</option>
+                                <c:forEach var="schedule" items="${workSchedules}">
+                                    <option value="${schedule.workScheduleId}"
+                                            ${(not empty param.workScheduleId and param.workScheduleId == schedule.workScheduleId)
+                                               or (empty param.workScheduleId and schedule.defaultSchedule) ? 'selected' : ''}>
+                                        ${schedule.scheduleName} (${schedule.dailyWorkingHours} hours/day)
+                                    </option>
+                                </c:forEach>
+                            </select>
+                            <div class="form-text">Monthly working days are calculated from this schedule.</div>
                         </div>
                         <div class="col-12">
                             <div class="table-responsive">

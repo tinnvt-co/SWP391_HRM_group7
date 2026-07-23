@@ -266,6 +266,7 @@ public class AttendanceImportService {
         if (punchRows == 0) {
             result.errors.add("The detail attendance sheet has no valid punch rows for " + month + ".");
         }
+        validatePunchPairs(punchesByEmployee, allEmps, result);
         if (result.hasErrors()) return result;
 
         List<Employee> importEmployees = resolveImportRoster(allEmps, referenceEmployeeCodes,
@@ -318,6 +319,56 @@ public class AttendanceImportService {
         }
 
         return result;
+    }
+
+    static void validatePunchPairs(
+            Map<Integer, Map<LocalDate, List<LocalTime>>> punchesByEmployee,
+            List<Employee> employees,
+            Result result) {
+        Map<Integer, String> employeeCodes = new HashMap<>();
+        for (Employee employee : employees) {
+            employeeCodes.put(employee.getEmployeeId(), employee.getEmployeeCode());
+        }
+
+        for (Map.Entry<Integer, Map<LocalDate, List<LocalTime>>> employeeEntry
+                : punchesByEmployee.entrySet()) {
+            String employeeCode = employeeCodes.getOrDefault(
+                    employeeEntry.getKey(), "Employee #" + employeeEntry.getKey());
+
+            for (Map.Entry<LocalDate, List<LocalTime>> dateEntry
+                    : employeeEntry.getValue().entrySet()) {
+                List<LocalTime> times = new ArrayList<>(dateEntry.getValue());
+                Collections.sort(times);
+                if (times.isEmpty()) continue;
+
+                if (times.size() == 1) {
+                    LocalTime onlyPunch = times.get(0);
+                    String missingPunch = onlyPunch.isBefore(LocalTime.NOON)
+                            ? "check-out" : "check-in";
+                    result.errors.add(employeeCode + " on " + dateEntry.getKey()
+                            + " has only one punch at " + onlyPunch
+                            + "; missing " + missingPunch
+                            + ". Please correct the Attendance Detail sheet.");
+                    continue;
+                }
+
+                LocalTime firstPunch = times.get(0);
+                LocalTime lastPunch = times.get(times.size() - 1);
+                if (firstPunch.equals(lastPunch)) {
+                    result.errors.add(employeeCode + " on " + dateEntry.getKey()
+                            + " has duplicate punch times at " + firstPunch
+                            + "; a distinct check-in and check-out are required.");
+                    continue;
+                }
+
+                if (times.size() > 2) {
+                    result.warnings.add(employeeCode + " on " + dateEntry.getKey()
+                            + " has " + times.size() + " punches; "
+                            + firstPunch + " was used as check-in and "
+                            + lastPunch + " as check-out.");
+                }
+            }
+        }
     }
 
     private AttendanceRecord buildPunchRecord(Employee emp, LocalDate date,

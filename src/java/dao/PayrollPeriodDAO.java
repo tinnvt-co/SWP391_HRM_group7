@@ -14,8 +14,9 @@ public class PayrollPeriodDAO {
     /** Create a Draft period for (month, year, department). Returns new id, or -1 if it already exists. */
     public int createDraft(PayrollPeriod p) throws SQLException {
         String sql = "INSERT INTO payroll_periods "
-                   + "(period_name, payroll_month, payroll_year, department_id, status, created_by) "
-                   + "VALUES (?, ?, ?, ?, 'Draft', ?)";
+                   + "(period_name, payroll_month, payroll_year, department_id, "
+                   + " standard_working_days, status, created_by) "
+                   + "VALUES (?, ?, ?, ?, ?, 'Draft', ?)";
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -25,8 +26,9 @@ public class PayrollPeriodDAO {
             ps.setInt(2, p.getPayrollMonth());
             ps.setInt(3, p.getPayrollYear());
             ps.setInt(4, p.getDepartmentId());
-            if (p.getCreatedBy() != null) ps.setInt(5, p.getCreatedBy());
-            else                          ps.setNull(5, Types.INTEGER);
+            ps.setBigDecimal(5, p.getStandardWorkingDays());
+            if (p.getCreatedBy() != null) ps.setInt(6, p.getCreatedBy());
+            else                          ps.setNull(6, Types.INTEGER);
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) return keys.getInt(1);
@@ -368,6 +370,7 @@ public class PayrollPeriodDAO {
         p.setPayrollMonth(rs.getInt("payroll_month"));
         p.setPayrollYear(rs.getInt("payroll_year"));
         p.setDepartmentId(rs.getInt("department_id"));
+        p.setStandardWorkingDays(rs.getBigDecimal("standard_working_days"));
         Date pd = rs.getDate("payment_date");
         if (pd != null) p.setPaymentDate(pd.toLocalDate());
         p.setStatus(Status.fromDb(rs.getString("status")));

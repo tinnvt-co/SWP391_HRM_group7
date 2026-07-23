@@ -37,6 +37,8 @@ public class EmployeeAccountRequest {
     private LocalDate contractEndDate;
     private BigDecimal basicSalary;
     private BigDecimal standardWorkingDays;
+    private int workScheduleId;
+    private String workScheduleName;
     private String contractNote;
     private String contractDocumentOriginalName;
     private String contractDocumentStoredName;
@@ -113,6 +115,12 @@ public class EmployeeAccountRequest {
 
     public BigDecimal getStandardWorkingDays() { return standardWorkingDays; }
     public void setStandardWorkingDays(BigDecimal standardWorkingDays) { this.standardWorkingDays = standardWorkingDays; }
+
+    public int getWorkScheduleId() { return workScheduleId; }
+    public void setWorkScheduleId(int workScheduleId) { this.workScheduleId = workScheduleId; }
+
+    public String getWorkScheduleName() { return workScheduleName; }
+    public void setWorkScheduleName(String workScheduleName) { this.workScheduleName = workScheduleName; }
 
     public String getContractNote() { return contractNote; }
     public void setContractNote(String contractNote) { this.contractNote = contractNote; }

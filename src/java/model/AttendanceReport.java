@@ -57,6 +57,7 @@ public class AttendanceReport {
     private int reportMonth;
     private int reportYear;
     private BigDecimal standardWorkingDays;
+    private BigDecimal expectedWorkingDays;
     private BigDecimal actualWorkingDays;
     private BigDecimal paidLeaveDays;
     private BigDecimal unpaidLeaveDays;
@@ -101,6 +102,9 @@ public class AttendanceReport {
 
     public BigDecimal getStandardWorkingDays()               { return standardWorkingDays; }
     public void setStandardWorkingDays(BigDecimal v)         { this.standardWorkingDays = v; }
+
+    public BigDecimal getExpectedWorkingDays()               { return expectedWorkingDays; }
+    public void setExpectedWorkingDays(BigDecimal v)         { this.expectedWorkingDays = v; }
 
     public BigDecimal getActualWorkingDays()                 { return actualWorkingDays; }
     public void setActualWorkingDays(BigDecimal v)           { this.actualWorkingDays = v; }

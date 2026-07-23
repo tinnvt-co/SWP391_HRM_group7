@@ -304,7 +304,7 @@
                             <th>Employee</th>
                             <th>Department</th>
                             <th>Manager</th>
-                            <th class="text-center">Work Days</th>
+                            <th class="text-center">Paid / Expected Days</th>
                             <th class="text-center">Paid Leave</th>
                             <th class="text-center">Unpaid Leave</th>
                             <th class="text-center">OT Hours</th>
@@ -331,7 +331,10 @@
                                 </td>
                                 <td>${r.departmentName}</td>
                                 <td class="text-muted">${r.managerFullName}</td>
-                                <td class="text-center fw-medium">${r.actualWorkingDays}</td>
+                                <td class="text-center fw-medium">
+                                    ${r.actualWorkingDays} / ${r.expectedWorkingDays}
+                                    <div class="small text-muted">${r.standardWorkingDays} standard this month</div>
+                                </td>
                                 <td class="text-center">${r.paidLeaveDays}</td>
                                 <td class="text-center">${r.unpaidLeaveDays}</td>
                                 <td class="text-center">${r.overtimeHours}</td>

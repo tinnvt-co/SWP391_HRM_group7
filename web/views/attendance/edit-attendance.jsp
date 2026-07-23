@@ -82,11 +82,6 @@
                 </span>
             </div>
 
-            <div class="info-badge d-flex align-items-center gap-2 mb-3">
-                <i class="bi bi-info-circle-fill"></i>
-                <span>Editing is allowed only while verification status is <strong>Pending</strong> or <strong>Rejected</strong>. Once verified, the record is locked.</span>
-            </div>
-
             <c:if test="${not empty error}">
                 <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-3">
                     <i class="bi bi-exclamation-circle-fill"></i><span>${error}</span>

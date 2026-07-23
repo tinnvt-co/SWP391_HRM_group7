@@ -198,6 +198,7 @@
                             ${period.status.dbValue}
                         </span>
                         <span class="text-muted ms-2">${period.payrollCount} employee(s)</span>
+                        <span class="text-muted ms-2">${period.standardWorkingDays} standard working days</span>
                     </c:otherwise>
                 </c:choose>
             </div>

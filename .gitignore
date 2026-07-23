@@ -12,3 +12,4 @@ db/migrations/04_hr_employee_permissions.sql
 /attendance-templates
 /db
 test/service/AttendanceImportRosterTest.java
+/outputs

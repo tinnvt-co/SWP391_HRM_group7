@@ -12,6 +12,7 @@ import model.PayrollTaskSummary;
 import model.User;
 import service.AttendanceAutoConfirmService;
 import service.PayrollCalculationService;
+import service.WorkingCalendarService;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -56,6 +57,7 @@ public class PayrollServlet extends HttpServlet {
     private final DepartmentDAO departmentDAO = new DepartmentDAO();
     private final PayrollCalculationService calc = new PayrollCalculationService();
     private final AttendanceAutoConfirmService autoConfirmService = new AttendanceAutoConfirmService();
+    private final WorkingCalendarService workingCalendarService = new WorkingCalendarService();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -246,6 +248,7 @@ public class PayrollServlet extends HttpServlet {
         p.setPayrollMonth(month);
         p.setPayrollYear(year);
         p.setDepartmentId(dept.getDepartmentId());
+        p.setStandardWorkingDays(workingCalendarService.standardWorkingDays(year, month));
         p.setCreatedBy(user.getUserId());
         int periodId = periodDAO.createDraft(p);
         if (periodId < 0) {

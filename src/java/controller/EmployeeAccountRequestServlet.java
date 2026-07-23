@@ -8,6 +8,7 @@ import dao.EmployeeDAO;
 import dao.ContractDAO;
 import dao.RoleDAO;
 import dao.UserDAO;
+import dao.WorkScheduleDAO;
 import model.Contract;
 import model.ContractDocument;
 import model.Department;
@@ -15,6 +16,7 @@ import model.Employee;
 import model.EmployeeAccountRequest;
 import model.Role;
 import model.User;
+import model.WorkSchedule;
 import service.MailService;
 import service.ContractDocumentStorage;
 import util.PasswordUtil;
@@ -69,6 +71,7 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
     private final ContractDAO contractDAO = new ContractDAO();
     private final UserDAO userDAO = new UserDAO();
     private final RoleDAO roleDAO = new RoleDAO();
+    private final WorkScheduleDAO workScheduleDAO = new WorkScheduleDAO();
     private final MailService mailService = new MailService();
     private final ContractDocumentStorage documentStorage = new ContractDocumentStorage();
     private final SecureRandom random = new SecureRandom();
@@ -99,6 +102,7 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             request.setAttribute("requestRoles", allowedRequestRoles(currentUser));
             request.setAttribute("genders", User.Gender.values());
             request.setAttribute("contractTypes", Contract.ContractType.values());
+            request.setAttribute("workSchedules", workScheduleDAO.findAllActive());
             request.setAttribute("adminScope", adminScope);
             request.setAttribute("canRequestAccount", requestScope);
             request.setAttribute("hrStaffScope", isRole(currentUser, "HR_STAFF") && requestScope);
@@ -238,7 +242,7 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
         if (isBlank(accountRequest.getContractCode()) || accountRequest.getContractType() == null
                 || accountRequest.getContractStartDate() == null
                 || accountRequest.getBasicSalary() == null
-                || accountRequest.getStandardWorkingDays() == null) {
+                || accountRequest.getWorkScheduleId() <= 0) {
             flashError(request, "This request is missing contract information. Please reject it and ask HR to resubmit.");
             response.sendRedirect(request.getContextPath() + "/employee-account-requests");
             return;
@@ -345,7 +349,8 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             catch (DateTimeParseException ignored) {}
         }
         r.setBasicSalary(parsePositiveDecimal(request.getParameter("basicSalary")));
-        r.setStandardWorkingDays(parsePositiveDecimal(request.getParameter("standardWorkingDays")));
+        Integer workScheduleId = parseIntOrNull(request.getParameter("workScheduleId"));
+        if (workScheduleId != null) r.setWorkScheduleId(workScheduleId);
         r.setContractNote(limit(trim(request.getParameter("contractNote")), 255));
         return r;
     }
@@ -402,10 +407,10 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
         if (isBlank(request.getParameter("basicSalary")) || r.getBasicSalary() == null) {
             errors.put("basicSalary", "Basic salary must be a non-negative number.");
         }
-        if (isBlank(request.getParameter("standardWorkingDays")) || r.getStandardWorkingDays() == null
-                || r.getStandardWorkingDays().signum() <= 0
-                || r.getStandardWorkingDays().compareTo(new BigDecimal("31")) > 0) {
-            errors.put("standardWorkingDays", "Standard working days must be greater than 0 and no more than 31.");
+        WorkSchedule workSchedule = r.getWorkScheduleId() <= 0
+                ? null : workScheduleDAO.findById(r.getWorkScheduleId());
+        if (workSchedule == null || !workSchedule.isActive()) {
+            errors.put("workScheduleId", "Please select an active work schedule.");
         }
 
         if (!errors.containsKey("contractStartDate") && !errors.containsKey("hireDate")
@@ -631,7 +636,7 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
     private int insertContract(Connection conn, EmployeeAccountRequest r, int employeeId,
                                int adminUserId) throws SQLException {
         String sql = "INSERT INTO contracts (employee_id, contract_code, contract_type, start_date, end_date, "
-                   + "basic_salary, standard_working_days, salary_policy, fixed_allowance_amount, "
+                   + "basic_salary, work_schedule_id, salary_policy, fixed_allowance_amount, "
                    + "is_system_contract, status, note, created_by, updated_by) "
                    + "VALUES (?, ?, ?, ?, ?, ?, ?, 'Attendance Based', 0.00, 0, 'Active', ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -642,7 +647,7 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             if (r.getContractEndDate() != null) ps.setDate(5, Date.valueOf(r.getContractEndDate()));
             else                                ps.setNull(5, Types.DATE);
             ps.setBigDecimal(6, r.getBasicSalary());
-            ps.setBigDecimal(7, r.getStandardWorkingDays());
+            ps.setInt(7, r.getWorkScheduleId());
             ps.setString(8, isBlank(r.getContractNote()) ? null : r.getContractNote());
             ps.setInt(9, adminUserId);
             ps.setInt(10, adminUserId);
@@ -855,7 +860,7 @@ public class EmployeeAccountRequestServlet extends HttpServlet {
             "fullName", "email", "phone", "gender", "dateOfBirth", "hireDate",
             "requestedRoleId", "departmentId", "address", "contractType",
             "contractStartDate", "contractEndDate", "basicSalary",
-            "standardWorkingDays", "contractNote"
+            "workScheduleId", "contractNote"
         };
         Map<String, String> values = new LinkedHashMap<>();
         for (String field : fields) {

@@ -4,12 +4,14 @@ import dao.AllowanceTypeDAO;
 import dao.ContractDocumentDAO;
 import dao.ContractDAO;
 import dao.EmployeeDAO;
+import dao.WorkScheduleDAO;
 import model.Contract;
 import model.ContractDocument;
 import model.Contract.ContractType;
 import model.Contract.Status;
 import model.Employee;
 import model.User;
+import model.WorkSchedule;
 import service.ContractDocumentStorage;
 
 import jakarta.servlet.ServletException;
@@ -40,6 +42,7 @@ public class ContractServlet extends HttpServlet {
     private final ContractDocumentDAO documentDAO = new ContractDocumentDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
     private final AllowanceTypeDAO allowanceDAO = new AllowanceTypeDAO();
+    private final WorkScheduleDAO workScheduleDAO = new WorkScheduleDAO();
     private final ContractDocumentStorage documentStorage = new ContractDocumentStorage();
 
     @Override
@@ -141,6 +144,7 @@ public class ContractServlet extends HttpServlet {
         request.setAttribute("readonly", true);
         request.setAttribute("systemContract", c.isSystemContract());
         request.setAttribute("contractTypes", ContractType.values());
+        loadWorkSchedules(request);
         loadAllowanceAttributes(request);
         request.getRequestDispatcher("/views/contract/edit-contract.jsp").forward(request, response);
     }
@@ -154,6 +158,7 @@ public class ContractServlet extends HttpServlet {
         }
         request.setAttribute("employees", employeeDAO.findAllActive());
         request.setAttribute("contractTypes", ContractType.values());
+        loadWorkSchedules(request);
         loadAllowanceAttributes(request);
         request.getRequestDispatcher("/views/contract/add-contract.jsp").forward(request, response);
     }
@@ -171,10 +176,12 @@ public class ContractServlet extends HttpServlet {
         String typeStr    = request.getParameter("contractType");
         String startStr   = trim(request.getParameter("startDate"));
         String endStr     = trim(request.getParameter("endDate"));
+        String workScheduleIdStr = trim(request.getParameter("workScheduleId"));
         String note       = trim(request.getParameter("note"));
 
         if (empIdStr == null || empIdStr.isBlank() || code.isEmpty()
-                || typeStr == null || typeStr.isBlank() || startStr.isEmpty()) {
+                || typeStr == null || typeStr.isBlank() || startStr.isEmpty()
+                || workScheduleIdStr.isEmpty()) {
             forwardAddForm(request, response, "Please fill in all required fields.");
             return;
         }
@@ -195,6 +202,12 @@ public class ContractServlet extends HttpServlet {
         try { type = ContractType.valueOf(typeStr); }
         catch (IllegalArgumentException ex) {
             forwardAddForm(request, response, "Invalid contract type.");
+            return;
+        }
+
+        WorkSchedule workSchedule = parseActiveWorkSchedule(workScheduleIdStr);
+        if (workSchedule == null) {
+            forwardAddForm(request, response, "Please select a valid work schedule.");
             return;
         }
 
@@ -231,11 +244,8 @@ public class ContractServlet extends HttpServlet {
 
         String salaryError = null;
         BigDecimal basicSalary  = parsePositiveMoney(request.getParameter("basicSalary"));
-        BigDecimal workingDays  = parsePositiveMoney(request.getParameter("standardWorkingDays"));
-        if (basicSalary == null || workingDays == null) {
-            salaryError = "Salary and working days must be valid non-negative numbers.";
-        } else if (workingDays.signum() <= 0) {
-            salaryError = "Standard working days must be greater than 0.";
+        if (basicSalary == null) {
+            salaryError = "Basic salary must be a valid non-negative number.";
         }
         if (salaryError != null) {
             forwardAddForm(request, response, salaryError);
@@ -263,7 +273,7 @@ public class ContractServlet extends HttpServlet {
         c.setStartDate(startDate);
         c.setEndDate(endDate);
         c.setBasicSalary(basicSalary);
-        c.setStandardWorkingDays(workingDays);
+        c.setWorkScheduleId(workSchedule.getWorkScheduleId());
         c.setStatus(Status.Active);
         c.setNote(note.isEmpty() ? null : note);
         c.setCreatedBy(currentUser.getUserId());
@@ -299,6 +309,7 @@ public class ContractServlet extends HttpServlet {
                 || (c.isSystemContract() && !canEditSystemContracts(request));
         request.setAttribute("contract", c);
         request.setAttribute("contractTypes", ContractType.values());
+        loadWorkSchedules(request);
         request.setAttribute("readonly", readonly);
         request.setAttribute("systemContract", c.isSystemContract());
         request.setAttribute("canEditSystemContract", c.isSystemContract() && canEditSystemContracts(request));
@@ -318,6 +329,7 @@ public class ContractServlet extends HttpServlet {
         String typeStr  = request.getParameter("contractType");
         String startStr = trim(request.getParameter("startDate"));
         String endStr   = trim(request.getParameter("endDate"));
+        String workScheduleIdStr = trim(request.getParameter("workScheduleId"));
         String note     = trim(request.getParameter("note"));
 
         if (idParam == null || idParam.isBlank()) {
@@ -350,6 +362,12 @@ public class ContractServlet extends HttpServlet {
             return;
         }
 
+        WorkSchedule workSchedule = parseActiveWorkSchedule(workScheduleIdStr);
+        if (workSchedule == null) {
+            forwardEditForm(request, response, contractId, "Please select a valid work schedule.");
+            return;
+        }
+
         if (startStr.isEmpty()) {
             forwardEditForm(request, response, contractId, "Start date is required.");
             return;
@@ -376,14 +394,9 @@ public class ContractServlet extends HttpServlet {
         }
 
         BigDecimal basicSalary    = parsePositiveMoney(request.getParameter("basicSalary"));
-        BigDecimal workingDays    = parsePositiveMoney(request.getParameter("standardWorkingDays"));
-        if (basicSalary == null || workingDays == null) {
+        if (basicSalary == null) {
             forwardEditForm(request, response, contractId,
-                    "Salary and working days must be valid non-negative numbers.");
-            return;
-        }
-        if (workingDays.signum() <= 0) {
-            forwardEditForm(request, response, contractId, "Standard working days must be greater than 0.");
+                    "Basic salary must be a valid non-negative number.");
             return;
         }
         if (note.length() > 255) {
@@ -406,7 +419,7 @@ public class ContractServlet extends HttpServlet {
         c.setStartDate(startDate);
         c.setEndDate(endDate);
         c.setBasicSalary(basicSalary);
-        c.setStandardWorkingDays(workingDays);
+        c.setWorkScheduleId(workSchedule.getWorkScheduleId());
         c.setNote(note.isEmpty() ? null : note);
         c.setUpdatedBy(currentUser.getUserId());
 
@@ -447,6 +460,7 @@ public class ContractServlet extends HttpServlet {
         request.setAttribute("error", error);
         request.setAttribute("employees", employeeDAO.findAllActive());
         request.setAttribute("contractTypes", ContractType.values());
+        loadWorkSchedules(request);
         loadAllowanceAttributes(request);
         request.getRequestDispatcher("/views/contract/add-contract.jsp").forward(request, response);
     }
@@ -466,8 +480,23 @@ public class ContractServlet extends HttpServlet {
                 && contract.isSystemContract()
                 && canEditSystemContracts(request));
         request.setAttribute("contractTypes", ContractType.values());
+        loadWorkSchedules(request);
         loadAllowanceAttributes(request);
         request.getRequestDispatcher("/views/contract/edit-contract.jsp").forward(request, response);
+    }
+
+    private void loadWorkSchedules(HttpServletRequest request) throws SQLException {
+        request.setAttribute("workSchedules", workScheduleDAO.findAllActive());
+    }
+
+    private WorkSchedule parseActiveWorkSchedule(String value) throws SQLException {
+        if (value == null || value.isBlank()) return null;
+        try {
+            WorkSchedule schedule = workScheduleDAO.findById(Integer.parseInt(value));
+            return schedule != null && schedule.isActive() ? schedule : null;
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private ContractDocument readUploadedDocument(HttpServletRequest request, boolean required,

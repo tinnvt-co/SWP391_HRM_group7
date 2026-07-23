@@ -20,13 +20,14 @@ public class AttendanceReportDAO {
         String sql =
             "INSERT INTO attendance_reports "
           + "(employee_id, manager_id, department_id, report_month, report_year, "
-          + " standard_working_days, actual_working_days, paid_leave_days, "
+          + " standard_working_days, expected_working_days, actual_working_days, paid_leave_days, "
           + " unpaid_leave_days, maternity_leave_days, overtime_hours, late_penalty_amount, "
           + " status, submitted_at) "
-          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Submitted To HR Staff', NOW()) "
+          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Submitted To HR Staff', NOW()) "
           + "ON DUPLICATE KEY UPDATE "
           + " manager_id=VALUES(manager_id), department_id=VALUES(department_id), "
           + " standard_working_days=VALUES(standard_working_days), "
+          + " expected_working_days=VALUES(expected_working_days), "
           + " actual_working_days=VALUES(actual_working_days), "
           + " paid_leave_days=VALUES(paid_leave_days), "
           + " unpaid_leave_days=VALUES(unpaid_leave_days), "
@@ -45,13 +46,14 @@ public class AttendanceReportDAO {
             ps.setInt(3, r.getDepartmentId());
             ps.setInt(4, r.getReportMonth());
             ps.setInt(5, r.getReportYear());
-            ps.setBigDecimal(6, nz(r.getStandardWorkingDays(), new BigDecimal("26")));
-            ps.setBigDecimal(7, nz(r.getActualWorkingDays(), BigDecimal.ZERO));
-            ps.setBigDecimal(8, nz(r.getPaidLeaveDays(), BigDecimal.ZERO));
-            ps.setBigDecimal(9, nz(r.getUnpaidLeaveDays(), BigDecimal.ZERO));
-            ps.setBigDecimal(10, nz(r.getMaternityLeaveDays(), BigDecimal.ZERO));
-            ps.setBigDecimal(11, nz(r.getOvertimeHours(), BigDecimal.ZERO));
-            ps.setBigDecimal(12, nz(r.getLatePenaltyAmount(), BigDecimal.ZERO));
+            ps.setBigDecimal(6, nz(r.getStandardWorkingDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(7, nz(r.getExpectedWorkingDays(), r.getStandardWorkingDays()));
+            ps.setBigDecimal(8, nz(r.getActualWorkingDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(9, nz(r.getPaidLeaveDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(10, nz(r.getUnpaidLeaveDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(11, nz(r.getMaternityLeaveDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(12, nz(r.getOvertimeHours(), BigDecimal.ZERO));
+            ps.setBigDecimal(13, nz(r.getLatePenaltyAmount(), BigDecimal.ZERO));
             return ps.executeUpdate() > 0;
         } finally {
             close(conn, ps, null);
@@ -62,14 +64,15 @@ public class AttendanceReportDAO {
         String sql =
             "INSERT INTO attendance_reports "
           + "(employee_id, manager_id, department_id, report_month, report_year, "
-          + " standard_working_days, actual_working_days, paid_leave_days, "
+          + " standard_working_days, expected_working_days, actual_working_days, paid_leave_days, "
           + " unpaid_leave_days, maternity_leave_days, overtime_hours, late_penalty_amount, "
           + " status, submitted_at) "
-          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending HR Manager Approval', NOW()) "
+          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending HR Manager Approval', NOW()) "
           + "ON DUPLICATE KEY UPDATE "
           + " manager_id=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN manager_id ELSE VALUES(manager_id) END, "
           + " department_id=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN department_id ELSE VALUES(department_id) END, "
           + " standard_working_days=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN standard_working_days ELSE VALUES(standard_working_days) END, "
+          + " expected_working_days=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN expected_working_days ELSE VALUES(expected_working_days) END, "
           + " actual_working_days=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN actual_working_days ELSE VALUES(actual_working_days) END, "
           + " paid_leave_days=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN paid_leave_days ELSE VALUES(paid_leave_days) END, "
           + " unpaid_leave_days=CASE WHEN attendance_reports.status='Approved By HR Manager' THEN unpaid_leave_days ELSE VALUES(unpaid_leave_days) END, "
@@ -92,13 +95,14 @@ public class AttendanceReportDAO {
             ps.setInt(3, r.getDepartmentId());
             ps.setInt(4, r.getReportMonth());
             ps.setInt(5, r.getReportYear());
-            ps.setBigDecimal(6, nz(r.getStandardWorkingDays(), new BigDecimal("26")));
-            ps.setBigDecimal(7, nz(r.getActualWorkingDays(), BigDecimal.ZERO));
-            ps.setBigDecimal(8, nz(r.getPaidLeaveDays(), BigDecimal.ZERO));
-            ps.setBigDecimal(9, nz(r.getUnpaidLeaveDays(), BigDecimal.ZERO));
-            ps.setBigDecimal(10, nz(r.getMaternityLeaveDays(), BigDecimal.ZERO));
-            ps.setBigDecimal(11, nz(r.getOvertimeHours(), BigDecimal.ZERO));
-            ps.setBigDecimal(12, nz(r.getLatePenaltyAmount(), BigDecimal.ZERO));
+            ps.setBigDecimal(6, nz(r.getStandardWorkingDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(7, nz(r.getExpectedWorkingDays(), r.getStandardWorkingDays()));
+            ps.setBigDecimal(8, nz(r.getActualWorkingDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(9, nz(r.getPaidLeaveDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(10, nz(r.getUnpaidLeaveDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(11, nz(r.getMaternityLeaveDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(12, nz(r.getOvertimeHours(), BigDecimal.ZERO));
+            ps.setBigDecimal(13, nz(r.getLatePenaltyAmount(), BigDecimal.ZERO));
             return ps.executeUpdate() > 0;
         } finally {
             close(conn, ps, null);
@@ -256,14 +260,15 @@ public class AttendanceReportDAO {
         String sql =
             "INSERT INTO attendance_reports "
           + "(employee_id, manager_id, department_id, report_month, report_year, "
-          + " standard_working_days, actual_working_days, paid_leave_days, "
+          + " standard_working_days, expected_working_days, actual_working_days, paid_leave_days, "
           + " unpaid_leave_days, maternity_leave_days, overtime_hours, late_penalty_amount, "
           + " status, submitted_at, reviewed_by, reviewed_at, hr_note) "
-          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
           + "        'Approved By HR Manager', NOW(), ?, NOW(), ?) "
           + "ON DUPLICATE KEY UPDATE "
           + " manager_id=VALUES(manager_id), department_id=VALUES(department_id), "
           + " standard_working_days=VALUES(standard_working_days), "
+          + " expected_working_days=VALUES(expected_working_days), "
           + " actual_working_days=VALUES(actual_working_days), "
           + " paid_leave_days=VALUES(paid_leave_days), "
           + " unpaid_leave_days=VALUES(unpaid_leave_days), "
@@ -283,16 +288,17 @@ public class AttendanceReportDAO {
             ps.setInt(3, r.getDepartmentId());
             ps.setInt(4, r.getReportMonth());
             ps.setInt(5, r.getReportYear());
-            ps.setBigDecimal(6, nz(r.getStandardWorkingDays(), new BigDecimal("26")));
-            ps.setBigDecimal(7, nz(r.getActualWorkingDays(), BigDecimal.ZERO));
-            ps.setBigDecimal(8, nz(r.getPaidLeaveDays(), BigDecimal.ZERO));
-            ps.setBigDecimal(9, nz(r.getUnpaidLeaveDays(), BigDecimal.ZERO));
-            ps.setBigDecimal(10, nz(r.getMaternityLeaveDays(), BigDecimal.ZERO));
-            ps.setBigDecimal(11, nz(r.getOvertimeHours(), BigDecimal.ZERO));
-            ps.setBigDecimal(12, nz(r.getLatePenaltyAmount(), BigDecimal.ZERO));
-            if (reviewedBy == null) ps.setNull(13, Types.INTEGER);
-            else ps.setInt(13, reviewedBy);
-            ps.setString(14, reviewNote);
+            ps.setBigDecimal(6, nz(r.getStandardWorkingDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(7, nz(r.getExpectedWorkingDays(), r.getStandardWorkingDays()));
+            ps.setBigDecimal(8, nz(r.getActualWorkingDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(9, nz(r.getPaidLeaveDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(10, nz(r.getUnpaidLeaveDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(11, nz(r.getMaternityLeaveDays(), BigDecimal.ZERO));
+            ps.setBigDecimal(12, nz(r.getOvertimeHours(), BigDecimal.ZERO));
+            ps.setBigDecimal(13, nz(r.getLatePenaltyAmount(), BigDecimal.ZERO));
+            if (reviewedBy == null) ps.setNull(14, Types.INTEGER);
+            else ps.setInt(14, reviewedBy);
+            ps.setString(15, reviewNote);
             return ps.executeUpdate() > 0;
         } finally {
             close(conn, ps, null);
@@ -679,6 +685,7 @@ public class AttendanceReportDAO {
         r.setReportMonth(rs.getInt("report_month"));
         r.setReportYear(rs.getInt("report_year"));
         r.setStandardWorkingDays(rs.getBigDecimal("standard_working_days"));
+        r.setExpectedWorkingDays(rs.getBigDecimal("expected_working_days"));
         r.setActualWorkingDays(rs.getBigDecimal("actual_working_days"));
         r.setPaidLeaveDays(rs.getBigDecimal("paid_leave_days"));
         r.setUnpaidLeaveDays(rs.getBigDecimal("unpaid_leave_days"));

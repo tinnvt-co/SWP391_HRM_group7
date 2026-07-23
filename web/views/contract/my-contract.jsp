@@ -166,8 +166,15 @@
                                     <div class="col-7">${not empty ct.endDate ? ct.endDate : 'Indefinite'}</div>
                                 </div>
                                 <div class="info-row row align-items-center">
-                                    <div class="col-5 text-muted small">Standard Working Days</div>
-                                    <div class="col-7">${ct.standardWorkingDays}</div>
+                                    <div class="col-5 text-muted small">Work Schedule</div>
+                                    <div class="col-7">${ct.workSchedule.scheduleName}</div>
+                                </div>
+                                <div class="info-row row align-items-center">
+                                    <div class="col-5 text-muted small">Working Hours</div>
+                                    <div class="col-7">
+                                        ${ct.workSchedule.checkInTime} - ${ct.workSchedule.checkOutTime}
+                                        (${ct.workSchedule.dailyWorkingHours} hours/day)
+                                    </div>
                                 </div>
                                 <div class="info-row row align-items-center">
                                     <div class="col-5 text-muted small">Salary Policy</div>

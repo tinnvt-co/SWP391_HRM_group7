@@ -16,6 +16,7 @@ import model.LeaveRequest;
 import model.PayrollTaskSummary;
 import model.User;
 import service.AttendanceAutoConfirmService;
+import service.WorkingCalendarService;
 import service.AttendanceImportService;
 import util.XlsxReader;
 
@@ -56,6 +57,7 @@ public class AttendanceServlet extends HttpServlet {
     private final LeaveRequestDAO leaveRequestDAO = new LeaveRequestDAO();
     private final PayrollPeriodDAO payrollPeriodDAO = new PayrollPeriodDAO();
     private final AttendanceAutoConfirmService autoConfirmService = new AttendanceAutoConfirmService();
+    private final WorkingCalendarService workingCalendarService = new WorkingCalendarService();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -733,18 +735,8 @@ public class AttendanceServlet extends HttpServlet {
 
         int reports = 0;
         for (AttendanceRecordDAO.MonthlySummary s : summaries) {
-            AttendanceReport rpt = new AttendanceReport();
-            rpt.setEmployeeId(s.employeeId);
-            rpt.setManagerId(mgrId);
-            rpt.setDepartmentId(s.departmentId);
-            rpt.setReportMonth(month.getMonthValue());
-            rpt.setReportYear(month.getYear());
-            rpt.setActualWorkingDays(java.math.BigDecimal.valueOf(s.actualWorkingDays));
-            rpt.setPaidLeaveDays(java.math.BigDecimal.valueOf(s.paidLeaveDays));
-            rpt.setUnpaidLeaveDays(java.math.BigDecimal.valueOf(s.unpaidLeaveDays));
-            rpt.setMaternityLeaveDays(java.math.BigDecimal.valueOf(s.maternityLeaveDays));
-            rpt.setOvertimeHours(s.overtimeHours);
-            rpt.setLatePenaltyAmount(s.latePenaltyAmount);
+            AttendanceReport rpt = buildReport(
+                    s, mgrId, month.getYear(), month.getMonthValue());
             if (reportDAO.upsertSubmitted(rpt)) reports++;
         }
 
@@ -824,13 +816,18 @@ public class AttendanceServlet extends HttpServlet {
     }
 
     private AttendanceReport buildReport(AttendanceRecordDAO.MonthlySummary summary,
-                                         int managerUserId, int year, int month) {
+                                         int managerUserId, int year, int month)
+            throws SQLException {
         AttendanceReport report = new AttendanceReport();
         report.setEmployeeId(summary.employeeId);
         report.setManagerId(managerUserId);
         report.setDepartmentId(summary.departmentId);
         report.setReportMonth(month);
         report.setReportYear(year);
+        WorkingCalendarService.PeriodDays periodDays =
+                workingCalendarService.periodDaysForEmployee(summary.employeeId, year, month);
+        report.setStandardWorkingDays(periodDays.standardWorkingDays);
+        report.setExpectedWorkingDays(periodDays.expectedWorkingDays);
         report.setActualWorkingDays(BigDecimal.valueOf(summary.actualWorkingDays));
         report.setPaidLeaveDays(BigDecimal.valueOf(summary.paidLeaveDays));
         report.setUnpaidLeaveDays(BigDecimal.valueOf(summary.unpaidLeaveDays));

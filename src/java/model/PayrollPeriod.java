@@ -1,5 +1,6 @@
 package model;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -38,6 +39,7 @@ public class PayrollPeriod {
     private int payrollMonth;
     private int payrollYear;
     private int departmentId;
+    private BigDecimal standardWorkingDays;
     private LocalDate paymentDate;
     private Status status;
     private Integer createdBy;
@@ -69,6 +71,9 @@ public class PayrollPeriod {
 
     public int getDepartmentId()                    { return departmentId; }
     public void setDepartmentId(int v)              { this.departmentId = v; }
+
+    public BigDecimal getStandardWorkingDays()      { return standardWorkingDays; }
+    public void setStandardWorkingDays(BigDecimal v){ this.standardWorkingDays = v; }
 
     public LocalDate getPaymentDate()               { return paymentDate; }
     public void setPaymentDate(LocalDate v)         { this.paymentDate = v; }

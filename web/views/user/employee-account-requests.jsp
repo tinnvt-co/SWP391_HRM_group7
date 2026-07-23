@@ -175,10 +175,20 @@
                         <div class="invalid-feedback">${accountRequestFieldErrors.basicSalary}</div>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label small text-muted mb-1">Standard Working Days</label>
-                        <input type="number" name="standardWorkingDays" class="form-control ${not empty accountRequestFieldErrors.standardWorkingDays ? 'is-invalid' : ''}" min="1" max="31" step="0.5"
-                               value="${accountRequestForm ne null ? accountRequestForm.standardWorkingDays : '26'}" required>
-                        <div class="invalid-feedback">${accountRequestFieldErrors.standardWorkingDays}</div>
+                        <label class="form-label small text-muted mb-1">Work Schedule</label>
+                        <select name="workScheduleId"
+                                class="form-select ${not empty accountRequestFieldErrors.workScheduleId ? 'is-invalid' : ''}"
+                                required>
+                            <option value="">Select a schedule</option>
+                            <c:forEach var="schedule" items="${workSchedules}">
+                                <option value="${schedule.workScheduleId}"
+                                    ${(accountRequestForm ne null and accountRequestForm.workScheduleId == schedule.workScheduleId)
+                                       or (accountRequestForm eq null and schedule.defaultSchedule) ? 'selected' : ''}>
+                                    ${schedule.scheduleName}
+                                </option>
+                            </c:forEach>
+                        </select>
+                        <div class="invalid-feedback">${accountRequestFieldErrors.workScheduleId}</div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small text-muted mb-1">Contract Note (Optional)</label>

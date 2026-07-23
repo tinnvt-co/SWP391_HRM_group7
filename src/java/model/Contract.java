@@ -52,6 +52,8 @@ public class Contract {
     private LocalDate endDate;
     private BigDecimal basicSalary;
     private BigDecimal standardWorkingDays;
+    private int workScheduleId;
+    private WorkSchedule workSchedule;
     private SalaryPolicy salaryPolicy = SalaryPolicy.AttendanceBased;
     private BigDecimal fixedAllowanceAmount;
     private boolean systemContract;
@@ -92,6 +94,12 @@ public class Contract {
 
     public BigDecimal getStandardWorkingDays()              { return standardWorkingDays; }
     public void setStandardWorkingDays(BigDecimal d)        { this.standardWorkingDays = d; }
+
+    public int getWorkScheduleId()                          { return workScheduleId; }
+    public void setWorkScheduleId(int v)                    { this.workScheduleId = v; }
+
+    public WorkSchedule getWorkSchedule()                   { return workSchedule; }
+    public void setWorkSchedule(WorkSchedule v)             { this.workSchedule = v; }
 
     public SalaryPolicy getSalaryPolicy()                   { return salaryPolicy; }
     public void setSalaryPolicy(SalaryPolicy salaryPolicy)  { this.salaryPolicy = salaryPolicy; }
